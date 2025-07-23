@@ -1,0 +1,49 @@
+#!/bin/bash
+set -e
+
+echo "[STEP 1] Copy TIRPC headers to sysroot..."
+mkdir -p /home/lind/lind-wasm/src/glibc/sysroot/include/wasm32-wasi/rpc
+sudo cp -r /usr/include/tirpc/rpc/* /home/lind/lind-wasm/src/glibc/sysroot/include/wasm32-wasi/rpc/
+sudo cp /usr/include/tirpc/netconfig.h /home/lind/lind-wasm/src/glibc/sysroot/include/wasm32-wasi/
+
+echo "[STEP 2] Ensure output directory is owned by current user..."
+sudo mkdir -p /home/lind/lind-wasm/src/glibc/sysroot/lib/wasm32-wasi/merge_tmp
+sudo chown -R "$(whoami)" /home/lind/lind-wasm/src/glibc/sysroot/lib/wasm32-wasi/merge_tmp
+
+echo "[STEP 3] Compile lib_*.c and getopt.c to wasm .o files..."
+SRC_DIR="/home/lind/lind-wasm/lind-wasm-apps/lmbench/src"
+OUT_DIR="/home/lind/lind-wasm/src/glibc/sysroot/lib/wasm32-wasi/merge_tmp"
+CLANG="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/clang"
+SYSROOT="/home/lind/lind-wasm/src/glibc/sysroot"
+
+for f in "$SRC_DIR"/lib_*.c "$SRC_DIR"/getopt.c; do
+    fname=$(basename "$f" .c)
+    echo "Compiling $fname.c ..."
+    if [[ "$fname" == "lib_sched" ]]; then
+        "$CLANG" --target=wasm32-unknown-wasi --sysroot="$SYSROOT" \
+                -O2 -g -Wno-return-type -c "$f" -o "$OUT_DIR/$fname.o"
+    else
+        "$CLANG" --target=wasm32-unknown-wasi --sysroot="$SYSROOT" \
+                -O2 -g -c "$f" -o "$OUT_DIR/$fname.o"
+    fi
+done
+
+echo "[STEP 4] Extract original libc.a objects into merge_tmp..."
+LLVM_AR="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/llvm-ar"
+LIBC_A="$SYSROOT/lib/wasm32-wasi/libc.a"
+
+cd "$OUT_DIR"
+"$LLVM_AR" x "$LIBC_A"
+
+echo "[STEP 5] Delete current libc.a..."
+sudo rm -f "$LIBC_A"
+echo "Deleted libc.a"
+
+echo "[STEP 6] Rebuild libc.a from all .o files..."
+sudo "$LLVM_AR" rcs "$LIBC_A" "$OUT_DIR"/*.o
+
+echo "[STEP 7] Run ranlib..."
+sudo /home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/llvm-ranlib "$LIBC_A"
+
+echo "[DONE] libc.a rebuilt with merged .o files."
+
