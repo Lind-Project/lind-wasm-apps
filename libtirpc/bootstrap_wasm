@@ -1,0 +1,39 @@
+#!/bin/bash
+set -e
+
+if command -v apt >/dev/null 2>&1; then
+    echo "[INFO] Installing autoconf, automake, libtool..."
+    apt update
+    apt install -y autoconf automake libtool
+fi
+
+if [ -f ./autogen.sh ]; then
+    chmod +x autogen.sh
+    ./autogen.sh
+fi
+
+export AR=/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/llvm-ar
+export CC="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/clang --target=wasm32-unknown-wasi"
+export CXX="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/clang++ --target=wasm32-unknown-wasi"
+export LD=/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/wasm-ld
+
+export SYSROOT="/home/lind/lind-wasm/src/glibc/sysroot"
+export CFLAGS="--sysroot=$SYSROOT -g -O2"
+export CXXFLAGS="--sysroot=$SYSROOT -g -O2"
+export LDFLAGS="--sysroot=$SYSROOT -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low"
+
+./configure --host=wasm32-unknown-wasi --disable-gssapi \
+            --disable-shared \
+            --enable-static \
+            --with-pic \
+            --sysconfdir=/etc \
+            ac_cv_func_malloc_0_nonnull=yes \
+            ac_cv_func_memset=yes \
+            ac_cv_func_strchr=yes
+
+make
+
+echo "[INFO] Moving .o files to sysroot merge_tmp..."
+
+mkdir -p /home/lind/lind-wasm/src/glibc/sysroot/lib/wasm32-wasi/merge_tmp
+find src -name '*.o' -exec mv {} /home/lind/lind-wasm/src/glibc/sysroot/lib/wasm32-wasi/merge_tmp/ \;
