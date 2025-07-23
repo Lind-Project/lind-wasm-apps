@@ -49,8 +49,8 @@ done
 
 total_count=$(echo "$cfiles" | wc -l)
 echo ""
-echo "[📊] total number: $total_count"
-echo "[❌] compile error number: $fail_count"
-echo "[✓] all the compiled file in: $OUT_DIR"
+echo "total number: $total_count"
+echo "compile error number: $fail_count"
+echo "all the compiled file in: $OUT_DIR"
 
 
