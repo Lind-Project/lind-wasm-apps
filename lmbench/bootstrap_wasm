@@ -1,0 +1,58 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "SCRIPT_DIR is: $SCRIPT_DIR"
+LIND_ROOT="$(dirname "$SCRIPT_DIR/../../../")"
+echo "LIND_ROOT is: $LIND_ROOT"
+APPS_ROOT="$LIND_ROOT/lind-wasm-apps/lmbench"
+SRC_DIR="$APPS_ROOT/src"
+SYSROOT="$APPS_ROOT/sysroot_overlay"
+OUT_DIR="$SYSROOT/lib/wasm32-wasi/merge_tmp"
+
+CLANG="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/clang"
+LLVM_AR="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/llvm-ar"
+LLVM_RANLIB="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/llvm-ranlib"
+LIBC_A="$SYSROOT/lib/wasm32-wasi/libc.a"
+GLIBC_LIBC="/home/lind/lind-wasm/src/glibc/sysroot/lib/wasm32-wasi/libc.a"
+
+echo "[STEP 1] Copy TIRPC headers to sysroot..."
+# sudo mkdir -p "$SYSROOT/include/wasm32-wasi/rpc"
+# sudo cp -r /usr/include/tirpc/rpc/* "$SYSROOT/include/wasm32-wasi/rpc"
+# sudo cp -r /usr/include/rpc/netdb.h "$SYSROOT/include/wasm32-wasi/rpc"
+# sudo cp /usr/include/tirpc/netconfig.h "$SYSROOT/include/wasm32-wasi/"
+
+sudo mkdir -p "$SYSROOT/include/wasm32-wasi/rpc"
+sudo ln -srf /usr/include/tirpc/rpc/* "$SYSROOT/include/wasm32-wasi/rpc/"
+[ -f /usr/include/rpc/netdb.h ] && sudo ln -srf /usr/include/rpc/netdb.h "$SYSROOT/include/wasm32-wasi/rpc/"
+[ -f /usr/include/tirpc/netconfig.h ] && sudo ln -srf /usr/include/tirpc/netconfig.h "$SYSROOT/include/wasm32-wasi/"
+
+
+echo "[STEP 2] Ensure output directory is owned by current user..."
+sudo mkdir -p "$OUT_DIR"
+sudo chown -R "$(whoami)" "$OUT_DIR"
+
+echo "[STEP 3] Compile lib_*.c and getopt.c to wasm .o files..."
+for f in "$SRC_DIR"/lib_*.c "$SRC_DIR"/getopt.c; do
+    fname=$(basename "$f" .c)
+    echo "Compiling $fname.c ..."
+    if [[ "$fname" == "lib_sched" ]]; then
+        "$CLANG" --target=wasm32-unknown-wasi --sysroot="$SYSROOT" \
+                -O2 -g -Wno-return-type -c "$f" -o "$OUT_DIR/$fname.o"
+    else
+        "$CLANG" --target=wasm32-unknown-wasi --sysroot="$SYSROOT" \
+                -O2 -g -c "$f" -o "$OUT_DIR/$fname.o"
+    fi
+done
+
+echo "[STEP 4] Extract original libc.a objects into merge_tmp..."
+cd "$OUT_DIR"
+"$LLVM_AR" x "$GLIBC_LIBC"
+
+echo "[STEP 5] Rebuild libc.a from all .o files..."
+sudo "$LLVM_AR" rcs "$LIBC_A" "$OUT_DIR"/*.o
+
+echo "[STEP 6] Run ranlib..."
+sudo "$LLVM_RANLIB" "$LIBC_A"
+
+echo "[DONE] libc.a rebuilt with merged .o files."

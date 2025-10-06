@@ -1,26 +1,39 @@
 #!/bin/bash
 set -e
 
-if command -v apt >/dev/null 2>&1; then
-    echo "[INFO] Installing autoconf, automake, libtool..."
-    apt update
-    apt install -y autoconf automake libtool
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIND_ROOT="$(realpath "$SCRIPT_DIR/../..")"
+APPS_ROOT="$LIND_ROOT/lind-wasm-apps/lmbench"
+SYSROOT="$LIND_ROOT/src/glibc/sysroot"
+OUT_DIR="$APPS_ROOT/sysroot_overlay/lib/wasm32-wasi/merge_tmp"
 
-if [ -f ./autogen.sh ]; then
-    chmod +x autogen.sh
-    ./autogen.sh
-fi
+CLANG_LLVM="$LIND_ROOT/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04"
+CLANG="$CLANG_LLVM/bin/clang"
+CLANGXX="$CLANG_LLVM/bin/clang++"
+LLVM_AR="$CLANG_LLVM/bin/llvm-ar"
+LLVM_LD="$CLANG_LLVM/bin/wasm-ld"
 
-export AR=/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/llvm-ar
-export CC="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/clang --target=wasm32-unknown-wasi"
-export CXX="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/clang++ --target=wasm32-unknown-wasi"
-export LD=/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/wasm-ld
-
-export SYSROOT="/home/lind/lind-wasm/src/glibc/sysroot"
+export AR="$LLVM_AR"
+export CC="$CLANG --target=wasm32-unknown-wasi"
+export CXX="$CLANGXX --target=wasm32-unknown-wasi"
+export LD="$LLVM_LD"
 export CFLAGS="--sysroot=$SYSROOT -g -O2"
 export CXXFLAGS="--sysroot=$SYSROOT -g -O2"
 export LDFLAGS="--sysroot=$SYSROOT -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low"
+
+echo "[INFO] Fixing permissions for working directory..."
+sudo chown -R "$(whoami)" .
+
+if command -v apt >/dev/null 2>&1; then
+    echo "[INFO] Installing dependencies..."
+    sudo apt update
+    sudo apt install -y autoconf automake libtool
+fi
+
+if [ -f ./autogen.sh ]; then
+    chmod +x ./autogen.sh
+    ./autogen.sh
+fi
 
 ./configure --host=wasm32-unknown-wasi --disable-gssapi \
             --disable-shared \
@@ -33,7 +46,7 @@ export LDFLAGS="--sysroot=$SYSROOT -Wl,--import-memory,--export-memory,--max-mem
 
 make
 
-echo "[INFO] Moving .o files to sysroot merge_tmp..."
+sudo mkdir -p "$OUT_DIR"
+find src -name '*.o' -exec mv {} "$OUT_DIR/" \;
 
-mkdir -p /home/lind/lind-wasm/src/glibc/sysroot/lib/wasm32-wasi/merge_tmp
-find src -name '*.o' -exec mv {} /home/lind/lind-wasm/src/glibc/sysroot/lib/wasm32-wasi/merge_tmp/ \;
+echo "[DONE] All object files moved to merge_tmp"
