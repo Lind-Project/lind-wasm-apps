@@ -1,73 +1,207 @@
-# Makefile for top level of lmbench
-# $Id: Makefile 1.17 00/05/31 16:16:15+03:00 staelin@hpli8.hpli.hpl.hp.com $
+# lmbench — Lind-WASM build-contract Makefile
+# Contract:
+#   - make all        -> build overlay + link wasm (requires SYSROOT_FINAL)
+#   - make clean      -> remove intermediates (keep overlay)
+#   - make distclean  -> remove everything incl. overlay
 
-# Possible things to $(MAKE):
-#
-# build		(default) go to the source directory and build the benchmark
-# results	go to the source directory and build and run the benchmark
-# rerun		run the benchmark again
-# see		see the results that came with this release
-#		Go to the results directory and read the Makefile.
-# doc.lpr	print the documentation
-# doc.x		preview the documentation (needs X, groff, pic, etc)
-# clean		go to the subdirs and $(MAKE) clean
-# get		$(MAKE) sure all files are checked out
-# shar		build a shippable shar archive
+SHELL := /bin/sh
 
-SHELL=/bin/sh
+# --- App layout ---
+APP         ?= lmbench
+SRC_DIR     ?= src
+APP_INCLUDE ?= $(SRC_DIR)
 
-build: 
-	cd src && $(MAKE)
+BUILD_DIR      := build
+SHIM_DIR       := $(BUILD_DIR)/wasi_shims
+OVERLAY_DIR    := sysroot_overlay
+OVERLAY_INC    := $(OVERLAY_DIR)/usr/include
+OVERLAY_LIB    := $(OVERLAY_DIR)/usr/lib
+OUT_DIR        := out
 
-results: FRC
-	cd src && $(MAKE) results
+# --- Toolchain ---
+LLVM_BIN    ?= $(abspath ../../clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin)
+CC          ?= $(LLVM_BIN)/clang
+AR          ?= $(LLVM_BIN)/llvm-ar
+RANLIB      ?= $(LLVM_BIN)/llvm-ranlib
+WASM_TARGET ?= wasm32-wasi
 
-rerun: 
-	cd src && $(MAKE) rerun
+ifeq ($(origin CC), default)
+  CC := /usr/local/bin/clang
+endif
+ifeq ($(origin AR), default)
+  AR := $(shell command -v llvm-ar || echo ar)
+endif
+ifeq ($(origin RANLIB), default)
+  RANLIB := $(shell command -v llvm-ranlib || echo ranlib)
+endif
+CLANG_OK := $(shell $(CC) --version 2>/dev/null | head -n1 | grep -i clang >/dev/null && echo yes || echo no)
+ifeq ($(CLANG_OK),no)
+  $(error CC=$(CC) is not clang; set CC=/usr/local/bin/clang or LLVM_BIN=<path>/bin)
+endif
 
-see:
-	cd results && $(MAKE) summary percent 2>/dev/null | more
+# --- Sysroots ---
+BASE_SYSROOT   ?= $(abspath ../../src/glibc/sysroot)
+SYSROOT_FINAL  ?=
 
-doc.lpr:
-	cd doc && $(MAKE) PS && lpr *.PS
+SYSROOT_ASSERT_1 := $(BASE_SYSROOT)/include/assert.h
+SYSROOT_ASSERT_2 := $(BASE_SYSROOT)/include/wasm32-wasi/assert.h
+ifeq ($(or $(wildcard $(SYSROOT_ASSERT_1)),$(wildcard $(SYSROOT_ASSERT_2))),)
+  $(error Missing libc headers: neither $(SYSROOT_ASSERT_1) nor $(SYSROOT_ASSERT_2) exists. Set BASE_SYSROOT correctly.)
+endif
 
-doc.x:
-	cd doc && $(MAKE) x
+# --- Flags ---
+COMMON_CFLAGS  := -O2 -g --target=$(WASM_TARGET) --sysroot=$(BASE_SYSROOT) -fvisibility=hidden -Wno-unused-result
+COMMON_INC     := -I$(APP_INCLUDE) \
+                  -isystem $(BASE_SYSROOT)/include \
+                  -isystem $(BASE_SYSROOT)/include/wasm32-wasi \
+                  -I$(SHIM_DIR)
+# force-include compat before system headers
+FORCE_INCLUDE  := -include $(SHIM_DIR)/wasi_compat.h
+COMMON_LDFLAGS := --target=$(WASM_TARGET) --sysroot=$(SYSROOT_FINAL) \
+                  -L$(SYSROOT_FINAL)/lib/wasm32-wasi -L$(BASE_SYSROOT)/lib/wasm32-wasi
 
-clobber clean: 
-	for i in doc src results scripts; do \
-		echo ===== $$i =====; \
-		(cd $$i && $(MAKE) clean); \
+# --- Overlay lib (exported) ---
+LIB_SRCS := lib_timing.c lib_mem.c lib_stats.c lib_debug.c getopt.c lib_sched.c
+LIB_OBJS := $(patsubst %.c,$(BUILD_DIR)/lib/%.o,$(LIB_SRCS))
+STATIC_LIB := $(OVERLAY_LIB)/lib$(APP).a
+
+EXPORTED_HEADERS := bench.h lib_debug.h names.h stats.h timing.h version.h
+
+# --- WASI-safe subset of benchmarks ---
+BINS := hello bw_mem memsize mhz tlb stream
+
+BIN_SRCS_hello    := hello.c
+BIN_SRCS_bw_mem   := bw_mem.c
+BIN_SRCS_memsize  := memsize.c
+BIN_SRCS_mhz      := mhz.c timing_o.c loop_o.c
+BIN_SRCS_tlb      := tlb.c
+BIN_SRCS_stream   := stream.c
+
+# --- Shim headers to satisfy bench.h on WASI (no-op stubs) ---
+SHIM_HEADERS := \
+  $(SHIM_DIR)/sys/socket.h \
+  $(SHIM_DIR)/sys/un.h \
+  $(SHIM_DIR)/sys/resource.h \
+  $(SHIM_DIR)/sys/wait.h \
+  $(SHIM_DIR)/rpc/rpc.h \
+  $(SHIM_DIR)/rpc/types.h \
+  $(SHIM_DIR)/rpc/xdr.h \
+  $(SHIM_DIR)/netinet/in.h \
+  $(SHIM_DIR)/arpa/inet.h \
+  $(SHIM_DIR)/wasi_compat.h \
+  $(SHIM_DIR)/lib_sched_compat.h
+
+# parent dirs
+$(SHIM_DIR)/%:
+	mkdir -p $@
+
+define WRITE_EMPTY
+	@mkdir -p $(dir $@) && printf "%s\n" "/* WASI shim: $@ (no-op) */" > $@
+endef
+
+# sys/*
+$(SHIM_DIR)/sys/socket.h:   | $(SHIM_DIR)/sys ; $(WRITE_EMPTY)
+$(SHIM_DIR)/sys/un.h:       | $(SHIM_DIR)/sys ; $(WRITE_EMPTY)
+$(SHIM_DIR)/sys/resource.h: | $(SHIM_DIR)/sys ; $(WRITE_EMPTY)
+$(SHIM_DIR)/sys/wait.h:     | $(SHIM_DIR)/sys ; $(WRITE_EMPTY)
+
+# rpc/*
+$(SHIM_DIR)/rpc/rpc.h:      | $(SHIM_DIR)/rpc ; $(WRITE_EMPTY)
+$(SHIM_DIR)/rpc/types.h:    | $(SHIM_DIR)/rpc ; $(WRITE_EMPTY)
+$(SHIM_DIR)/rpc/xdr.h:      | $(SHIM_DIR)/rpc ; $(WRITE_EMPTY)
+
+# net headers occasionally pulled by rpc/socket code paths
+$(SHIM_DIR)/netinet/in.h:   | $(SHIM_DIR)/netinet ; $(WRITE_EMPTY)
+$(SHIM_DIR)/arpa/inet.h:    | $(SHIM_DIR)/arpa ; $(WRITE_EMPTY)
+
+# compat pre-include: define missing types & stub functions used by lmbench
+$(SHIM_DIR)/wasi_compat.h: | $(SHIM_DIR)
+	@mkdir -p $(SHIM_DIR)
+	@{ \
+	  echo "/* Autogenerated WASI compatibility shims for lmbench */"; \
+	  echo "#ifndef LMBENCH_WASI_COMPAT_H"; \
+	  echo "#define LMBENCH_WASI_COMPAT_H"; \
+	  echo ""; \
+	  echo "typedef unsigned short sa_family_t;"; \
+	  echo "typedef unsigned int   socklen_t;"; \
+	  echo "typedef int            pid_t;"; \
+	  echo ""; \
+	  echo "static inline int wait(int *status) { (void)status; return -1; }"; \
+	  echo "static inline int waitpid(pid_t pid, void *status, int options) { (void)pid; (void)status; (void)options; return -1; }"; \
+	  echo ""; \
+	  echo "#endif /* LMBENCH_WASI_COMPAT_H */"; \
+	} > $@
+
+# lib_sched.c needs <string.h> and a relaxed return diagnostic
+$(SHIM_DIR)/lib_sched_compat.h: | $(SHIM_DIR)
+	@mkdir -p $(SHIM_DIR)
+	@{ \
+	  echo "/* Autogenerated shim for lib_sched.c */"; \
+	  echo "#include <string.h>"; \
+	} > $@
+
+# --- Internal rules ---
+$(BUILD_DIR)/lib $(OVERLAY_LIB) $(OVERLAY_INC) $(OUT_DIR):
+	mkdir -p $@
+
+# default rule for lib objects
+$(BUILD_DIR)/lib/%.o: $(SRC_DIR)/%.c $(SHIM_HEADERS) | $(BUILD_DIR)/lib
+	$(CC) $(FORCE_INCLUDE) $(COMMON_CFLAGS) $(COMMON_INC) -c $< -o $@
+
+# file-specific override for lib_sched.c (adds -Wno-return-type and extra include)
+$(BUILD_DIR)/lib/lib_sched.o: $(SRC_DIR)/lib_sched.c $(SHIM_HEADERS) $(SHIM_DIR)/lib_sched_compat.h | $(BUILD_DIR)/lib
+	$(CC) $(FORCE_INCLUDE) -include $(SHIM_DIR)/lib_sched_compat.h -Wno-return-type $(COMMON_CFLAGS) $(COMMON_INC) -c $< -o $@
+
+$(OVERLAY_DIR)/usr/lib/lib$(APP).a: $(LIB_OBJS) | $(OVERLAY_LIB)
+	$(AR) rcs $@ $(LIB_OBJS)
+	$(RANLIB) $@
+
+overlay_headers: | $(OVERLAY_INC)
+	@for h in $(EXPORTED_HEADERS); do \
+	  if [ -f "$(APP_INCLUDE)/$$h" ]; then \
+	    install -m 0644 "$(APP_INCLUDE)/$$h" "$(OVERLAY_INC)/"; \
+	  fi; \
 	done
-	/bin/rm -rf bin/*
-	-bk clean 
 
-get: 
-	for i in doc src results scripts; do \
-		echo ===== $$i =====; \
-		(cd $$i && bk get -q); \
+# object/output mapping per binary
+define BIN_template
+$$(BUILD_DIR)/bin/$(1)/%.o: $$(SRC_DIR)/%.c $(SHIM_HEADERS) | $$(BUILD_DIR)/bin/$(1)
+	mkdir -p $$(@D)
+	$$(CC) $(FORCE_INCLUDE) $$(COMMON_CFLAGS) $$(COMMON_INC) -c $$< -o $$@
+
+BIN_OBJS_$(1)   := $$(patsubst %.c,$$(BUILD_DIR)/bin/$(1)/%.o,$$(BIN_SRCS_$(1)))
+FINAL_WASM_$(1) := $$(OUT_DIR)/$(1).wasm
+
+$$(FINAL_WASM_$(1)): $$(BIN_OBJS_$(1)) $$(OVERLAY_DIR)/usr/lib/lib$(APP).a | $$(OUT_DIR)
+	$$(CC) $$(COMMON_LDFLAGS) $$(BIN_OBJS_$(1)) $$(OVERLAY_DIR)/usr/lib/lib$(APP).a -o $$@
+endef
+
+# --- WASI-safe subset of benchmarks (define after template) ---
+BINS := hello bw_mem memsize mhz tlb stream
+BIN_SRCS_hello    := hello.c
+BIN_SRCS_bw_mem   := bw_mem.c
+BIN_SRCS_memsize  := memsize.c
+BIN_SRCS_mhz      := mhz.c timing_o.c loop_o.c
+BIN_SRCS_tlb      := tlb.c
+BIN_SRCS_stream   := stream.c
+
+$(foreach b,$(BINS),$(eval $(call BIN_template,$(b))))
+
+# --- Contract surface ---
+.PHONY: all clean distclean
+
+all:  ## build overlay + link (requires SYSROOT_FINAL)
+	@test -n "$(SYSROOT_FINAL)" || (echo "ERROR: SYSROOT_FINAL is empty; run via orchestrator after overlay merge." && exit 1)
+	$(MAKE) $(OVERLAY_DIR)/usr/lib/lib$(APP).a overlay_headers
+	@for b in $(BINS); do \
+	  $(MAKE) $$(FINAL_WASM_$$b); \
 	done
-	@co -q
+	@echo "[done] $(APP): wasm built in $(OUT_DIR)"
 
-info: 
-	for i in doc src results scripts; do \
-		echo ===== $$i =====; \
-		(cd $$i && info); \
-	done
+clean:  ## remove intermediates (keep overlay)
+	@echo "[clean] removing build and out"
+	rm -rf $(BUILD_DIR) $(OUT_DIR)
 
-release: scripts/mkrelease
-	scripts/mkrelease
-
-scripts/mkrelease:
-	cd scripts && co mkrelease
-
-# XXX - . must be named lmbench for this to work
-shar:
-	$(MAKE) clean
-	co -q Makefile
-	$(MAKE) get
-	cd .. && \
-	find lmbench -type f -print  | egrep -v 'noship|RCS' > /tmp/FILES
-	cd .. && shar -S -a -n lmbench1.0 -L 50K < /tmp/FILES 
-
-FRC:
+distclean: clean  ## remove everything incl. overlay
+	@echo "[distclean] removing overlay"
+	rm -rf $(OVERLAY_DIR)
