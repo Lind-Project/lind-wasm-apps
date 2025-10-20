@@ -1,207 +1,194 @@
-# lmbench — Lind-WASM build-contract Makefile
+# lmbench — per-app sandbox build
 # Contract:
-#   - make all        -> build overlay + link wasm (requires SYSROOT_FINAL)
+#   - make all        -> build overlay + compile .wasm + .cwasm
 #   - make clean      -> remove intermediates (keep overlay)
 #   - make distclean  -> remove everything incl. overlay
 
-SHELL := /bin/sh
+SHELL := /bin/bash
 
-# --- App layout ---
-APP         ?= lmbench
-SRC_DIR     ?= src
-APP_INCLUDE ?= $(SRC_DIR)
+# --- Paths (override as needed) ---
+APP              ?= lmbench
+SRC_DIR          ?= src
+OUT_DIR          ?= out
+OVERLAY_DIR      ?= sysroot_overlay
 
-BUILD_DIR      := build
-SHIM_DIR       := $(BUILD_DIR)/wasi_shims
-OVERLAY_DIR    := sysroot_overlay
-OVERLAY_INC    := $(OVERLAY_DIR)/usr/include
-OVERLAY_LIB    := $(OVERLAY_DIR)/usr/lib
-OUT_DIR        := out
+# Overlay include/lib roots (support usr/ and bare include/)
+OVERLAY_INC_MAIN := $(OVERLAY_DIR)/usr/include
+OVERLAY_INC_ALT  := $(OVERLAY_DIR)/include
+OVERLAY_LIB      := $(OVERLAY_DIR)/usr/lib
 
-# --- Toolchain ---
-LLVM_BIN    ?= $(abspath ../../clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin)
-CC          ?= $(LLVM_BIN)/clang
-AR          ?= $(LLVM_BIN)/llvm-ar
-RANLIB      ?= $(LLVM_BIN)/llvm-ranlib
-WASM_TARGET ?= wasm32-wasi
+# --- Base sysroot (your glibc-built sysroot) ---
+BASE_SYSROOT     ?= ../../src/glibc/sysroot
 
-ifeq ($(origin CC), default)
-  CC := /usr/local/bin/clang
+# --- Toolchain roots (override these, not the leaf paths) ---
+LLVM_PREFIX      ?= /home/lind/lind-wasm/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04
+BINARYEN_PREFIX  ?= /home/lind/lind-wasm/tools/binaryen
+WASMTIME_DEFAULT := ../../src/wasmtime/target/release/wasmtime
+
+# Tools (may be overridden by env); we'll normalize them below
+CLANG    ?= $(LLVM_PREFIX)/bin/clang
+WASM_OPT ?= $(BINARYEN_PREFIX)/bin/wasm-opt
+WASMTIME ?= $(if $(wildcard $(WASMTIME_DEFAULT)),$(WASMTIME_DEFAULT),$(shell command -v wasmtime 2>/dev/null || echo /bin/false))
+WANT_AOT ?= 1
+
+# Archive tools (use LLVM's to match clang)
+AR      ?= $(LLVM_PREFIX)/bin/llvm-ar
+RANLIB  ?= $(LLVM_PREFIX)/bin/llvm-ranlib
+
+# --- Tool path normalization (fix common "directory instead of binary" overrides) ---
+ifneq ($(wildcard $(CLANG)/bin/clang),)
+  CLANG := $(CLANG)/bin/clang
 endif
-ifeq ($(origin AR), default)
-  AR := $(shell command -v llvm-ar || echo ar)
+ifeq ($(wildcard $(CLANG)),)
+  CLANG := $(LLVM_PREFIX)/bin/clang
 endif
-ifeq ($(origin RANLIB), default)
-  RANLIB := $(shell command -v llvm-ranlib || echo ranlib)
+ifneq ($(wildcard $(WASM_OPT)/bin/wasm-opt),)
+  WASM_OPT := $(WASM_OPT)/bin/wasm-opt
 endif
-CLANG_OK := $(shell $(CC) --version 2>/dev/null | head -n1 | grep -i clang >/dev/null && echo yes || echo no)
-ifeq ($(CLANG_OK),no)
-  $(error CC=$(CC) is not clang; set CC=/usr/local/bin/clang or LLVM_BIN=<path>/bin)
+ifeq ($(wildcard $(WASM_OPT)),)
+  WASM_OPT := $(BINARYEN_PREFIX)/bin/wasm-opt
+endif
+ifneq ($(wildcard $(AR)/llvm-ar),)
+  AR := $(AR)/llvm-ar
+endif
+ifeq ($(wildcard $(AR)),)
+  AR := $(LLVM_PREFIX)/bin/llvm-ar
+endif
+ifneq ($(wildcard $(RANLIB)/llvm-ranlib),)
+  RANLIB := $(RANLIB)/llvm-ranlib
+endif
+ifeq ($(wildcard $(RANLIB)),)
+  RANLIB := $(LLVM_PREFIX)/bin/llvm-ranlib
 endif
 
-# --- Sysroots ---
-BASE_SYSROOT   ?= $(abspath ../../src/glibc/sysroot)
-SYSROOT_FINAL  ?=
+TARGET := wasm32-unknown-wasi
 
-SYSROOT_ASSERT_1 := $(BASE_SYSROOT)/include/assert.h
-SYSROOT_ASSERT_2 := $(BASE_SYSROOT)/include/wasm32-wasi/assert.h
-ifeq ($(or $(wildcard $(SYSROOT_ASSERT_1)),$(wildcard $(SYSROOT_ASSERT_2))),)
-  $(error Missing libc headers: neither $(SYSROOT_ASSERT_1) nor $(SYSROOT_ASSERT_2) exists. Set BASE_SYSROOT correctly.)
-endif
+# Extra flags injectable from CLI
+CFLAGS_EXTRA  ?=
+LDFLAGS_EXTRA ?=
 
-# --- Flags ---
-COMMON_CFLAGS  := -O2 -g --target=$(WASM_TARGET) --sysroot=$(BASE_SYSROOT) -fvisibility=hidden -Wno-unused-result
-COMMON_INC     := -I$(APP_INCLUDE) \
-                  -isystem $(BASE_SYSROOT)/include \
-                  -isystem $(BASE_SYSROOT)/include/wasm32-wasi \
-                  -I$(SHIM_DIR)
-# force-include compat before system headers
-FORCE_INCLUDE  := -include $(SHIM_DIR)/wasi_compat.h
-COMMON_LDFLAGS := --target=$(WASM_TARGET) --sysroot=$(SYSROOT_FINAL) \
-                  -L$(SYSROOT_FINAL)/lib/wasm32-wasi -L$(BASE_SYSROOT)/lib/wasm32-wasi
+COMMON_CFLAGS := -std=gnu89 --target=$(TARGET) -g -O2 \
+                 --sysroot=$(BASE_SYSROOT) \
+                 -isystem $(BASE_SYSROOT)/include/wasm32-wasi \
+                 -isystem $(BASE_SYSROOT)/include \
+                 -isystem $(OVERLAY_INC_MAIN) \
+                 -isystem $(OVERLAY_INC_MAIN)/wasm32-wasi \
+                 -isystem $(OVERLAY_INC_ALT) \
+                 -isystem $(OVERLAY_INC_ALT)/wasm32-wasi \
+                 $(CFLAGS_EXTRA)
 
-# --- Overlay lib (exported) ---
-LIB_SRCS := lib_timing.c lib_mem.c lib_stats.c lib_debug.c getopt.c lib_sched.c
-LIB_OBJS := $(patsubst %.c,$(BUILD_DIR)/lib/%.o,$(LIB_SRCS))
-STATIC_LIB := $(OVERLAY_LIB)/lib$(APP).a
+COMMON_LDFLAGS := -L$(BASE_SYSROOT)/lib/wasm32-wasi \
+                  -L$(OVERLAY_LIB) \
+                  -Wl,--import-memory,--export-memory,--max-memory=67108864 \
+                  -Wl,--export=__stack_pointer,--export=__stack_low \
+                  $(LDFLAGS_EXTRA)
 
-EXPORTED_HEADERS := bench.h lib_debug.h names.h stats.h timing.h version.h
+# --- Source discovery ---
+EXCLUDE_SRCS := getopt.c lat_usleep.c lib_*.c
+SRC   := $(filter-out $(EXCLUDE_SRCS),$(notdir $(wildcard $(SRC_DIR)/*.c)))
+WASM  := $(patsubst %.c,$(OUT_DIR)/%.wasm,$(SRC))
+CWASM := $(patsubst %.wasm,%.cwasm,$(WASM))
 
-# --- WASI-safe subset of benchmarks ---
-BINS := hello bw_mem memsize mhz tlb stream
+# Support code that provides benchmp, bandwidth, mygetopt, etc.
+LIB_SRCS := $(wildcard $(SRC_DIR)/lib_*.c) $(SRC_DIR)/getopt.c
+LIB_OBJS := $(patsubst $(SRC_DIR)/%.c,$(OUT_DIR)/%.o,$(LIB_SRCS))
+LIB_A    := $(OUT_DIR)/liblmbench.a
 
-BIN_SRCS_hello    := hello.c
-BIN_SRCS_bw_mem   := bw_mem.c
-BIN_SRCS_memsize  := memsize.c
-BIN_SRCS_mhz      := mhz.c timing_o.c loop_o.c
-BIN_SRCS_tlb      := tlb.c
-BIN_SRCS_stream   := stream.c
+# --- Shim forwarders list ---
+# Format: header=dep1,dep2,...
+# Add new entries here as you discover missing headers.
+SHIM_FORWARDERS := \
+  rpc/rpc.h=rpc/clnt.h,rpc/svc.h \
+  rpc/clnt.h= \
+  rpc/svc.h= \
+  rpc/types.h= \
+  netconfig.h=rpc/netconfig.h \
+  netdb.h=arpa/inet.h \
+  resolv/resolv.h=arpa/nameser.h,netinet/in.h
 
-# --- Shim headers to satisfy bench.h on WASI (no-op stubs) ---
-SHIM_HEADERS := \
-  $(SHIM_DIR)/sys/socket.h \
-  $(SHIM_DIR)/sys/un.h \
-  $(SHIM_DIR)/sys/resource.h \
-  $(SHIM_DIR)/sys/wait.h \
-  $(SHIM_DIR)/rpc/rpc.h \
-  $(SHIM_DIR)/rpc/types.h \
-  $(SHIM_DIR)/rpc/xdr.h \
-  $(SHIM_DIR)/netinet/in.h \
-  $(SHIM_DIR)/arpa/inet.h \
-  $(SHIM_DIR)/wasi_compat.h \
-  $(SHIM_DIR)/lib_sched_compat.h
+.PHONY: all build clean distclean overlay-check overlay-shims print-vars
 
-# parent dirs
-$(SHIM_DIR)/%:
+# ---------------------------------------------------------------
+all: build
+
+build: overlay-check overlay-shims $(OUT_DIR) $(LIB_A) $(CWASM)
+	@echo "[✔] Build complete: $(OUT_DIR)"
+
+$(OUT_DIR):
 	mkdir -p $@
 
-define WRITE_EMPTY
-	@mkdir -p $(dir $@) && printf "%s\n" "/* WASI shim: $@ (no-op) */" > $@
-endef
+# Build support objs and archive into static lib
+$(OUT_DIR)/%.o: $(SRC_DIR)/%.c | $(OUT_DIR)
+	$(CLANG) $(COMMON_CFLAGS) -c $< -o $@
 
-# sys/*
-$(SHIM_DIR)/sys/socket.h:   | $(SHIM_DIR)/sys ; $(WRITE_EMPTY)
-$(SHIM_DIR)/sys/un.h:       | $(SHIM_DIR)/sys ; $(WRITE_EMPTY)
-$(SHIM_DIR)/sys/resource.h: | $(SHIM_DIR)/sys ; $(WRITE_EMPTY)
-$(SHIM_DIR)/sys/wait.h:     | $(SHIM_DIR)/sys ; $(WRITE_EMPTY)
-
-# rpc/*
-$(SHIM_DIR)/rpc/rpc.h:      | $(SHIM_DIR)/rpc ; $(WRITE_EMPTY)
-$(SHIM_DIR)/rpc/types.h:    | $(SHIM_DIR)/rpc ; $(WRITE_EMPTY)
-$(SHIM_DIR)/rpc/xdr.h:      | $(SHIM_DIR)/rpc ; $(WRITE_EMPTY)
-
-# net headers occasionally pulled by rpc/socket code paths
-$(SHIM_DIR)/netinet/in.h:   | $(SHIM_DIR)/netinet ; $(WRITE_EMPTY)
-$(SHIM_DIR)/arpa/inet.h:    | $(SHIM_DIR)/arpa ; $(WRITE_EMPTY)
-
-# compat pre-include: define missing types & stub functions used by lmbench
-$(SHIM_DIR)/wasi_compat.h: | $(SHIM_DIR)
-	@mkdir -p $(SHIM_DIR)
-	@{ \
-	  echo "/* Autogenerated WASI compatibility shims for lmbench */"; \
-	  echo "#ifndef LMBENCH_WASI_COMPAT_H"; \
-	  echo "#define LMBENCH_WASI_COMPAT_H"; \
-	  echo ""; \
-	  echo "typedef unsigned short sa_family_t;"; \
-	  echo "typedef unsigned int   socklen_t;"; \
-	  echo "typedef int            pid_t;"; \
-	  echo ""; \
-	  echo "static inline int wait(int *status) { (void)status; return -1; }"; \
-	  echo "static inline int waitpid(pid_t pid, void *status, int options) { (void)pid; (void)status; (void)options; return -1; }"; \
-	  echo ""; \
-	  echo "#endif /* LMBENCH_WASI_COMPAT_H */"; \
-	} > $@
-
-# lib_sched.c needs <string.h> and a relaxed return diagnostic
-$(SHIM_DIR)/lib_sched_compat.h: | $(SHIM_DIR)
-	@mkdir -p $(SHIM_DIR)
-	@{ \
-	  echo "/* Autogenerated shim for lib_sched.c */"; \
-	  echo "#include <string.h>"; \
-	} > $@
-
-# --- Internal rules ---
-$(BUILD_DIR)/lib $(OVERLAY_LIB) $(OVERLAY_INC) $(OUT_DIR):
-	mkdir -p $@
-
-# default rule for lib objects
-$(BUILD_DIR)/lib/%.o: $(SRC_DIR)/%.c $(SHIM_HEADERS) | $(BUILD_DIR)/lib
-	$(CC) $(FORCE_INCLUDE) $(COMMON_CFLAGS) $(COMMON_INC) -c $< -o $@
-
-# file-specific override for lib_sched.c (adds -Wno-return-type and extra include)
-$(BUILD_DIR)/lib/lib_sched.o: $(SRC_DIR)/lib_sched.c $(SHIM_HEADERS) $(SHIM_DIR)/lib_sched_compat.h | $(BUILD_DIR)/lib
-	$(CC) $(FORCE_INCLUDE) -include $(SHIM_DIR)/lib_sched_compat.h -Wno-return-type $(COMMON_CFLAGS) $(COMMON_INC) -c $< -o $@
-
-$(OVERLAY_DIR)/usr/lib/lib$(APP).a: $(LIB_OBJS) | $(OVERLAY_LIB)
+$(LIB_A): $(LIB_OBJS)
 	$(AR) rcs $@ $(LIB_OBJS)
 	$(RANLIB) $@
 
-overlay_headers: | $(OVERLAY_INC)
-	@for h in $(EXPORTED_HEADERS); do \
-	  if [ -f "$(APP_INCLUDE)/$$h" ]; then \
-	    install -m 0644 "$(APP_INCLUDE)/$$h" "$(OVERLAY_INC)/"; \
-	  fi; \
+# Compile each test .c → .wasm, link with liblmbench
+$(OUT_DIR)/%.wasm: $(SRC_DIR)/%.c $(LIB_A)
+	@echo "[*] Compiling $< → $@"
+	$(CLANG) $(COMMON_CFLAGS) $< -o $@ $(COMMON_LDFLAGS) $(LIB_A) -lc
+
+# Optimize and (optionally) AOT-compile to .cwasm
+$(OUT_DIR)/%.cwasm: $(OUT_DIR)/%.wasm
+	@echo "[*] Optimizing $<"
+	$(WASM_OPT) --epoch-injection --asyncify -O2 --debuginfo $< -o $<
+	@if [ "$(WANT_AOT)" = "1" ] && [ -x "$(WASMTIME)" ]; then \
+		echo "[*] AOT-compiling $< → $@ using $(WASMTIME)"; \
+		"$(WASMTIME)" compile $< -o $@; \
+	else \
+		echo "[!] Skipping AOT (WANT_AOT=$(WANT_AOT), WASMTIME=$(WASMTIME))"; \
+		cp $< $@.wasm-skipped; \
+	fi
+
+# ---------------------------------------------------------------
+# Validate tool/sysroot, ensure overlay roots exist
+overlay-check:
+	@mkdir -p "$(OVERLAY_INC_MAIN)" "$(OVERLAY_INC_ALT)" "$(OVERLAY_LIB)"
+	@if [ ! -x "$(CLANG)" ]; then echo "CLANG not executable: $(CLANG)"; exit 1; fi
+	@if [ ! -x "$(WASM_OPT)" ]; then echo "WASM_OPT not executable: $(WASM_OPT)"; exit 1; fi
+	@h1="$(BASE_SYSROOT)/include/wasm32-wasi/stdio.h"; \
+	 l1="$(BASE_SYSROOT)/lib/wasm32-wasi/libc.a"; \
+	 c1="$(BASE_SYSROOT)/lib/wasm32-wasi/crt1.o"; \
+	 if [ ! -r "$$h1" ] || [ ! -r "$$l1" ] || [ ! -r "$$c1" ]; then \
+	   echo "Missing base sysroot pieces (check BASE_SYSROOT):"; \
+	   echo "  $$h1"; echo "  $$l1"; echo "  $$c1"; \
+	   exit 1; \
+	 fi
+
+# Generate forwarder headers from SHIM_FORWARDERS into both overlay include roots
+overlay-shims:
+	@set -e; \
+	for entry in $(SHIM_FORWARDERS); do \
+		[ -n "$$entry" ] || continue; \
+		hdr="$${entry%%=*}"; incs="$${entry#*=}"; \
+		[ -n "$$hdr" ] || continue; \
+		for root in "$(OVERLAY_INC_MAIN)" "$(OVERLAY_INC_ALT)"; do \
+			out="$${root}/$${hdr}"; mkdir -p "$${out%/*}"; \
+			{ echo '#pragma once'; IFS=','; for inc in $$incs; do [ -n "$$inc" ] && echo "#include <$$inc>"; done; } > "$$out"; \
+			echo "[*] shim: $$out <= $$incs"; \
+		done; \
 	done
 
-# object/output mapping per binary
-define BIN_template
-$$(BUILD_DIR)/bin/$(1)/%.o: $$(SRC_DIR)/%.c $(SHIM_HEADERS) | $$(BUILD_DIR)/bin/$(1)
-	mkdir -p $$(@D)
-	$$(CC) $(FORCE_INCLUDE) $$(COMMON_CFLAGS) $$(COMMON_INC) -c $$< -o $$@
+# ---------------------------------------------------------------
+clean:
+	@echo "[*] Cleaning build artifacts (keeping overlay)..."
+	rm -rf $(OUT_DIR)
+	@echo "[✔] Overlay preserved at $(OVERLAY_DIR)"
 
-BIN_OBJS_$(1)   := $$(patsubst %.c,$$(BUILD_DIR)/bin/$(1)/%.o,$$(BIN_SRCS_$(1)))
-FINAL_WASM_$(1) := $$(OUT_DIR)/$(1).wasm
+distclean:
+	@echo "[*] Full cleanup: removing out/ and overlay..."
+	rm -rf $(OUT_DIR) $(OVERLAY_DIR)
+	@echo "[✔] Everything removed for $(APP)"
 
-$$(FINAL_WASM_$(1)): $$(BIN_OBJS_$(1)) $$(OVERLAY_DIR)/usr/lib/lib$(APP).a | $$(OUT_DIR)
-	$$(CC) $$(COMMON_LDFLAGS) $$(BIN_OBJS_$(1)) $$(OVERLAY_DIR)/usr/lib/lib$(APP).a -o $$@
-endef
-
-# --- WASI-safe subset of benchmarks (define after template) ---
-BINS := hello bw_mem memsize mhz tlb stream
-BIN_SRCS_hello    := hello.c
-BIN_SRCS_bw_mem   := bw_mem.c
-BIN_SRCS_memsize  := memsize.c
-BIN_SRCS_mhz      := mhz.c timing_o.c loop_o.c
-BIN_SRCS_tlb      := tlb.c
-BIN_SRCS_stream   := stream.c
-
-$(foreach b,$(BINS),$(eval $(call BIN_template,$(b))))
-
-# --- Contract surface ---
-.PHONY: all clean distclean
-
-all:  ## build overlay + link (requires SYSROOT_FINAL)
-	@test -n "$(SYSROOT_FINAL)" || (echo "ERROR: SYSROOT_FINAL is empty; run via orchestrator after overlay merge." && exit 1)
-	$(MAKE) $(OVERLAY_DIR)/usr/lib/lib$(APP).a overlay_headers
-	@for b in $(BINS); do \
-	  $(MAKE) $$(FINAL_WASM_$$b); \
-	done
-	@echo "[done] $(APP): wasm built in $(OUT_DIR)"
-
-clean:  ## remove intermediates (keep overlay)
-	@echo "[clean] removing build and out"
-	rm -rf $(BUILD_DIR) $(OUT_DIR)
-
-distclean: clean  ## remove everything incl. overlay
-	@echo "[distclean] removing overlay"
-	rm -rf $(OVERLAY_DIR)
+print-vars:
+	@echo BASE_SYSROOT=$(BASE_SYSROOT)
+	@echo LLVM_PREFIX=$(LLVM_PREFIX)
+	@echo CLANG=$(CLANG)
+	@echo AR=$(AR)
+	@echo RANLIB=$(RANLIB)
+	@echo WASM_OPT=$(WASM_OPT)
+	@echo WASMTIME=$(WASMTIME)
+	@echo WANT_AOT=$(WANT_AOT)
+	@echo SHIM_FORWARDERS=$(SHIM_FORWARDERS)
