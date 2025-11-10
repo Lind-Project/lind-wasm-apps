@@ -1,7 +1,7 @@
 #!/bin/bash
 set +e
 
-CLANG="/home/lind/lind-wasm/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin/clang"
+CLANG="/home/lind/lind-wasm/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang"
 WASM_OPT="/home/lind/lind-wasm/tools/binaryen/bin/wasm-opt"
 WASMTIME="/home/lind/lind-wasm/src/wasmtime/target/debug/wasmtime"
 SYSROOT="/home/lind/lind-wasm/lind-wasm-apps/lmbench/sysroot_overlay"
@@ -55,6 +55,3 @@ echo ""
 echo "total number: $total_count"
 echo "compile error number: $fail_count"
 echo "all the compiled files are in: $OUT_DIR"
-
-
-
