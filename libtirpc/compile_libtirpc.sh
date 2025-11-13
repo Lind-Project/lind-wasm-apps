@@ -43,4 +43,3 @@ find "src" -name '*.o' -exec cp {} "$MERGE_TMP/" \;
 
 popd >/dev/null
 echo "[libtirpc] done → $OVERLAY/usr/lib/wasm32-wasi/libtirpc.a"
-

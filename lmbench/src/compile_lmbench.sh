@@ -1,53 +1,152 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Paths
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-: "${LIND_WASM_ROOT:=${LIND_WASM_ROOT:-$(cd "$REPO_ROOT/.." && pwd)/lind-wasm}}"
 
-BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
-LLVM_BIN="${LLVM_BIN:-$(ls -d "$LIND_WASM_ROOT"/clang+llvm-*/bin 2>/dev/null | head -n1)}"
-APPS_MERGED="$REPO_ROOT/build/sysroot_merged"
-LIBDIR="$APPS_MERGED/lib/wasm32-wasi"
+APPS_BUILD="$REPO_ROOT/build"
+APPS_OVERLAY="$APPS_BUILD/sysroot_overlay"
+MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
+APPS_LIB_DIR="$APPS_BUILD/lib"
+APPS_BIN_ROOT="$APPS_BUILD/bin/lmbench"
+TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
-[[ -x "$LLVM_BIN/clang" ]] || { echo "ERROR: clang not found"; exit 1; }
-[[ -r "$BASE_SYSROOT/include/wasm32-wasi/stdio.h" ]] || { echo "ERROR: sysroot missing"; exit 1; }
-[[ -r "$LIBDIR/libc.a" ]] || { echo "ERROR: merged sysroot missing; run: make merge-sysroot"; exit 1; }
-
-REAL_CC="$LLVM_BIN/clang --target=wasm32-unknown-wasi --sysroot=$APPS_MERGED"
-CFLAGS=" -O2 -g -I$APPS_MERGED/include -I$APPS_MERGED/include/wasm32-wasi -I$APPS_MERGED/include/tirpc "
-LDFLAGS=" -L$LIBDIR -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low "
-LIBS=" -lc -lm -lpthread -ltirpc "
-
-# wrapper for makefile calls
-mkdir -p "$REPO_ROOT/lmbench/scripts"
-cat > "$REPO_ROOT/lmbench/scripts/compiler" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-: "${REAL_CC:=clang}"
-: "${CFLAGS:=}"
-: "${LDFLAGS:=}"
-: "${LIBS:=}"
-if printf ' %s ' "$*" | grep -q ' -c '; then
-  exec ${REAL_CC} ${CFLAGS} "$@"
+# ----------------------------------------------------------------------
+# 1) Load toolchain from Makefile preflight
+# ----------------------------------------------------------------------
+if [[ -r "$TOOL_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$TOOL_ENV"
 else
-  exec ${REAL_CC} ${CFLAGS} "$@" ${LDFLAGS} ${LIBS}
+  echo "[lmbench] ERROR: missing toolchain env '$TOOL_ENV' (run 'make preflight' first)" >&2
+  exit 1
 fi
-EOF
-chmod +x "$REPO_ROOT/lmbench/scripts/compiler"
 
-# sanitize Makefile
-sed -i 's/--as-needed//g' "$REPO_ROOT/lmbench/src/Makefile" || true
-sed -i -E 's|(../bin/[^ ]*/)getopt\.o|\1mygetopt.o|g' "$REPO_ROOT/lmbench/src/Makefile"
-sed -i -E 's|(../bin/[^ ]*/)getopt\.o:|\1mygetopt.o:|g' "$REPO_ROOT/lmbench/src/Makefile"
-grep -q 'mygetopt\.o' "$REPO_ROOT/lmbench/src/Makefile" || cat >> "$REPO_ROOT/lmbench/src/Makefile" <<'EOF'
+: "${CLANG:?missing CLANG in $TOOL_ENV}"
+: "${AR:?missing AR in $TOOL_ENV}"
+: "${RANLIB:?missing RANLIB in $TOOL_ENV}"
 
-../bin/x86_64-linux-gnu/mygetopt.o: getopt.c
-	$(CC) $(CFLAGS) -c getopt.c -o ../bin/x86_64-linux-gnu/mygetopt.o
-EOF
+BASE_LIBC="$MERGED_SYSROOT/lib/wasm32-wasi/libc.a"
+TIRPC_MERGE_DIR="$APPS_OVERLAY/usr/lib/wasm32-wasi/merge_tmp"
 
-# build
-make -C "$REPO_ROOT/lmbench/src" -j \
-  CC="$REPO_ROOT/lmbench/scripts/compiler" REAL_CC="$REAL_CC" \
-  CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" LIBS="$LIBS"
+if [[ ! -f "$BASE_LIBC" ]]; then
+  echo "[lmbench] ERROR: merged sysroot libc.a not found at: $BASE_LIBC" >&2
+  echo "[lmbench] Hint: run 'make merge-sysroot' before 'make lmbench'." >&2
+  exit 1
+fi
+
+if [[ ! -d "$TIRPC_MERGE_DIR" ]]; then
+  echo "[lmbench] ERROR: expected libtirpc .o dir '$TIRPC_MERGE_DIR' not found" >&2
+  echo "[lmbench] Hint: did 'make libtirpc' succeed?" >&2
+  exit 1
+fi
+
+shopt -s nullglob
+tirpc_objs=("$TIRPC_MERGE_DIR"/*.o)
+shopt -u nullglob
+
+if (( ${#tirpc_objs[@]} == 0 )); then
+  echo "[lmbench] ERROR: no libtirpc .o files under $TIRPC_MERGE_DIR" >&2
+  exit 1
+fi
+
+# ----------------------------------------------------------------------
+# 2) Build a combined libc.a = base libc + libtirpc objects
+# ----------------------------------------------------------------------
+COMB_DIR="$APPS_BUILD/.lmbench_libc_objs"
+rm -rf "$COMB_DIR"
+mkdir -p "$COMB_DIR"
+
+echo "[lmbench] extracting base libc objects…"
+(
+  cd "$COMB_DIR"
+  "$AR" x "$BASE_LIBC"
+)
+
+echo "[lmbench] adding libtirpc objects from $TIRPC_MERGE_DIR…"
+cp "${tirpc_objs[@]}" "$COMB_DIR/"
+
+mkdir -p "$APPS_LIB_DIR"
+COMBINED_LIBC="$APPS_LIB_DIR/libc.a"
+
+echo "[lmbench] creating combined libc.a → $COMBINED_LIBC"
+(
+  cd "$COMB_DIR"
+  "$AR" rcs "$COMBINED_LIBC" ./*.o
+  "$RANLIB" "$COMBINED_LIBC" || true
+)
+
+# Replace libc in merged sysroot so clang -lc picks up the combined one
+cp "$COMBINED_LIBC" "$BASE_LIBC"
+
+
+
+# ----------------------------------------------------------------------
+# 3) Run lmbench/src/Makefile with WASI toolchain
+# ----------------------------------------------------------------------
+LM_BENCH_BIN_DIR="$REPO_ROOT/lmbench/bin/wasm32-wasi"
+mkdir -p "$LM_BENCH_BIN_DIR"   # <<< this is the crucial fix
+
+REAL_CC="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
+CFLAGS="-O2 -g -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -I$MERGED_SYSROOT/include/tirpc"
+LDFLAGS="-L$MERGED_SYSROOT/lib/wasm32-wasi -L$MERGED_SYSROOT/usr/lib/wasm32-wasi -L$APPS_LIB_DIR"
+# liblmb_stubs.a comes from the Makefile 'stubs' target
+LDLIBS="-llmb_stubs -ltirpc -lm"
+
+echo "[lmbench] building suite with REAL_CC='$REAL_CC'"
+(
+  cd "$REPO_ROOT/lmbench/src"
+
+  # Force a full rebuild so we know fresh binaries are produced
+  make clean || true
+
+  make -j \
+    OS="wasm32-wasi" \
+    O="../bin/wasm32-wasi" \
+    CC="$REAL_CC" \
+    CFLAGS="$CFLAGS" \
+    CPPFLAGS="-I$MERGED_SYSROOT/include/tirpc" \
+    LDFLAGS="$LDFLAGS" \
+    LDLIBS="$LDLIBS" \
+    all
+)
+
+    
+
+# ----------------------------------------------------------------------
+# 4) Stage binaries under build/bin/lmbench/wasm32-wasi
+# ----------------------------------------------------------------------
+mkdir -p "$APPS_BIN_ROOT"
+OUT_DIR="$APPS_BIN_ROOT/wasm32-wasi"
+LM_BENCH_BIN_DIR="$REPO_ROOT/lmbench/bin/wasm32-wasi"
+
+echo "[lmbench] staging binaries from $LM_BENCH_BIN_DIR → $OUT_DIR"
+
+if [[ ! -d "$LM_BENCH_BIN_DIR" ]]; then
+  echo "[lmbench] ERROR: expected lmbench output dir '$LM_BENCH_BIN_DIR' not found" >&2
+  exit 1
+fi
+
+mkdir -p "$OUT_DIR"
+
+shopt -s nullglob
+bin_files=("$LM_BENCH_BIN_DIR"/*)
+shopt -u nullglob
+
+have_files=0
+for f in "${bin_files[@]}"; do
+  case "$f" in
+    *.o|*.a) continue ;;  # skip non-executable artifacts
+  esac
+  cp "$f" "$OUT_DIR/"
+  have_files=1
+done
+
+if (( have_files == 0 )); then
+  echo "[lmbench] ERROR: no non-.o binaries found in $LM_BENCH_BIN_DIR" >&2
+  exit 1
+fi
+
+echo "[lmbench] staged binaries under $OUT_DIR"
 

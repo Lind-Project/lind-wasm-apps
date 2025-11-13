@@ -43,7 +43,7 @@ dirs:
 	  '$(MERGED_SYSROOT)/include/wasm32-wasi' \
 	  '$(MERGED_SYSROOT)/lib/wasm32-wasi' \
 	  '$(MERGED_SYSROOT)/usr/lib/wasm32-wasi' \
-	  '$(APPS_BIN_DIR)/x86_64-linux-gnu' \
+	  '$(APPS_BIN_DIR)' \
 	  '$(APPS_LIB_DIR)'
 
 preflight: dirs
@@ -70,8 +70,8 @@ preflight: dirs
 	  CLANG="$$(pick "$${CLANG_CAND[@]}")"
 	  AR="$$(pick   "$${AR_CAND[@]}")"
 	  RANLIB="$$(pick "$${RANLIB_CAND[@]}")"
-	  [[ -x "$$CLANG" ]]  || { echo "ERROR: clang not found (tried: $${CLANG_CAND[*]})"; exit 1; }
-	  [[ -x "$$AR"    ]]  || { echo "ERROR: llvm-ar/ar not found (tried: $${AR_CAND[*]})"; exit 1; }
+	  [[ -x "$$CLANG"  ]] || { echo "ERROR: clang not found (tried: $${CLANG_CAND[*]})"; exit 1; }
+	  [[ -x "$$AR"     ]] || { echo "ERROR: llvm-ar/ar not found (tried: $${AR_CAND[*]})"; exit 1; }
 	  [[ -x "$$RANLIB" ]] || { echo "ERROR: llvm-ranlib/ranlib not found (tried: $${RANLIB_CAND[*]})"; exit 1; }
 	  {
 	    echo "export CLANG='$$CLANG'"
@@ -82,41 +82,10 @@ preflight: dirs
 	  "$$CLANG" --version | head -n1
 	}
 
-# ---------------- libtirpc (GSS off) ------------------------------------------
+# ---------------- libtirpc (via compile_libtirpc.sh) -------------------------
 libtirpc: preflight
 	. '$(TOOL_ENV)'
-	cd '$(APPS_ROOT)/libtirpc'
-	if [[ ! -f configure || ! -f Makefile.in ]]; then
-	  command -v autoreconf >/dev/null || { echo "ERROR: 'autoreconf' not found (install autoconf automake libtool)"; exit 1; }
-	  echo "[libtirpc] autoreconf -fvi"
-	  autoreconf -fvi
-	fi
-	PKG_CONFIG=/bin/false \
-	CC="$$CLANG --target=wasm32-unknown-wasi --sysroot=$(BASE_SYSROOT)" \
-	AR="$$AR" RANLIB="$$RANLIB" \
-	CFLAGS="--sysroot=$(BASE_SYSROOT) -O2 -g" \
-	CPPFLAGS="--sysroot=$(BASE_SYSROOT)" \
-	LDFLAGS="--sysroot=$(BASE_SYSROOT)" \
-	ac_cv_header_gssapi_gssapi_h=no ac_cv_header_gssrpc_auth_gssapi_h=no \
-	ac_cv_lib_gssapi_krb5_gss_init_sec_context=no \
-	./configure --host=wasm32-unknown-wasi \
-	            --enable-static --disable-shared \
-	            --disable-gssapi --without-gssapi \
-	            --without-krb5 --without-gssapi_krb5
-	$(MAKE) -j'$(JOBS)'
-	mkdir -p '$(APPS_OVERLAY)/usr/include/tirpc'
-	if [[ -d '$(APPS_ROOT)/libtirpc/tirpc' ]]; then \
-	  rsync -a '$(APPS_ROOT)/libtirpc/tirpc/' '$(APPS_OVERLAY)/usr/include/tirpc/'; \
-	elif [[ -d '$(APPS_ROOT)/libtirpc/include/tirpc' ]]; then \
-	  rsync -a '$(APPS_ROOT)/libtirpc/include/tirpc/' '$(APPS_OVERLAY)/usr/include/tirpc/'; \
-	else \
-	  echo "[libtirpc] WARNING: no tirpc headers found to stage"; \
-	fi
-	LIB_A="$$(find '$(APPS_ROOT)/libtirpc' -path '*/.libs/libtirpc.a' -print -quit)"
-	[[ -f "$$LIB_A" ]] || { echo "[libtirpc] ERROR: libtirpc.a not built"; exit 1; }
-	install -m 0644 "$$LIB_A" '$(APPS_OVERLAY)/usr/lib/wasm32-wasi/libtirpc.a'
-	install -m 0644 "$$LIB_A" '$(APPS_OVERLAY)/lib/wasm32-wasi/libtirpc.a'
-	@echo "[libtirpc] staged: $$LIB_A → overlay (usr/lib & lib)"
+	'$(APPS_ROOT)/libtirpc/compile_libtirpc.sh'
 
 # ---------------- Merge sysroot + overlay -------------------------------------
 merge-sysroot: libtirpc
@@ -128,7 +97,7 @@ merge-sysroot: libtirpc
 	rsync -a '$(APPS_OVERLAY)/usr/lib/wasm32-wasi/' '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
 	rsync -a '$(APPS_OVERLAY)/lib/wasm32-wasi/'     '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
 
-# ---------------- Stubs (libm + WASI sched_*) ---------------------------------
+# ---------------- Stubs (libm + WASI sched_*) --------------------------------
 stubs: merge-sysroot
 	. '$(TOOL_ENV)'
 	if [[ ! -f '$(MERGED_SYSROOT)/lib/wasm32-wasi/libm.a' ]]; then
@@ -151,82 +120,17 @@ stubs: merge-sysroot
 	"$$AR" rcs '$(APPS_LIB_DIR)/liblmb_stubs.a' '$(APPS_BUILD)/wasi_compat_stubs.o'
 	"$$RANLIB" '$(APPS_LIB_DIR)/liblmb_stubs.a' || true
 
-# ---------------- lmbench (with safe wrappers) --------------------------------
+# ---------------- lmbench (via compile_lmbench.sh) ---------------------------
 lmbench: stubs
 	. '$(TOOL_ENV)'
-	mkdir -p '$(APPS_ROOT)/lmbench/src/scripts'
-
-	# ---- scripts/compiler (POSIX /bin/sh; prints one-line CC command) ----
-	cat > '$(APPS_ROOT)/lmbench/src/scripts/compiler' <<-'EOF'
-		#!/bin/sh
-		set -e
-		export LC_ALL=C LANG=C
-		here=$(cd "$(dirname "$0")" && pwd)
-		apps_root=$(cd "$here/../.." && pwd)
-		merged="$apps_root/build/sysroot_merged"
-		# Load toolchain exported by preflight
-		if [ -r "$apps_root/build/.toolchain.env" ]; then
-		  . "$apps_root/build/.toolchain.env"
-		fi
-		: "${CLANG:?missing CLANG from preflight}"
-		# Emit ONE line used by Make as the compiler command
-		printf "%s " "$CLANG"
-		printf -- "--target=wasm32-unknown-wasi --sysroot=%s -O2 -g " "$merged"
-		printf -- "-I%s/include -I%s/include/wasm32-wasi -I%s/include/tirpc " "$merged" "$merged" "$merged"
-		printf -- "-L%s/lib/wasm32-wasi -L%s/usr/lib/wasm32-wasi -L%s/build/lib -llmb_stubs\n" "$merged" "$merged" "$apps_root"
-	EOF
-	chmod +x '$(APPS_ROOT)/lmbench/src/scripts/compiler'
-
-	# ---- scripts/build (POSIX /bin/sh; tolerant of empty/noise invocations) ----
-	cat > '$(APPS_ROOT)/lmbench/src/scripts/build' <<-'EOF'
-		#!/bin/sh
-		set -e
-		# Case 1: used as shell -> "build -c 'cmd...'"
-		if [ "x${1-}" = "x-c" ]; then
-		  shift
-		  [ -n "${1-}" ] || exit 0
-		  exec /bin/sh -c "$1"
-		fi
-		# Case 2: argv execution; drop leading noise tokens Make may pass
-		while [ -n "${1-}" ]; do
-		  case "$1" in
-		    all|LANG|XLANG) shift ;;
-		    *=*)            shift ;;
-		    -c)             shift; [ -n "${1-}" ] || exit 0; exec /bin/sh -c "$1" ;;
-		    *)              break ;;
-		  esac
-		done
-		# If nothing left to run, succeed quietly
-		[ -n "${1-}" ] || exit 0
-		exec "$@"
-	EOF
-	chmod +x '$(APPS_ROOT)/lmbench/src/scripts/build'
-
-	# Tidy upstream Makefile quirks:
-	sed -i 's/-Wl,--as-needed//g' '$(APPS_ROOT)/lmbench/src/Makefile' || true
-	sed -i -E 's#[[:space:]]\.\./bin/[^[:space:]]+/getopt\.o##g' '$(APPS_ROOT)/lmbench/src/Makefile' || true
-	sed -i 's#\.\./scripts/build#\.\./scripts/build#g' '$(APPS_ROOT)/lmbench/src/Makefile' || true
-
-	# Build the common archive first (serial, clearer failures)
-	if ! $(MAKE) -C '$(APPS_ROOT)/lmbench/src' -j1 V=1 \
-	    CC="`$(APPS_ROOT)/lmbench/src/scripts/compiler`" CFLAGS="" LDFLAGS="" lib 2>/dev/null; then \
-	  if ! $(MAKE) -C '$(APPS_ROOT)/lmbench/src' -j1 V=1 \
-	    CC="`$(APPS_ROOT)/lmbench/src/scripts/compiler`" CFLAGS="" LDFLAGS="" library 2>/dev/null; then \
-	    $(MAKE) -C '$(APPS_ROOT)/lmbench/src' -j1 V=1 \
-	      CC="`$(APPS_ROOT)/lmbench/src/scripts/compiler`" CFLAGS="" LDFLAGS=""; \
-	  fi; \
-	fi
-
-	# Then build the rest
-	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' -j'$(JOBS)' V=1 \
-	  CC="`$(APPS_ROOT)/lmbench/src/scripts/compiler`" \
-	  CFLAGS="" LDFLAGS=""
+	'$(APPS_ROOT)/lmbench/src/compile_lmbench.sh'
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
 	-rm -f '$(APPS_BUILD)/.libm.c' '$(APPS_BUILD)/.libm.o' \
 	       '$(APPS_BUILD)/wasi_compat_stubs.c' '$(APPS_BUILD)/wasi_compat_stubs.o' \
 	       '$(APPS_LIB_DIR)/liblmb_stubs.a'
+	-rm -rf '$(APPS_BIN_DIR)/lmbench'
 
 clean-all: clean
 	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
