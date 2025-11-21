@@ -46,6 +46,11 @@ dirs:
 	  '$(APPS_BIN_DIR)' \
 	  '$(APPS_LIB_DIR)'
 
+#   TODO:
+#     Once we have a shared helper in lind-wasm (or a stable
+#     container path for the toolchain), we should move this into a small
+#     script (e.g. scripts/detect_toolchain.sh) or reuse a common helper
+#     so the Makefile itself can stay leaner.
 preflight: dirs
 	@echo "[*] preflight checks…"
 	[ -r '$(BASE_SYSROOT)/include/wasm32-wasi/stdio.h' ] || { echo "ERROR: sysroot headers missing at $(BASE_SYSROOT)"; exit 1; }
@@ -98,6 +103,23 @@ merge-sysroot: libtirpc
 	rsync -a '$(APPS_OVERLAY)/lib/wasm32-wasi/'     '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
 
 # ---------------- Stubs (libm + WASI sched_*) --------------------------------
+# NOTE:
+#   The current lind-wasm WASI sysroot does not always ship a libm.a or
+#   implementations of the POSIX scheduler calls that lmbench expects
+#   (sched_get_priority_max, sched_setscheduler). To keep the lmbench build
+#   self-contained, we:
+#     * synthesize a tiny dummy libm.a when it is missing, and
+#     * build a small compatibility archive (liblmb_stubs.a) that provides
+#       "not supported" stubs for the missing scheduler APIs.
+#
+#   This lets lmbench link successfully without pretending the functionality
+#   is actually supported at runtime (the stubs just set errno = ENOTSUP and
+#   return an error).
+#
+#   TODO:
+#     Once the lind-wasm toolchain / sysroot grows proper libm and scheduler
+#     support for wasm32-wasi, we should delete this target and have lmbench
+#     link directly against the real libraries instead of these stubs.
 stubs: merge-sysroot
 	. '$(TOOL_ENV)'
 	if [[ ! -f '$(MERGED_SYSROOT)/lib/wasm32-wasi/libm.a' ]]; then
