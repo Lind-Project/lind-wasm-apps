@@ -1,122 +1,206 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# This script builds bash as a wasm32-wasi binary using the lind-wasm-apps
-# infrastructure:
-#   - toolchain is picked by the top-level Makefile (build/.toolchain.env)
-#   - sysroot comes from build/sysroot_merged
-#   - output is staged into build/bin/bash/wasm32-wasi/
+###############################################################################
+# Bash WASM build helper for lind-wasm-apps
 #
-# It is intended to be called from the top-level Makefile via:
+# High-level strategy:
+#   1. Run a full native (host) bash build:
+#        - make distclean
+#        - ./configure (host, job control disabled)
+#        - make -j (host gcc/cc)
+#      This gives us:
+#        - builtins/mkbuiltins (native tool)
+#        - generated headers (builtext.h, etc.)
+#
+#   2. Patch builtins/Makefile:
+#        - strip -ldl (libdl doesn't exist in wasm32-wasi)
+#
+#   3. Delete host-built *.o / *.a for the parts we rebuild as WASM,
+#      but KEEP mkbuiltins and mkbuiltins.o as native tools.
+#
+#   4. Rebuild core bash objects and libs with the wasm32-wasi toolchain,
+#      skipping xmalloc helpers that conflict with the WASI glibc sysroot.
+#
+#   5. Provide small WASI stubs (termcap, locale, getgroups).
+#
+#   6. Link bash.wasm into build/bin/bash/wasm32-wasi/bash.wasm.
+#
+# Intended usage (top-level Makefile):
 #   make bash
+#
+# NOTE: We always re-run the host configure+make for reproducibility. This
+# could be optimized later to reuse an existing, known-good host build. (TODO)
+###############################################################################
 
-# ---------------------------------------------------------------------------
-# Paths / shared state from lind-wasm-apps
-# ---------------------------------------------------------------------------
+# --- basic paths -------------------------------------------------------------
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APPS_BUILD="$APPS_ROOT/build"
-MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-APPS_LIB_DIR="$APPS_BUILD/lib"
-APPS_BIN_DIR="$APPS_BUILD/bin"
-TOOL_ENV="$APPS_BUILD/.toolchain.env"
+BASH_ROOT="$APPS_ROOT/bash"
 
-BASH_SRC="$SCRIPT_DIR"
-OUT_DIR="$APPS_BIN_DIR/bash/wasm32-wasi"
+TOOL_ENV="$APPS_ROOT/build/.toolchain.env"
 
-if [[ ! -r "$TOOL_ENV" ]]; then
-  echo "[bash] ERROR: $TOOL_ENV not found. Run 'make preflight' from lind-wasm-apps root." >&2
+if [[ -r "$TOOL_ENV" ]]; then
+  # shellcheck source=/dev/null
+  . "$TOOL_ENV"
+fi
+
+if [[ -z "${CLANG:-}" ]]; then
+  echo "[bash] ERROR: CLANG is not set. Run 'make preflight' from lind-wasm-apps root."
   exit 1
 fi
 
-# Load CLANG/AR/RANLIB chosen by preflight
-# shellcheck disable=SC1090
-. "$TOOL_ENV"
-
-: "${CLANG:?CLANG not set in $TOOL_ENV}"
-: "${AR:?AR not set in $TOOL_ENV}"
-
-# LIND_WASM_ROOT is only needed for wasm-opt / wasmtime; fall back to ~/lind-wasm
-LIND_WASM_ROOT="${LIND_WASM_ROOT:-$HOME/lind-wasm}"
-WASM_OPT="${WASM_OPT:-"$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt"}"
-WASMTIME="${WASMTIME:-"$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime"}"
-
-mkdir -p "$OUT_DIR"
-
-echo "[bash] APPS_ROOT      = $APPS_ROOT"
-echo "[bash] APPS_BUILD     = $APPS_BUILD"
-echo "[bash] MERGED_SYSROOT = $MERGED_SYSROOT"
-echo "[bash] OUT_DIR        = $OUT_DIR"
-echo "[bash] CLANG          = $CLANG"
-echo "[bash] AR             = $AR"
-echo "[bash] WASM_OPT       = $WASM_OPT"
-echo "[bash] WASMTIME       = $WASMTIME"
-echo
-
-if [[ ! -d "$MERGED_SYSROOT" ]]; then
-  echo "[bash] ERROR: merged sysroot not found at $MERGED_SYSROOT (run 'make merge-sysroot' first)" >&2
-  exit 1
+# Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
+if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
+  LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-# ---------------------------------------------------------------------------
-# WASM compatibility header (already tracked in repo)
-# ---------------------------------------------------------------------------
-WASM_COMPAT_H="$BASH_SRC/wasm_compat.h"
+BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
+MERGED_SYSROOT="${APPS_MERGED:-$APPS_ROOT/build/sysroot_merged}"
 
-if [[ ! -f "$WASM_COMPAT_H" ]]; then
-  echo "[bash] ERROR: wasm_compat.h not found at $WASM_COMPAT_H" >&2
-  echo "[bash]        (this file is expected to be tracked in the repo)" >&2
-  exit 1
-fi
+LLVM_BIN_DIR="$(dirname "$CLANG")"
+AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
+RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
-# ---------------------------------------------------------------------------
-# Toolchain flags for wasm32-wasi bash
-# ---------------------------------------------------------------------------
-CC_WASM="$CLANG -pthread --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
-CFLAGS_WASM="-O2 -g -std=gnu89 -pthread -DHAVE_STRSIGNAL=1 -DHAVE_MKTIME=1 -include $WASM_COMPAT_H"
-LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864,\
---export=__stack_pointer,--export=__stack_low \
--L$MERGED_SYSROOT/lib/wasm32-wasi -L$MERGED_SYSROOT/usr/lib/wasm32-wasi -L$APPS_LIB_DIR"
-
-# liblmb_stubs.a comes from the top-level 'stubs' target; bash may need
-# scheduler shims, so link it in.
-LDLIBS_WASM="-llmb_stubs"
+# Optional tools; not required for a successful `make bash`
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+WASMTIME="${WASMTIME:-$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
-echo "[bash] Using:"
-echo "  CC      = $CC_WASM"
-echo "  CFLAGS  = $CFLAGS_WASM"
-echo "  LDFLAGS = $LDFLAGS_WASM"
-echo "  AR      = $AR"
-echo
+# Output location
+BASH_OUT_DIR="$APPS_ROOT/build/bin/bash/wasm32-wasi"
+mkdir -p "$BASH_OUT_DIR"
 
-# ---------------------------------------------------------------------------
-# Ensure bash is configured (native-style configure)
-# ---------------------------------------------------------------------------
-pushd "$BASH_SRC" >/dev/null
+# wasm_compat header is committed in the repo
+WASM_COMPAT_H="$BASH_ROOT/wasm_compat.h"
 
-if [[ ! -f Makefile ]]; then
-  echo "[bash] No Makefile found; running configure for bash..."
-  ./configure \
-    --without-bash-malloc \
-    --disable-nls \
-    --disable-profiling
+# --- sanity checks -----------------------------------------------------------
+
+if [[ ! -d "$MERGED_SYSROOT" ]]; then
+  echo "[bash] ERROR: merged sysroot '$MERGED_SYSROOT' not found."
+  echo "        Run 'make merge-sysroot' (or 'make all') in lind-wasm-apps first."
+  exit 1
 fi
 
-# ---------------------------------------------------------------------------
-# Build objects and libs with the WASM toolchain
-#   (adapted from Robin's script, but using shared sysroot & toolchain)
-# ---------------------------------------------------------------------------
-echo "[bash] Cleaning previous wasm build..."
-make clean || true
+if [[ ! -r "$BASE_SYSROOT/include/wasm32-wasi/stdio.h" ]]; then
+  echo "[bash] ERROR: base sysroot headers missing at '$BASE_SYSROOT'."
+  echo "        Did you run 'make sysroot' in lind-wasm?"
+  exit 1
+fi
 
-echo "[bash] Building top-level objects (WASM target)..."
+if [[ ! -f "$WASM_COMPAT_H" ]]; then
+  echo "[bash] ERROR: missing bash/wasm_compat.h (it should be committed in the repo)."
+  exit 1
+fi
+
+# --- WASM toolchain flags ----------------------------------------------------
+
+CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
+
+CFLAGS_WASM="-O2 -g -std=gnu89 -pthread \
+  -DHAVE_STRSIGNAL=1 -DHAVE_MKTIME=1 \
+  -include $WASM_COMPAT_H \
+  -I$MERGED_SYSROOT/include \
+  -I$MERGED_SYSROOT/include/wasm32-wasi"
+
+LDFLAGS_WASM="-Wl,--import-memory,--export-memory,\
+--max-memory=67108864,--export=__stack_pointer,--export=__stack_low \
+-L$MERGED_SYSROOT/lib/wasm32-wasi \
+-L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+
+echo "[bash] using CLANG       = $CLANG"
+echo "[bash] using AR          = $AR"
+echo "[bash] LIND_WASM_ROOT    = $LIND_WASM_ROOT"
+echo "[bash] merged sysroot    = $MERGED_SYSROOT"
+echo "[bash] output dir        = $BASH_OUT_DIR"
+echo
+
+pushd "$BASH_ROOT" >/dev/null
+
+###############################################################################
+# 1. Native (host) bash build for mkbuiltins + generated headers
+###############################################################################
+
+echo "[bash] [host] cleaning any previous host build..."
+make distclean >/dev/null 2>&1 || true
+
+echo "[bash] [host] configuring (native, job control disabled)..."
+./configure \
+  --without-bash-malloc \
+  --disable-nls \
+  --disable-profiling \
+  --disable-job-control
+
+###############################################################################
+# 2. Patch builtins/Makefile for WASI (-ldl is not available in wasm32-wasi)
+###############################################################################
+
+if [[ -f builtins/Makefile ]]; then
+  if grep -q -- '-ldl' builtins/Makefile 2>/dev/null; then
+    echo "[bash] [patch] stripping -ldl from builtins/Makefile for WASI/native build"
+    sed -i 's/-ldl//g' builtins/Makefile
+  fi
+fi
+
+echo "[bash] [host] building full native bash (this may take a bit)..."
+make -j"$JOBS"
+
+if [[ ! -x builtins/mkbuiltins ]]; then
+  echo "[bash] ERROR: host builtins/mkbuiltins was not produced."
+  exit 1
+fi
+
+###############################################################################
+# 3. Clean host-built objects/libs that we will rebuild as WASM
+#    IMPORTANT: keep mkbuiltins and mkbuiltins.o as native tools.
+###############################################################################
+
+echo "[bash] [wasm] cleaning host-built core objects..."
+rm -f \
+  shell.o eval.o y.tab.o general.o make_cmd.o print_cmd.o \
+  dispose_cmd.o execute_cmd.o variables.o copy_cmd.o error.o \
+  expr.o flags.o nojobs.o subst.o hashcmd.o hashlib.o mailcheck.o \
+  trap.o input.o unwind_prot.o pathexp.o sig.o test.o version.o \
+  alias.o array.o arrayfunc.o assoc.o braces.o bracecomp.o \
+  bashhist.o bashline.o siglist.o list.o stringlib.o locale.o \
+  findcmd.o redir.o pcomplete.o pcomplib.o syntax.o xmalloc.o \
+  signames.o
+
+echo "[bash] [wasm] cleaning host-built library objects (preserving mkbuiltins.o)..."
+# Remove all .o in builtins/ except mkbuiltins.o
+find builtins -maxdepth 1 -type f -name '*.o' ! -name 'mkbuiltins.o' -delete || true
+rm -f lib/glob/*.o lib/sh/*.o lib/readline/*.o lib/tilde/*.o || true
+
+echo "[bash] [wasm] cleaning host-built archives..."
+rm -f \
+  builtins/libbuiltins.a \
+  lib/glob/libglob.a \
+  lib/sh/libsh.a \
+  lib/readline/libreadline.a \
+  lib/readline/libhistory.a \
+  lib/tilde/libtilde.a
+
+###############################################################################
+# 4. WASM build: core objects
+#
+# NOTE: We intentionally skip xmalloc.o and signames.o here to avoid the
+# duplicate symbol conflicts seen with:
+#   - libc.a(xmalloc.o/xrealloc.o) in the WASI sysroot
+#   - signal_names in signames.o vs trap.o
+#
+# With --disable-job-control, job-control-specific symbols should not be
+# required anymore (set_job_control, shell_pgrp, etc.). If they still appear,
+# that would mean the config is not honoring --disable-job-control. (TODO)
+###############################################################################
+
+echo "[bash] [wasm] building core objects with wasm32-wasi toolchain..."
 make -j1 \
   V=1 \
   CC="$CC_WASM" \
   CFLAGS="$CFLAGS_WASM" \
-  LDFLAGS="$LDFLAGS_WASM $LDLIBS_WASM" \
+  LDFLAGS="$LDFLAGS_WASM" \
   AR="$AR" \
   ARFLAGS="crs" \
   RANLIB="echo" \
@@ -127,32 +211,68 @@ make -j1 \
   trap.o input.o unwind_prot.o pathexp.o sig.o test.o version.o \
   alias.o array.o arrayfunc.o assoc.o braces.o bracecomp.o \
   bashhist.o bashline.o siglist.o list.o stringlib.o locale.o \
-  findcmd.o redir.o pcomplete.o pcomplib.o syntax.o xmalloc.o \
-  signames.o
+  findcmd.o redir.o pcomplete.o pcomplib.o syntax.o
 
-echo "[bash] Building libraries in subdirs..."
-for d in builtins lib/glob lib/sh lib/readline lib/tilde; do
-  echo "[bash]   -> $d"
-  make -j1 -C "$d" \
-    V=1 \
-    CC="$CC_WASM" \
-    CFLAGS="$CFLAGS_WASM" \
-    AR="$AR" \
-    ARFLAGS="crs" \
-    RANLIB="echo"
+###############################################################################
+# 5. WASM build: libraries in subdirectories
+###############################################################################
+
+echo "[bash] [wasm] building builtins/libbuiltins.a..."
+make -j1 -C builtins \
+  V=1 \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  AR="$AR" ARFLAGS="crs" RANLIB="echo" \
+  libbuiltins.a
+
+echo "[bash] [wasm] building lib/glob/libglob.a..."
+make -j1 -C lib/glob \
+  V=1 \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  AR="$AR" ARFLAGS="crs" RANLIB="echo" \
+  libglob.a
+
+echo "[bash] [wasm] building lib/sh/libsh.a..."
+make -j1 -C lib/sh \
+  V=1 \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  AR="$AR" ARFLAGS="crs" RANLIB="echo" \
+  libsh.a
+
+echo "[bash] [wasm] building lib/readline/libreadline.a + libhistory.a..."
+make -j1 -C lib/readline \
+  V=1 \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  AR="$AR" ARFLAGS="crs" RANLIB="echo" \
+  libreadline.a libhistory.a
+
+# Avoid duplicate xmalloc/xrealloc by dropping readline's xmalloc.o from both
+# libreadline.a and libhistory.a. For now we rely on the sysroot libc's
+# xmalloc/xrealloc. TODO: replace this with a cleaner configure-time option.
+for archive in libreadline.a libhistory.a; do
+  if [[ -f "./lib/readline/$archive" ]]; then
+    echo "[bash] [wasm] stripping xmalloc.o from ./lib/readline/$archive to avoid duplicate xmalloc/xrealloc (TODO: cleaner config option)."
+    "$AR" d "./lib/readline/$archive" xmalloc.o || true
+  fi
 done
 
-# Remove mktime.o from libsh to avoid clashes with libc
-if [[ -f ./lib/sh/libsh.a ]]; then
-  echo "[bash] Removing mktime.o from lib/sh/libsh.a ..."
-  "$AR" d ./lib/sh/libsh.a mktime.o || true
-fi
+echo "[bash] [wasm] building lib/tilde/libtilde.a..."
+make -j1 -C lib/tilde \
+  V=1 \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  AR="$AR" ARFLAGS="crs" RANLIB="echo" \
+  libtilde.a
 
-# ---------------------------------------------------------------------------
-# Termcap stubs for readline
-# ---------------------------------------------------------------------------
-TPUTS_STUB_C="$BASH_SRC/tputs_stub.c"
-TPUTS_STUB_O="$BASH_SRC/tputs_stub.o"
+###############################################################################
+# 6. Termcap + locale + getgroups stubs (WASI compatibility)
+###############################################################################
+
+TPUTS_STUB_C="$BASH_ROOT/tputs_stub.c"
+TPUTS_STUB_O="$BASH_ROOT/tputs_stub.o"
 
 cat > "$TPUTS_STUB_C" << 'EOF'
 /* Minimal termcap stubs for readline on WASI. */
@@ -205,14 +325,11 @@ int tgetflag(const char *id)
 }
 EOF
 
-echo "[bash] Compiling termcap stubs ..."
+echo "[bash] [wasm] compiling termcap stubs..."
 $CC_WASM $CFLAGS_WASM -c "$TPUTS_STUB_C" -o "$TPUTS_STUB_O"
 
-# ---------------------------------------------------------------------------
-# Locale stub to avoid __ctype_get_mb_cur_max traps
-# ---------------------------------------------------------------------------
-LOCALE_STUB_C="$BASH_SRC/locale_stub.c"
-LOCALE_STUB_O="$BASH_SRC/locale_stub.o"
+LOCALE_STUB_C="$BASH_ROOT/locale_stub.c"
+LOCALE_STUB_O="$BASH_ROOT/locale_stub.o"
 
 cat > "$LOCALE_STUB_C" << 'EOF'
 /* Minimal locale stub for WASM. Avoids heavy locale logic. */
@@ -226,66 +343,93 @@ size_t __ctype_get_mb_cur_max(void)
 }
 EOF
 
-echo "[bash] Compiling locale stub ..."
+echo "[bash] [wasm] compiling locale stubs..."
 $CC_WASM $CFLAGS_WASM -c "$LOCALE_STUB_C" -o "$LOCALE_STUB_O"
 
-# ---------------------------------------------------------------------------
-# Manual link of bash (WASM)
-# ---------------------------------------------------------------------------
-echo "[bash] Linking bash manually with clang..."
+GROUPS_STUB_C="$BASH_ROOT/getgroups_stub.c"
+GROUPS_STUB_O="$BASH_ROOT/getgroups_stub.o"
+
+cat > "$GROUPS_STUB_C" << 'EOF'
+/* Minimal getgroups(2) stub for WASI.
+ *
+ * Upstream configure detects getgroups() on the native host, but the WASI
+ * sysroot does not provide it. For now, we provide a stub that reports
+ * no supplementary groups. TODO: replace with a proper WASI-aware check
+ * in configure or a dedicated compatibility layer.
+ */
+
+#include <sys/types.h>
+
+int getgroups(int size, gid_t list[])
+{
+    (void)size;
+    (void)list;
+    return 0;
+}
+EOF
+
+echo "[bash] [wasm] compiling getgroups stub..."
+$CC_WASM $CFLAGS_WASM -c "$GROUPS_STUB_C" -o "$GROUPS_STUB_O"
+
+###############################################################################
+# 7. Link bash.wasm
+###############################################################################
+
+BASH_WASM="$BASH_OUT_DIR/bash.wasm"
+
+echo "[bash] [wasm] linking bash → $BASH_WASM ..."
 $CC_WASM \
   -L./builtins \
   -L./lib/readline \
   -L./lib/glob \
   -L./lib/tilde \
   -L./lib/sh \
-  $LDFLAGS_WASM $LDLIBS_WASM \
-  -o bash \
+  $LDFLAGS_WASM \
+  -o "$BASH_WASM" \
   "$LOCALE_STUB_O" \
+  "$GROUPS_STUB_O" \
   shell.o eval.o y.tab.o general.o make_cmd.o print_cmd.o \
   dispose_cmd.o execute_cmd.o variables.o copy_cmd.o error.o \
   expr.o flags.o nojobs.o subst.o hashcmd.o hashlib.o mailcheck.o \
   trap.o input.o unwind_prot.o pathexp.o sig.o test.o version.o \
   alias.o array.o arrayfunc.o assoc.o braces.o bracecomp.o \
   bashhist.o bashline.o siglist.o list.o stringlib.o locale.o \
-  findcmd.o redir.o pcomplete.o syntax.o xmalloc.o \
-  signames.o \
+  findcmd.o redir.o pcomplete.o pcomplib.o syntax.o \
   "$TPUTS_STUB_O" \
   -lbuiltins -lglob -lsh -lreadline -lhistory -ltilde
 
-if [[ ! -f bash ]]; then
-  echo "[bash] ERROR: bash binary not produced by manual link." >&2
+if [[ ! -f "$BASH_WASM" ]]; then
+  echo "[bash] ERROR: bash.wasm was not produced."
   exit 1
 fi
 
-echo "[bash] raw wasm binary built:"
-ls -lh bash
-echo
-
-# ---------------------------------------------------------------------------
-# Optional: wasm-opt + wasmtime compile, staged under build/bin
-# ---------------------------------------------------------------------------
-WASM_FILE="$OUT_DIR/bash.wasm"
-CWA_FILE="$OUT_DIR/bash.cwasm"
+###############################################################################
+# 8. Optional: wasm-opt + wasmtime compile (best-effort)
+###############################################################################
 
 if [[ -x "$WASM_OPT" ]]; then
-  echo "[bash] Running wasm-opt -> $WASM_FILE ..."
+  echo "[bash] running wasm-opt (best-effort)..."
+  OPT_WASM="$BASH_OUT_DIR/bash.opt.wasm"
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
-      bash -o "$WASM_FILE"
+    "$BASH_WASM" -o "$OPT_WASM"
+  BASH_WASM="$OPT_WASM"
 else
-  echo "[bash] WARNING: wasm-opt not found at $WASM_OPT; copying raw 'bash' to $WASM_FILE"
-  cp bash "$WASM_FILE"
+  echo "[bash] NOTE: wasm-opt not found; skipping optimization step."
 fi
 
 if [[ -x "$WASMTIME" ]]; then
-  echo "[bash] Running wasmtime compile -> $CWA_FILE ..."
-  "$WASMTIME" compile "$WASM_FILE" -o "$CWA_FILE"
+  echo "[bash] running wasmtime compile (best-effort)..."
+  BASH_CWASM="$BASH_OUT_DIR/bash.cwasm"
+  "$WASMTIME" compile "$BASH_WASM" -o "$BASH_CWASM" || \
+    echo "[bash] WARNING: wasmtime compile failed; continuing."
 else
-  echo "[bash] WARNING: wasmtime not found at $WASMTIME; skipping .cwasm compilation"
+  echo "[bash] NOTE: wasmtime not found; skipping .cwasm compilation."
 fi
 
-echo
-echo "[bash] Build complete. Output files:"
-ls -lh "$OUT_DIR"
-
 popd >/dev/null
+
+echo
+echo "[bash] build complete. Outputs under:"
+echo "  $BASH_OUT_DIR"
+ls -lh "$BASH_OUT_DIR" || true
+
