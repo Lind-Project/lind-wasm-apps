@@ -24,13 +24,8 @@ set -euo pipefail
 #
 #   5. Provide small WASI stubs (termcap, locale, getgroups).
 #
-#   6. Link bash.wasm into build/bin/bash/wasm32-wasi/bash.wasm.
-#
-# Intended usage (top-level Makefile):
-#   make bash
-#
-# NOTE: We always re-run the host configure+make for reproducibility. This
-# could be optimized later to reuse an existing, known-good host build. (TODO)
+#   6. Link bash.wasm into build/bin/bash/wasm32-wasi/bash.wasm and
+#      run wasm-opt + wasmtime compile (best-effort).
 ###############################################################################
 
 # --- basic paths -------------------------------------------------------------
@@ -63,9 +58,16 @@ LLVM_BIN_DIR="$(dirname "$CLANG")"
 AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
 RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
-# Optional tools; not required for a successful `make bash`
+# We follow lind_compile's convention for WASMTIME_PROFILE (debug vs release)
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
-WASMTIME="${WASMTIME:-$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime}"
+
+WASMTIME_PROFILE="${WASMTIME_PROFILE:-release}"
+WASMTIME="${WASMTIME:-$LIND_WASM_ROOT/src/wasmtime/target/${WASMTIME_PROFILE}/wasmtime}"
+# Fallback to release if the requested profile isn't built yet.
+if [[ ! -x "$WASMTIME" ]]; then
+  ALT="$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime"
+  [[ -x "$ALT" ]] && WASMTIME="$ALT"
+fi
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
@@ -184,15 +186,6 @@ rm -f \
 
 ###############################################################################
 # 4. WASM build: core objects
-#
-# NOTE: We intentionally skip xmalloc.o and signames.o here to avoid the
-# duplicate symbol conflicts seen with:
-#   - libc.a(xmalloc.o/xrealloc.o) in the WASI sysroot
-#   - signal_names in signames.o vs trap.o
-#
-# With --disable-job-control, job-control-specific symbols should not be
-# required anymore (set_job_control, shell_pgrp, etc.). If they still appear,
-# that would mean the config is not honoring --disable-job-control. (TODO)
 ###############################################################################
 
 echo "[bash] [wasm] building core objects with wasm32-wasi toolchain..."
@@ -404,7 +397,7 @@ if [[ ! -f "$BASH_WASM" ]]; then
 fi
 
 ###############################################################################
-# 8. Optional: wasm-opt + wasmtime compile (best-effort)
+# 8. wasm-opt + wasmtime compile (best-effort)
 ###############################################################################
 
 if [[ -x "$WASM_OPT" ]]; then
