@@ -2,17 +2,23 @@
 set -euo pipefail
 
 ###############################################################################
-# Nginx WASM build helper for lind-wasm-apps
+# Nginx WASM build helper for lind-wasm-apps (vendored nginx/)
 #
-# Strategy:
-#   1) Load toolchain from build/.toolchain.env (set by top-level Makefile preflight).
-#   2) Locate Lind's wasmtime (used to run nginx configure-time probe programs).
-#   3) Copy vendored nginx source into build/nginx-src (keep repo clean).
-#   4) Patch nginx auto scripts so configure runs probe binaries via wasmtime
-#      instead of executing wasm directly (avoids "Exec format error").
-#   5) Configure + build with wasm32-wasi toolchain against merged sysroot.
-#   6) Stage build/bin/nginx/wasm32-wasi/nginx.wasm
-#   7) Best-effort wasm-opt + wasmtime compile -> nginx.opt.wasm / nginx.cwasm
+# Goal: build nginx as wasm32-wasi using lind-wasm sysroot.
+#
+# IMPORTANT CONTEXT (based on your logs):
+# - The lind-wasm glibc sysroot produces WASM binaries that are NOT reliably
+#   runnable under plain `wasmtime run` during nginx's configure-time probes.
+#   (you saw wasm-ld signature mismatch + wasmtime panic)
+# - So we DISABLE *runtime* autotest execution in nginx's auto scripts and
+#   provide cross-compile defaults for key probes (sizeof(int), etc.).
+#
+# This gets configure past the "C compiler ... found but is not working" gate
+# without trying to execute test binaries.
+#
+# Also:
+# - nginx configure expects CC/--with-cc to be an *executable path* (no spaces),
+#   so we use a wrapper script for clang with --target/--sysroot.
 ###############################################################################
 
 # ----------------------------------------------------------------------
@@ -29,7 +35,6 @@ fi
 APPS_BUILD="${APPS_BUILD:-$REPO_ROOT/build}"
 MERGED_SYSROOT="${MERGED_SYSROOT:-$APPS_BUILD/sysroot_merged}"
 TOOL_ENV="${TOOL_ENV:-$APPS_BUILD/.toolchain.env}"
-
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
 OUT_DIR="$APPS_BUILD/bin/nginx/wasm32-wasi"
@@ -56,35 +61,11 @@ if [[ ! -d "$MERGED_SYSROOT" ]]; then
   exit 1
 fi
 
-# ----------------------------------------------------------------------
-# 2) Locate wasmtime (match lmbench/bash convention)
-# ----------------------------------------------------------------------
-WASMTIME_PROFILE="${WASMTIME_PROFILE:-release}"
-WASMTIME="${WASMTIME:-$LIND_WASM_ROOT/src/wasmtime/target/${WASMTIME_PROFILE}/wasmtime}"
-
-# Fallback to release if the requested profile isn't built yet.
-if [[ ! -x "$WASMTIME" ]]; then
-  ALT="$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime"
-  [[ -x "$ALT" ]] && WASMTIME="$ALT"
-fi
-
-if [[ ! -x "$WASMTIME" ]]; then
-  echo "[nginx] ERROR: wasmtime not found at:" >&2
-  echo "        $LIND_WASM_ROOT/src/wasmtime/target/${WASMTIME_PROFILE}/wasmtime" >&2
-  echo "        (and no release fallback found)" >&2
-  echo "[nginx] Hint: run 'make wasmtime' in lind-wasm, or export WASMTIME=/path/to/wasmtime." >&2
-  exit 1
-fi
-
-# Configure-time probe runner (nginx configure runs objs/autotest)
-export NGX_WASM_RUNNER="$WASMTIME --dir=."
-echo "[nginx] using NGX_WASM_RUNNER = $NGX_WASM_RUNNER"
-
-# Optional post-processing tools (best-effort)
+# Optional post-processing tool (best-effort)
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 
 # ----------------------------------------------------------------------
-# 3) Copy vendored nginx source into build/ (keep repo clean)
+# 2) Copy vendored nginx source into build/ (keep repo clean)
 # ----------------------------------------------------------------------
 echo "[nginx] preparing source copy -> $WORK_SRC"
 rm -rf "$WORK_SRC"
@@ -94,92 +75,111 @@ rsync -a --delete "$REPO_ROOT/nginx/" "$WORK_SRC/"
 cd "$WORK_SRC"
 
 # ----------------------------------------------------------------------
-# 4) Patch nginx auto scripts to run autotests via NGX_WASM_RUNNER
-#    (use awk for deterministic, non-fragile patching)
+# 3) Cross mode: disable *runtime* configure probes
 # ----------------------------------------------------------------------
-echo "[nginx] patching auto scripts to run configure probes via NGX_WASM_RUNNER"
+export NGX_WASM_CROSS=1
 
-# ---- Patch auto/types/sizeof ----
-# Replace the single line: ngx_size=`$NGX_AUTOTEST`
-# with a runner-aware block that uses NGX_WASM_RUNNER when set.
-awk '
-{
-  if ($0 ~ /^[[:space:]]*ngx_size=`\$NGX_AUTOTEST`[[:space:]]*$/) {
-    print "    if [ -n \"\\$NGX_WASM_RUNNER\" ]; then"
-    print "        ngx_size=`\\$NGX_WASM_RUNNER \\$NGX_AUTOTEST`"
-    print "    else"
-    print "        ngx_size=`\\$NGX_AUTOTEST`"
-    print "    fi"
-    next
-  }
-  print
-}
-' auto/types/sizeof > auto/types/sizeof.new
-mv auto/types/sizeof.new auto/types/sizeof
-chmod +x auto/types/sizeof
-
-# Sanity check: if this fails, stop and show the file section
-if ! grep -n "NGX_WASM_RUNNER" auto/types/sizeof >/dev/null; then
-  echo "[nginx] ERROR: failed to patch auto/types/sizeof (no NGX_WASM_RUNNER reference found)"
-  echo "[nginx] ---- auto/types/sizeof (first 140 lines) ----"
-  sed -n '1,140p' auto/types/sizeof
-  exit 1
-fi
+echo "[nginx] patching nginx auto scripts to disable run-probes (NGX_WASM_CROSS=1)"
 
 # ---- Patch auto/feature ----
-# 1) Inject ngx_autotest_cmd after: if [ -x $NGX_AUTOTEST ]; then
-# 2) Replace /bin/sh -c $NGX_AUTOTEST with /bin/sh -c "$ngx_autotest_cmd"
-# 3) Replace backtick `$NGX_AUTOTEST` in the value-probe define with runner
-awk '
-{
-  if ($0 ~ /^if \[ -x \$NGX_AUTOTEST \ ]; then$/) {
-    print $0
-    print ""
-    print "    # When cross-compiling to wasm32-wasi, $NGX_AUTOTEST is a WASM module."
-    print "    # Running it directly will fail with \"Exec format error\"."
-    print "    ngx_autotest_cmd=\"$NGX_AUTOTEST\""
-    print "    if [ -n \"$NGX_WASM_RUNNER\" ]; then"
-    print "        ngx_autotest_cmd=\"$NGX_WASM_RUNNER $NGX_AUTOTEST\""
-    print "    fi"
-    next
-  }
+# Force ngx_feature_run=no so it never tries to execute objs/autotest.
+# This still allows compile/link checks to drive "found"/"not found".
+if [[ -f auto/feature ]]; then
+  if ! grep -q 'NGX_WASM_CROSS' auto/feature; then
+    # Insert right after "ngx_found=no"
+    awk '
+      {print}
+      $0 ~ /^ngx_found=no$/ {
+        print ""
+        print "# --- lind-wasm cross: disable runtime autotests ---"
+        print "if test -n \"${NGX_WASM_CROSS:-}\"; then"
+        print "    ngx_feature_run=no"
+        print "fi"
+        print "# -------------------------------------------------"
+      }
+    ' auto/feature > auto/feature.new
+    mv auto/feature.new auto/feature
+  fi
+fi
 
-  gsub(/\/bin\/sh -c \$NGX_AUTOTEST/, "/bin/sh -c \"\\$ngx_autotest_cmd\"")
-
-  # Replace the backtick execution used in the value-probe define
-  gsub(/`\\$NGX_AUTOTEST`/, "` /bin/sh -c \"\\$ngx_autotest_cmd\" `")
-
-  print
-}
-' auto/feature > auto/feature.new
-mv auto/feature.new auto/feature
-chmod +x auto/feature
-
-if ! grep -n "ngx_autotest_cmd" auto/feature >/dev/null; then
-  echo "[nginx] ERROR: failed to patch auto/feature (no ngx_autotest_cmd found)"
+# Sanity check
+if [[ -f auto/feature ]] && ! grep -q 'ngx_feature_run=no' auto/feature; then
+  echo "[nginx] ERROR: failed to patch auto/feature to disable runtime tests" >&2
   exit 1
 fi
 
+# ---- Patch auto/types/sizeof ----
+# Provide cross defaults for common C types on wasm32, and skip execution.
+if [[ -f auto/types/sizeof ]]; then
+  if ! grep -q 'NGX_WASM_CROSS' auto/types/sizeof; then
+    # 1) After "ngx_size=" inject a cross-size assignment block
+    awk '
+      {print}
+      $0 ~ /^ngx_size=$/ {
+        print ""
+        print "# --- lind-wasm cross: provide sizeof() without running autotest ---"
+        print "if [ -n \"${NGX_WASM_CROSS:-}\" ]; then"
+        print "    case \"$ngx_type\" in"
+        print "        \"char\"|\"signed char\"|\"unsigned char\"|\"u_char\") ngx_size=1 ;;"
+        print "        \"short\"|\"unsigned short\") ngx_size=2 ;;"
+        print "        \"int\"|\"unsigned int\"|\"int32_t\"|\"uint32_t\") ngx_size=4 ;;"
+        print "        \"long\"|\"unsigned long\") ngx_size=4 ;;"
+        print "        \"long long\"|\"unsigned long long\"|\"int64_t\"|\"uint64_t\") ngx_size=8 ;;"
+        print "        \"void *\"|\"char *\"|\"u_char *\"|\"size_t\"|\"ssize_t\"|\"ptrdiff_t\") ngx_size=4 ;;"
+        print "        \"off_t\"|\"time_t\") ngx_size=8 ;;"
+        print "        \"double\") ngx_size=8 ;;"
+        print "        *) ngx_size=4 ;;"
+        print "    esac"
+        print "fi"
+        print "# ------------------------------------------------------------------"
+      }
+    ' auto/types/sizeof > auto/types/sizeof.new
+    mv auto/types/sizeof.new auto/types/sizeof
+
+    # 2) Prevent overwriting ngx_size by running $NGX_AUTOTEST
+    #    Change: if [ -x $NGX_AUTOTEST ]; then
+    #    To:     if [ -z "${NGX_WASM_CROSS:-}" ] && [ -x $NGX_AUTOTEST ]; then
+    sed -i 's/if \[ -x \$NGX_AUTOTEST \ ]; then/if [ -z "${NGX_WASM_CROSS:-}" ] \&\& [ -x $NGX_AUTOTEST ]; then/' auto/types/sizeof
+  fi
+fi
+
+# Sanity check
+if [[ -f auto/types/sizeof ]] && ! grep -q 'provide sizeof() without running autotest' auto/types/sizeof; then
+  echo "[nginx] ERROR: failed to patch auto/types/sizeof for cross sizeof defaults" >&2
+  exit 1
+fi
+
+echo "[nginx] patch OK (run-probes disabled; sizeof defaults installed)"
+
 # ----------------------------------------------------------------------
-# 5) Configure + build (baseline minimal modules first)
+# 4) Configure + build
+#
+# IMPORTANT:
+#   nginx configure expects CC/--with-cc to be an executable path (no spaces).
+#   Use a wrapper script that injects --target/--sysroot for every compile.
 # ----------------------------------------------------------------------
 TARGET="wasm32-unknown-wasi"
+
+CC_WRAPPER="$APPS_BUILD/nginx-wasi-cc.sh"
+cat > "$CC_WRAPPER" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec "$CLANG" --target=$TARGET --sysroot="$MERGED_SYSROOT" "\$@"
+EOF
+chmod +x "$CC_WRAPPER"
+echo "[nginx] CC_WRAPPER = $CC_WRAPPER"
+
 CC_OPT=(
-  "--target=$TARGET"
-  "--sysroot=$MERGED_SYSROOT"
   "-O2"
   "-g0"
-)
-LD_OPT=(
-  "--target=$TARGET"
-  "--sysroot=$MERGED_SYSROOT"
+  "-fno-common"
 )
 
 echo "[nginx] configure (baseline, minimal modules)"
-./configure \
-  --with-cc="$CLANG" \
+CC="$CC_WRAPPER" ./configure \
+  --with-cc="$CC_WRAPPER" \
   --with-cc-opt="${CC_OPT[*]}" \
-  --with-ld-opt="${LD_OPT[*]}" \
+  --with-ld-opt="" \
   --prefix=/ \
   --conf-path=/nginx.conf \
   --error-log-path=/error.log \
@@ -205,7 +205,7 @@ echo "[nginx] build"
 make -j"$JOBS"
 
 # ----------------------------------------------------------------------
-# 6) Stage output
+# 5) Stage output
 # ----------------------------------------------------------------------
 if [[ ! -f objs/nginx ]]; then
   echo "[nginx] ERROR: expected objs/nginx not found after build" >&2
@@ -217,28 +217,19 @@ cp -f objs/nginx "$NGINX_WASM"
 echo "[nginx] staged -> $NGINX_WASM"
 
 # ----------------------------------------------------------------------
-# 7) wasm-opt + wasmtime compile (best-effort)
+# 6) wasm-opt (best-effort)
 # ----------------------------------------------------------------------
-BIN_FOR_COMPILE="$NGINX_WASM"
-
 if [[ -x "$WASM_OPT" ]]; then
   OPT_OUT="$OUT_DIR/nginx.opt.wasm"
   echo "[nginx] wasm-opt: nginx.wasm -> nginx.opt.wasm"
   if "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
       "$NGINX_WASM" -o "$OPT_OUT"; then
-    BIN_FOR_COMPILE="$OPT_OUT"
+    echo "[nginx] optimized -> $OPT_OUT"
   else
-    echo "[nginx] WARNING: wasm-opt failed; continuing with unoptimized binary."
+    echo "[nginx] WARNING: wasm-opt failed; continuing."
   fi
 else
   echo "[nginx] NOTE: wasm-opt not found; skipping optimization."
-fi
-
-if [[ -x "$WASMTIME" ]]; then
-  CWASM_OUT="$OUT_DIR/nginx.cwasm"
-  echo "[nginx] wasmtime compile: -> nginx.cwasm"
-  "$WASMTIME" compile "$BIN_FOR_COMPILE" -o "$CWASM_OUT" || \
-    echo "[nginx] WARNING: wasmtime compile failed; continuing."
 fi
 
 echo "[nginx] done. Outputs under: $OUT_DIR"
