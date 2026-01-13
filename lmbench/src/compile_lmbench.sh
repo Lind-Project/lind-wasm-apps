@@ -116,11 +116,17 @@ cp "$COMBINED_LIBC" "$BASE_LIBC"
 LM_BENCH_BIN_DIR="$REPO_ROOT/lmbench/bin/wasm32-wasi"
 mkdir -p "$LM_BENCH_BIN_DIR"
 
-REAL_CC="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
+# --- REQUIRED CHANGE: move -L paths from LDFLAGS into CC (configure-style behavior) ---
+REAL_CC_BASE="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
+
 CFLAGS="-O2 -g -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -I$MERGED_SYSROOT/include/tirpc"
 LDFLAGS="-L$MERGED_SYSROOT/lib/wasm32-wasi -L$MERGED_SYSROOT/usr/lib/wasm32-wasi -L$APPS_LIB_DIR"
 # liblmb_stubs.a comes from the Makefile 'stubs' target
 LDLIBS="-llmb_stubs -ltirpc -lm"
+
+# Put linker search paths inside CC, and stop passing them via LDFLAGS.
+REAL_CC="$REAL_CC_BASE $LDFLAGS"
+PASS_LDFLAGS=""
 
 echo "[lmbench] building suite with REAL_CC='$REAL_CC'"
 (
@@ -135,7 +141,7 @@ echo "[lmbench] building suite with REAL_CC='$REAL_CC'"
     CC="$REAL_CC" \
     CFLAGS="$CFLAGS" \
     CPPFLAGS="-I$MERGED_SYSROOT/include/tirpc" \
-    LDFLAGS="$LDFLAGS" \
+    LDFLAGS="$PASS_LDFLAGS" \
     LDLIBS="$LDLIBS" \
     all
 )
