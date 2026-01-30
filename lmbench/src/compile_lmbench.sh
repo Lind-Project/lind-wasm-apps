@@ -36,11 +36,30 @@ MAX_WASM_MEMORY="${MAX_WASM_MEMORY:-67108864}"
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 
 WASMTIME_PROFILE="${WASMTIME_PROFILE:-release}"
-WASMTIME="${WASMTIME:-$LIND_WASM_ROOT/src/wasmtime/target/${WASMTIME_PROFILE}/wasmtime}"
-# Fallback to release if the requested profile isn't built yet.
-if [[ ! -x "$WASMTIME" ]]; then
-  ALT="$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime"
-  [[ -x "$ALT" ]] && WASMTIME="$ALT"
+# Prefer system/installed wasmtime first
+WASMTIME="${WASMTIME:-$(command -v wasmtime || true)}"
+
+# Then common lind layouts
+if [[ -z "${WASMTIME}" ]]; then
+  for cand in \
+    "$LIND_WASM_ROOT/build/wasmtime" \
+    "$LIND_WASM_ROOT/build/wasmtime-debug" \
+    "$LIND_WASM_ROOT/build/wasmtime-release" \
+    "$LIND_WASM_ROOT/build/wasmtime/target/${WASMTIME_PROFILE}/wasmtime" \
+    "$LIND_WASM_ROOT/build/wasmtime/target/release/wasmtime" \
+    "$LIND_WASM_ROOT/build/wasmtime/target/debug/wasmtime" \
+    "$LIND_WASM_ROOT/build/target/${WASMTIME_PROFILE}/wasmtime" \
+    "$LIND_WASM_ROOT/build/target/release/wasmtime" \
+    "$LIND_WASM_ROOT/build/target/debug/wasmtime" \
+    "$LIND_WASM_ROOT/wasmtime/target/${WASMTIME_PROFILE}/wasmtime" \
+    "$LIND_WASM_ROOT/wasmtime/target/release/wasmtime" \
+    "$LIND_WASM_ROOT/wasmtime/target/debug/wasmtime" \
+    "$LIND_WASM_ROOT/src/wasmtime/target/${WASMTIME_PROFILE}/wasmtime" \
+    "$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime" \
+    "$LIND_WASM_ROOT/src/wasmtime/target/debug/wasmtime"
+  do
+    [[ -x "$cand" ]] && { WASMTIME="$cand"; break; }
+  done
 fi
 
 # ----------------------------------------------------------------------
