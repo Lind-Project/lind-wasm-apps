@@ -30,6 +30,7 @@ MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
 APPS_LIB_DIR="$APPS_BUILD/lib"
 APPS_BIN_ROOT="$APPS_BUILD/bin/lmbench"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
+MAX_WASM_MEMORY="${MAX_WASM_MEMORY:-67108864}"
 
 # We follow lind_compile's convention for WASMTIME_PROFILE (debug vs release)
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
@@ -118,7 +119,31 @@ mkdir -p "$LM_BENCH_BIN_DIR"
 
 REAL_CC="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
 CFLAGS="-O2 -g -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -I$MERGED_SYSROOT/include/tirpc"
-LDFLAGS="-L$MERGED_SYSROOT/lib/wasm32-wasi -L$MERGED_SYSROOT/usr/lib/wasm32-wasi -L$APPS_LIB_DIR"
+LDFLAGS_WASM=(
+  "-Wl,--import-memory,--export-memory,--max-memory=${MAX_WASM_MEMORY},--export=__stack_pointer,--export=__stack_low"
+"-L$MERGED_SYSROOT/lib/wasm32-wasi"
+  "-L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+  "-L$APPS_LIB_DIR"
+)
+if [[ "$ENABLE_WASI_THREADS" == "1" ]]; then
+  thread_flag="-mthread-model=posix"
+  if ! supports_cflag "$thread_flag"; then
+    thread_flag=""
+  fi
+  if supports_cflag "-pthread" && supports_cflag "-matomics" && supports_cflag "-mbulk-memory"; then
+    CFLAGS+=" -pthread -matomics -mbulk-memory"
+    if [[ -n "$thread_flag" ]]; then
+      CFLAGS+=" $thread_flag"
+    else
+      echo "[lmbench] WARNING: clang does not support -mthread-model=posix; skipping thread model flag."
+    fi
+    LDFLAGS_WASM+=("-Wl,--shared-memory")
+  else
+    echo "[lmbench] WARNING: clang does not support wasi-threads flags; disabling shared memory."
+    ENABLE_WASI_THREADS="0"
+  fi
+fi
+LDFLAGS="${LDFLAGS_WASM[*]}"
 # liblmb_stubs.a comes from the Makefile 'stubs' target
 LDLIBS="-llmb_stubs -ltirpc -lm"
 
