@@ -217,7 +217,7 @@ shopt -u nullglob
 have_files=0
 for f in "${bin_files[@]}"; do
   case "$f" in
-    *.o|*.a) continue ;;  # skip non-executable artifacts and post-processed outputs
+    *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm) continue ;;  # skip non-executable artifacts and post-processed outputs
   esac
   cp "$f" "$OUT_DIR/"
   have_files=1
