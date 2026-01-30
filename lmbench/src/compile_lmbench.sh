@@ -31,6 +31,7 @@ APPS_LIB_DIR="$APPS_BUILD/lib"
 APPS_BIN_ROOT="$APPS_BUILD/bin/lmbench"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 MAX_WASM_MEMORY="${MAX_WASM_MEMORY:-67108864}"
+ENABLE_WASI_THREADS="${ENABLE_WASI_THREADS:-1}"
 
 # We follow lind_compile's convention for WASMTIME_PROFILE (debug vs release)
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
@@ -76,6 +77,14 @@ fi
 : "${CLANG:?missing CLANG in $TOOL_ENV}"
 : "${AR:?missing AR in $TOOL_ENV}"
 : "${RANLIB:?missing RANLIB in $TOOL_ENV}"
+
+supports_cflag() {
+  local flag="$1"
+  printf 'int main(void){return 0;}\n' | \
+    "$CLANG" --target=wasm32-unknown-wasi --sysroot="$MERGED_SYSROOT" \
+    $flag -x c -c -o /dev/null - >/dev/null 2>&1
+}
+
 
 BASE_LIBC="$MERGED_SYSROOT/lib/wasm32-wasi/libc.a"
 TIRPC_MERGE_DIR="$APPS_OVERLAY/usr/lib/wasm32-wasi/merge_tmp"
@@ -198,6 +207,7 @@ if [[ ! -d "$LM_BENCH_BIN_DIR" ]]; then
   exit 1
 fi
 
+rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 shopt -s nullglob
@@ -207,7 +217,7 @@ shopt -u nullglob
 have_files=0
 for f in "${bin_files[@]}"; do
   case "$f" in
-    *.o|*.a) continue ;;  # skip non-executable artifacts
+    *.o|*.a) continue ;;  # skip non-executable artifacts and post-processed outputs
   esac
   cp "$f" "$OUT_DIR/"
   have_files=1
@@ -236,7 +246,7 @@ shopt -u nullglob
 
 for f in "${stage_bins[@]}"; do
   case "$f" in
-    *.o|*.a) continue ;;
+    *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm) continue ;;
   esac
 
   base="$(basename -- "$f")"
