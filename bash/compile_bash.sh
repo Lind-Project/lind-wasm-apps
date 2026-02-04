@@ -61,17 +61,10 @@ RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 # We follow lind_compile's convention for WASMTIME_PROFILE (debug vs release)
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 
-WASMTIME="${WASMTIME:-}"
-if [[ -z "$WASMTIME" ]]; then
-  for CANDIDATE in \
-    "$LIND_WASM_ROOT/build/wasmtime-release" \
-    "$LIND_WASM_ROOT/build/wasmtime-debug"
-  do
-    if [[ -x "$CANDIDATE" ]]; then
-      WASMTIME="$CANDIDATE"
-      break
-    fi
-  done
+WASMTIME="${WASMTIME:-$LIND_WASM_ROOT/build/wasmtime}"
+if [[ ! -x "${WASMTIME}" ]]; then
+  echo "ERROR: wasmtime missing: ${WASMTIME}" >&2
+  exit 127 # Note: This is the traditional "command not found" exit code, can be changed as needed
 fi
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
