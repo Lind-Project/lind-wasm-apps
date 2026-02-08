@@ -89,15 +89,21 @@
 
 
 #if (NGX_HAVE_FILE_AIO)
+
 #include <aio.h>
 typedef struct aiocb  ngx_aiocb_t;
+
+#if (__FreeBSD_version < 700005 && !defined __DragonFly__)
+#define sival_ptr     sigval_ptr
+#endif
+
 #endif
 
 
 #define NGX_LISTEN_BACKLOG        -1
 
 
-#ifdef __DragonFly__
+#if (defined __DragonFly__ && __DragonFly_version < 500702)
 #define NGX_KEEPALIVE_FACTOR      1000
 #endif
 

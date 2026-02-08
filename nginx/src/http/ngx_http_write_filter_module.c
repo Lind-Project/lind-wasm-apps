@@ -227,7 +227,8 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
     if (size == 0
         && !(c->buffered & NGX_LOWLEVEL_BUFFERED)
-        && !(last && c->need_last_buf))
+        && !(last && c->need_last_buf)
+        && !(flush && c->need_flush_buf))
     {
         if (last || flush || sync) {
             for (cl = r->out; cl; /* void */) {
@@ -238,6 +239,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
             r->out = NULL;
             c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
+
+            if (last) {
+                r->response_sent = 1;
+            }
 
             return NGX_OK;
         }
@@ -250,9 +255,17 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_ERROR;
     }
 
+    if (!r->limit_rate_set) {
+        r->limit_rate = ngx_http_complex_value_size(r, clcf->limit_rate, 0);
+        r->limit_rate_set = 1;
+    }
+
     if (r->limit_rate) {
-        if (r->limit_rate_after == 0) {
-            r->limit_rate_after = clcf->limit_rate_after;
+
+        if (!r->limit_rate_after_set) {
+            r->limit_rate_after = ngx_http_complex_value_size(r,
+                                                    clcf->limit_rate_after, 0);
+            r->limit_rate_after_set = 1;
         }
 
         limit = (off_t) r->limit_rate * (ngx_time() - r->start_sec + 1)
@@ -313,18 +326,13 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
         delay = (ngx_msec_t) ((nsent - sent) * 1000 / r->limit_rate);
 
         if (delay > 0) {
-            limit = 0;
             c->write->delayed = 1;
             ngx_add_timer(c->write, delay);
         }
     }
 
-    if (limit
-        && c->write->ready
-        && c->sent - sent >= limit - (off_t) (2 * ngx_pagesize))
-    {
-        c->write->delayed = 1;
-        ngx_add_timer(c->write, 1);
+    if (chain && c->write->ready && !c->write->delayed) {
+        ngx_post_event(c->write, &ngx_posted_next_events);
     }
 
     for (cl = r->out; cl && cl != chain; /* void */) {
@@ -341,6 +349,10 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
     }
 
     c->buffered &= ~NGX_HTTP_WRITE_BUFFERED;
+
+    if (last) {
+        r->response_sent = 1;
+    }
 
     if ((c->buffered & NGX_LOWLEVEL_BUFFERED) && r->postponed == NULL) {
         return NGX_AGAIN;

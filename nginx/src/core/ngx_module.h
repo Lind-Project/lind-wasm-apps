@@ -41,7 +41,7 @@
 #define NGX_MODULE_SIGNATURE_3   "0"
 #endif
 
-#if (NGX_HAVE_AIO_SENDFILE || NGX_COMPAT)
+#if (NGX_HAVE_SENDFILE_NODISKIO || NGX_COMPAT)
 #define NGX_MODULE_SIGNATURE_4   "1"
 #else
 #define NGX_MODULE_SIGNATURE_4   "0"
@@ -107,7 +107,12 @@
 #endif
 
 #define NGX_MODULE_SIGNATURE_17  "0"
+
+#if (NGX_QUIC || NGX_COMPAT)
+#define NGX_MODULE_SIGNATURE_18  "1"
+#else
 #define NGX_MODULE_SIGNATURE_18  "0"
+#endif
 
 #if (NGX_HAVE_OPENAT)
 #define NGX_MODULE_SIGNATURE_19  "1"

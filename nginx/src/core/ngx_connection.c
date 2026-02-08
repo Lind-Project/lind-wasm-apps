@@ -495,21 +495,24 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 return NGX_ERROR;
             }
 
-            if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
-                           (const void *) &reuseaddr, sizeof(int))
-                == -1)
-            {
-                ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                              "setsockopt(SO_REUSEADDR) %V failed",
-                              &ls[i].addr_text);
+            if (ls[i].type != SOCK_DGRAM || !ngx_test_config) {
 
-                if (ngx_close_socket(s) == -1) {
+                if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
+                               (const void *) &reuseaddr, sizeof(int))
+                    == -1)
+                {
                     ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
-                                  ngx_close_socket_n " %V failed",
+                                  "setsockopt(SO_REUSEADDR) %V failed",
                                   &ls[i].addr_text);
-                }
 
-                return NGX_ERROR;
+                    if (ngx_close_socket(s) == -1) {
+                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                      ngx_close_socket_n " %V failed",
+                                      &ls[i].addr_text);
+                    }
+
+                    return NGX_ERROR;
+                }
             }
 
 #if (NGX_HAVE_REUSEPORT)
@@ -657,7 +660,7 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                 /*
                  * on OpenVZ after suspend/resume EADDRINUSE
                  * may be returned by listen() instead of bind(), see
-                 * https://bugzilla.openvz.org/show_bug.cgi?id=2470
+                 * https://bugs.openvz.org/browse/OVZ-5587
                  */
 
                 if (err != NGX_EADDRINUSE || !ngx_test_config) {
@@ -1011,6 +1014,78 @@ ngx_configure_listening_sockets(ngx_cycle_t *cycle)
         }
 
 #endif
+
+#if (NGX_HAVE_IP_MTU_DISCOVER)
+
+        if (ls[i].quic && ls[i].sockaddr->sa_family == AF_INET) {
+            value = IP_PMTUDISC_DO;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IP, IP_MTU_DISCOVER,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IP_MTU_DISCOVER) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#elif (NGX_HAVE_IP_DONTFRAG)
+
+        if (ls[i].quic && ls[i].sockaddr->sa_family == AF_INET) {
+            value = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IP, IP_DONTFRAG,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IP_DONTFRAG) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#endif
+
+#if (NGX_HAVE_INET6)
+
+#if (NGX_HAVE_IPV6_MTU_DISCOVER)
+
+        if (ls[i].quic && ls[i].sockaddr->sa_family == AF_INET6) {
+            value = IPV6_PMTUDISC_DO;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IPV6, IPV6_MTU_DISCOVER,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IPV6_MTU_DISCOVER) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#elif (NGX_HAVE_IP_DONTFRAG)
+
+        if (ls[i].quic && ls[i].sockaddr->sa_family == AF_INET6) {
+            value = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IPV6, IPV6_DONTFRAG,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IPV6_DONTFRAG) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#endif
+
+#endif
     }
 
     return;
@@ -1033,6 +1108,12 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
 
     ls = cycle->listening.elts;
     for (i = 0; i < cycle->listening.nelts; i++) {
+
+#if (NGX_QUIC)
+        if (ls[i].quic) {
+            continue;
+        }
+#endif
 
         c = ls[i].connection;
 
@@ -1070,7 +1151,8 @@ ngx_close_listening_sockets(ngx_cycle_t *cycle)
 
         if (ls[i].sockaddr->sa_family == AF_UNIX
             && ngx_process <= NGX_PROCESS_MASTER
-            && ngx_new_binary == 0)
+            && ngx_new_binary == 0
+            && (!ls[i].inherited || ngx_getppid() != ngx_parent))
         {
             u_char *name = ls[i].addr_text.data + sizeof("unix:") - 1;
 
@@ -1106,12 +1188,9 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
         return NULL;
     }
 
-    c = ngx_cycle->free_connections;
+    ngx_drain_connections((ngx_cycle_t *) ngx_cycle);
 
-    if (c == NULL) {
-        ngx_drain_connections((ngx_cycle_t *) ngx_cycle);
-        c = ngx_cycle->free_connections;
-    }
+    c = ngx_cycle->free_connections;
 
     if (c == NULL) {
         ngx_log_error(NGX_LOG_ALERT, log, 0,
@@ -1297,6 +1376,22 @@ ngx_drain_connections(ngx_cycle_t *cycle)
     ngx_queue_t       *q;
     ngx_connection_t  *c;
 
+    if (cycle->free_connection_n > cycle->connection_n / 16
+        || cycle->reusable_connections_n == 0)
+    {
+        return;
+    }
+
+    if (cycle->connections_reuse_time != ngx_time()) {
+        cycle->connections_reuse_time = ngx_time();
+
+        ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                      "%ui worker_connections are not enough, "
+                      "reusing connections",
+                      cycle->connection_n);
+    }
+
+    c = NULL;
     n = ngx_max(ngx_min(32, cycle->reusable_connections_n / 8), 1);
 
     for (i = 0; i < n; i++) {
@@ -1309,6 +1404,21 @@ ngx_drain_connections(ngx_cycle_t *cycle)
 
         ngx_log_debug0(NGX_LOG_DEBUG_CORE, c->log, 0,
                        "reusing connection");
+
+        c->close = 1;
+        c->read->handler(c->read);
+    }
+
+    if (cycle->free_connection_n == 0 && c && c->reusable) {
+
+        /*
+         * if no connections were freed, try to reuse the last
+         * connection again: this should free it as long as
+         * previous reuse moved it to lingering close
+         */
+
+        ngx_log_debug0(NGX_LOG_DEBUG_CORE, c->log, 0,
+                       "reusing connection again");
 
         c->close = 1;
         c->read->handler(c->read);
@@ -1473,6 +1583,10 @@ ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text)
     }
 #endif
 
+    if (err == NGX_EMSGSIZE && c->log_error == NGX_ERROR_IGNORE_EMSGSIZE) {
+        return 0;
+    }
+
     if (err == 0
         || err == NGX_ECONNRESET
 #if (NGX_WIN32)
@@ -1490,6 +1604,7 @@ ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text)
     {
         switch (c->log_error) {
 
+        case NGX_ERROR_IGNORE_EMSGSIZE:
         case NGX_ERROR_IGNORE_EINVAL:
         case NGX_ERROR_IGNORE_ECONNRESET:
         case NGX_ERROR_INFO:

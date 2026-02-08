@@ -57,7 +57,9 @@ ngx_event_pipe(ngx_event_pipe_t *p, ngx_int_t do_write)
         do_write = 1;
     }
 
-    if (p->upstream->fd != (ngx_socket_t) -1) {
+    if (p->upstream
+        && p->upstream->fd != (ngx_socket_t) -1)
+    {
         rev = p->upstream->read;
 
         flags = (rev->eof || rev->error) ? NGX_CLOSE_EVENT : 0;
@@ -108,7 +110,9 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
     ngx_msec_t    delay;
     ngx_chain_t  *chain, *cl, *ln;
 
-    if (p->upstream_eof || p->upstream_error || p->upstream_done) {
+    if (p->upstream_eof || p->upstream_error || p->upstream_done
+        || p->upstream == NULL)
+    {
         return NGX_OK;
     }
 
@@ -172,7 +176,11 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
              */
 
             if (p->upstream->read->available == 0
-                && p->upstream->read->pending_eof)
+                && p->upstream->read->pending_eof
+#if (NGX_SSL)
+                && !p->upstream->ssl
+#endif
+                )
             {
                 p->upstream->read->ready = 0;
                 p->upstream->read->eof = 1;
@@ -956,6 +964,22 @@ ngx_event_pipe_copy_input_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
         return NGX_OK;
     }
 
+    if (p->upstream_done) {
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, p->log, 0,
+                       "input data after close");
+        return NGX_OK;
+    }
+
+    if (p->length == 0) {
+        p->upstream_done = 1;
+
+        ngx_log_error(NGX_LOG_WARN, p->log, 0,
+                      "upstream sent more data than specified in "
+                      "\"Content-Length\" header");
+
+        return NGX_OK;
+    }
+
     cl = ngx_chain_get_free_buf(p->pool, &p->free);
     if (cl == NULL) {
         return NGX_ERROR;
@@ -980,6 +1004,18 @@ ngx_event_pipe_copy_input_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
     p->last_in = &cl->next;
 
     if (p->length == -1) {
+        return NGX_OK;
+    }
+
+    if (b->last - b->pos > p->length) {
+
+        ngx_log_error(NGX_LOG_WARN, p->log, 0,
+                      "upstream sent more data than specified in "
+                      "\"Content-Length\" header");
+
+        b->last = b->pos + p->length;
+        p->upstream_done = 1;
+
         return NGX_OK;
     }
 

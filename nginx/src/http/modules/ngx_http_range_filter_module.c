@@ -258,6 +258,7 @@ next_filter:
     }
 
     r->headers_out.accept_ranges->hash = 1;
+    r->headers_out.accept_ranges->next = NULL;
     ngx_str_set(&r->headers_out.accept_ranges->key, "Accept-Ranges");
     ngx_str_set(&r->headers_out.accept_ranges->value, "bytes");
 
@@ -424,9 +425,14 @@ ngx_http_range_singlepart_header(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    if (r->headers_out.content_range) {
+        r->headers_out.content_range->hash = 0;
+    }
+
     r->headers_out.content_range = content_range;
 
     content_range->hash = 1;
+    content_range->next = NULL;
     ngx_str_set(&content_range->key, "Content-Range");
 
     content_range->value.data = ngx_pnalloc(r->pool,
@@ -580,6 +586,11 @@ ngx_http_range_multipart_header(ngx_http_request_t *r,
         r->headers_out.content_length = NULL;
     }
 
+    if (r->headers_out.content_range) {
+        r->headers_out.content_range->hash = 0;
+        r->headers_out.content_range = NULL;
+    }
+
     return ngx_http_next_header_filter(r);
 }
 
@@ -596,9 +607,14 @@ ngx_http_range_not_satisfiable(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
+    if (r->headers_out.content_range) {
+        r->headers_out.content_range->hash = 0;
+    }
+
     r->headers_out.content_range = content_range;
 
     content_range->hash = 1;
+    content_range->next = NULL;
     ngx_str_set(&content_range->key, "Content-Range");
 
     content_range->value.data = ngx_pnalloc(r->pool,
@@ -700,8 +716,9 @@ ngx_http_range_singlepart_body(ngx_http_request_t *r,
     ngx_http_range_filter_ctx_t *ctx, ngx_chain_t *in)
 {
     off_t              start, last;
+    ngx_int_t          rc;
     ngx_buf_t         *buf;
-    ngx_chain_t       *out, *cl, **ll;
+    ngx_chain_t       *out, *cl, *tl, **ll;
     ngx_http_range_t  *range;
 
     out = NULL;
@@ -721,8 +738,22 @@ ngx_http_range_singlepart_body(ngx_http_request_t *r,
                        "http range body buf: %O-%O", start, last);
 
         if (ngx_buf_special(buf)) {
-            *ll = cl;
-            ll = &cl->next;
+
+            if (range->end <= start) {
+                continue;
+            }
+
+            tl = ngx_alloc_chain_link(r->pool);
+            if (tl == NULL) {
+                return NGX_ERROR;
+            }
+
+            tl->buf = buf;
+            tl->next = NULL;
+
+            *ll = tl;
+            ll = &tl->next;
+
             continue;
         }
 
@@ -764,21 +795,42 @@ ngx_http_range_singlepart_body(ngx_http_request_t *r,
 
             buf->last_buf = (r == r->main) ? 1 : 0;
             buf->last_in_chain = 1;
-            *ll = cl;
-            cl->next = NULL;
 
-            break;
+            tl = ngx_alloc_chain_link(r->pool);
+            if (tl == NULL) {
+                return NGX_ERROR;
+            }
+
+            tl->buf = buf;
+            tl->next = NULL;
+
+            *ll = tl;
+            ll = &tl->next;
+
+            continue;
         }
 
-        *ll = cl;
-        ll = &cl->next;
+        tl = ngx_alloc_chain_link(r->pool);
+        if (tl == NULL) {
+            return NGX_ERROR;
+        }
+
+        tl->buf = buf;
+        tl->next = NULL;
+
+        *ll = tl;
+        ll = &tl->next;
     }
 
-    if (out == NULL) {
-        return NGX_OK;
+    rc = ngx_http_next_body_filter(r, out);
+
+    while (out) {
+        cl = out;
+        out = out->next;
+        ngx_free_chain(r->pool, cl);
     }
 
-    return ngx_http_next_body_filter(r, out);
+    return rc;
 }
 
 

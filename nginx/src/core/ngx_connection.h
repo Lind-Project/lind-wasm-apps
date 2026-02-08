@@ -45,8 +45,6 @@ struct ngx_listening_s {
     size_t              pool_size;
     /* should be here because of the AcceptEx() preread */
     size_t              post_accept_buffer_size;
-    /* should be here because of the deferred accept */
-    ngx_msec_t          post_accept_timeout;
 
     ngx_listening_t    *previous;
     ngx_connection_t   *connection;
@@ -75,6 +73,7 @@ struct ngx_listening_s {
     unsigned            reuseport:1;
     unsigned            add_reuseport:1;
     unsigned            keepalive:2;
+    unsigned            quic:1;
 
     unsigned            deferred_accept:1;
     unsigned            delete_deferred:1;
@@ -98,7 +97,8 @@ typedef enum {
     NGX_ERROR_ERR,
     NGX_ERROR_INFO,
     NGX_ERROR_IGNORE_ECONNRESET,
-    NGX_ERROR_IGNORE_EINVAL
+    NGX_ERROR_IGNORE_EINVAL,
+    NGX_ERROR_IGNORE_EMSGSIZE
 } ngx_connection_log_error_e;
 
 
@@ -147,8 +147,11 @@ struct ngx_connection_s {
     socklen_t           socklen;
     ngx_str_t           addr_text;
 
-    ngx_str_t           proxy_protocol_addr;
-    in_port_t           proxy_protocol_port;
+    ngx_proxy_protocol_t  *proxy_protocol;
+
+#if (NGX_QUIC || NGX_COMPAT)
+    ngx_quic_stream_t     *quic;
+#endif
 
 #if (NGX_SSL || NGX_COMPAT)
     ngx_ssl_connection_t  *ssl;
@@ -165,6 +168,7 @@ struct ngx_connection_s {
 
     ngx_atomic_uint_t   number;
 
+    ngx_msec_t          start_time;
     ngx_uint_t          requests;
 
     unsigned            buffered:8;
@@ -174,6 +178,7 @@ struct ngx_connection_s {
     unsigned            timedout:1;
     unsigned            error:1;
     unsigned            destroyed:1;
+    unsigned            pipeline:1;
 
     unsigned            idle:1;
     unsigned            reusable:1;
@@ -186,8 +191,9 @@ struct ngx_connection_s {
     unsigned            tcp_nopush:2;    /* ngx_connection_tcp_nopush_e */
 
     unsigned            need_last_buf:1;
+    unsigned            need_flush_buf:1;
 
-#if (NGX_HAVE_AIO_SENDFILE || NGX_COMPAT)
+#if (NGX_HAVE_SENDFILE_NODISKIO || NGX_COMPAT)
     unsigned            busy_count:2;
 #endif
 

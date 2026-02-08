@@ -318,6 +318,11 @@ ngx_http_rewrite(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
+    if (value[2].len == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "empty replacement");
+        return NGX_CONF_ERROR;
+    }
+
     ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
 
     rc.pattern = value[1];
@@ -484,6 +489,7 @@ ngx_http_rewrite_return(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 
         if (cf->args->nelts == 2) {
+            ngx_str_set(&ret->text.value, "");
             return NGX_CONF_OK;
         }
 

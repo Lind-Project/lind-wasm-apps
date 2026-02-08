@@ -575,6 +575,10 @@ ngx_http_clean_header(ngx_http_request_t *r)
     r->headers_out.headers.part.next = NULL;
     r->headers_out.headers.last = &r->headers_out.headers.part;
 
+    r->headers_out.trailers.part.nelts = 0;
+    r->headers_out.trailers.part.next = NULL;
+    r->headers_out.trailers.last = &r->headers_out.trailers.part;
+
     r->headers_out.content_length_n = -1;
     r->headers_out.last_modified_time = -1;
 }
@@ -623,6 +627,12 @@ ngx_http_send_error_page(ngx_http_request_t *r, ngx_http_err_page_t *err_page)
         return ngx_http_named_location(r, &uri);
     }
 
+    r->expect_tested = 1;
+
+    if (ngx_http_discard_request_body(r) != NGX_OK) {
+        r->keepalive = 0;
+    }
+
     location = ngx_list_push(&r->headers_out.headers);
 
     if (location == NULL) {
@@ -639,6 +649,7 @@ ngx_http_send_error_page(ngx_http_request_t *r, ngx_http_err_page_t *err_page)
     }
 
     location->hash = 1;
+    location->next = NULL;
     ngx_str_set(&location->key, "Location");
     location->value = uri;
 
