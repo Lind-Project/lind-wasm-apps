@@ -99,7 +99,7 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
 # Note: We do NOT pass WASM-specific flags via --with-ld-opt because configure
 # tests them with native compilation, which fails. Instead, we patch the
 # generated Makefile after configure completes.
-LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
+LDFLAGS_WASM="-Wl,--shared-memory,--import-memory,--export-memory,--max-memory=67108864 \
     -Wl,--export=__stack_pointer,--export=__stack_low \
     -L$MERGED_SYSROOT/lib/wasm32-wasi \
     -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
