@@ -174,7 +174,12 @@ ngx_rbtree_delete(ngx_rbtree_t *tree, ngx_rbtree_node_t *node)
 
     } else {
         subst = ngx_rbtree_min(node->right, sentinel);
-        temp = subst->right;
+
+        if (subst->left != sentinel) {
+            temp = subst->left;
+        } else {
+            temp = subst->right;
+        }
     }
 
     if (subst == *root) {

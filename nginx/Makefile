@@ -4,8 +4,6 @@ default:	build
 clean:
 	rm -rf Makefile objs
 
-.PHONY:	default clean
-
 build:
 	$(MAKE) -f objs/Makefile
 
@@ -23,5 +21,3 @@ upgrade:
 	test -f /var/run/nginx.pid.oldbin
 
 	kill -QUIT `cat /var/run/nginx.pid.oldbin`
-
-.PHONY:	build install modules upgrade

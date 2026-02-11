@@ -9,12 +9,11 @@
 #include <ngx_core.h>
 
 
-char     ngx_darwin_kern_ostype[16];
-char     ngx_darwin_kern_osrelease[128];
-int      ngx_darwin_hw_ncpu;
-int      ngx_darwin_kern_ipc_somaxconn;
-u_long   ngx_darwin_net_inet_tcp_sendspace;
-int64_t  ngx_darwin_hw_cachelinesize;
+char    ngx_darwin_kern_ostype[16];
+char    ngx_darwin_kern_osrelease[128];
+int     ngx_darwin_hw_ncpu;
+int     ngx_darwin_kern_ipc_somaxconn;
+u_long  ngx_darwin_net_inet_tcp_sendspace;
 
 ngx_uint_t  ngx_debug_malloc;
 
@@ -56,10 +55,6 @@ sysctl_t sysctls[] = {
     { "kern.ipc.somaxconn",
       &ngx_darwin_kern_ipc_somaxconn,
       sizeof(ngx_darwin_kern_ipc_somaxconn), 0 },
-
-    { "hw.cachelinesize",
-      &ngx_darwin_hw_cachelinesize,
-      sizeof(ngx_darwin_hw_cachelinesize), 0 },
 
     { NULL, NULL, 0, 0 }
 };
@@ -160,7 +155,6 @@ ngx_os_specific_init(ngx_log_t *log)
         return NGX_ERROR;
     }
 
-    ngx_cacheline_size = ngx_darwin_hw_cachelinesize;
     ngx_ncpu = ngx_darwin_hw_ncpu;
 
     if (ngx_darwin_kern_ipc_somaxconn > 32767) {

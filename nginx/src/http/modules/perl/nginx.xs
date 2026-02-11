@@ -15,10 +15,8 @@
 #include "XSUB.h"
 
 
-#define ngx_http_perl_set_request(r, ctx)                                     \
-                                                                              \
-    ctx = INT2PTR(ngx_http_perl_ctx_t *, SvIV((SV *) SvRV(ST(0))));           \
-    r = ctx->request
+#define ngx_http_perl_set_request(r)                                          \
+    r = INT2PTR(ngx_http_request_t *, SvIV((SV *) SvRV(ST(0))))
 
 
 #define ngx_http_perl_set_targ(p, len)                                        \
@@ -66,12 +64,14 @@ ngx_http_perl_sv2str(pTHX_ ngx_http_request_t *r, ngx_str_t *s, SV *sv)
 
 
 static ngx_int_t
-ngx_http_perl_output(ngx_http_request_t *r, ngx_http_perl_ctx_t *ctx,
-    ngx_buf_t *b)
+ngx_http_perl_output(ngx_http_request_t *r, ngx_buf_t *b)
 {
-    ngx_chain_t   out;
+    ngx_chain_t           out;
 #if (NGX_HTTP_SSI)
-    ngx_chain_t  *cl;
+    ngx_chain_t          *cl;
+    ngx_http_perl_ctx_t  *ctx;
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_perl_module);
 
     if (ctx->ssi) {
         cl = ngx_alloc_chain_link(r->pool);
@@ -105,14 +105,9 @@ void
 status(r, code)
     CODE:
 
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->variable) {
-        croak("status(): cannot be used in variable handler");
-    }
+    ngx_http_perl_set_request(r);
 
     r->headers_out.status = SvIV(ST(1));
 
@@ -126,28 +121,10 @@ void
 send_http_header(r, ...)
     CODE:
 
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
-    SV                   *sv;
-    ngx_int_t             rc;
+    ngx_http_request_t  *r;
+    SV                  *sv;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->error) {
-        croak("send_http_header(): called after error");
-    }
-
-    if (ctx->variable) {
-        croak("send_http_header(): cannot be used in variable handler");
-    }
-
-    if (ctx->header_sent) {
-        croak("send_http_header(): header already sent");
-    }
-
-    if (ctx->redirect_uri.len) {
-        croak("send_http_header(): cannot be used with internal_redirect()");
-    }
+    ngx_http_perl_set_request(r);
 
     if (r->headers_out.status == 0) {
         r->headers_out.status = NGX_HTTP_OK;
@@ -159,30 +136,18 @@ send_http_header(r, ...)
         if (ngx_http_perl_sv2str(aTHX_ r, &r->headers_out.content_type, sv)
             != NGX_OK)
         {
-            ctx->error = 1;
-            croak("ngx_http_perl_sv2str() failed");
+            XSRETURN_EMPTY;
         }
 
         r->headers_out.content_type_len = r->headers_out.content_type.len;
 
     } else {
         if (ngx_http_set_content_type(r) != NGX_OK) {
-            ctx->error = 1;
-            croak("ngx_http_set_content_type() failed");
+            XSRETURN_EMPTY;
         }
     }
 
-    ctx->header_sent = 1;
-
-    r->disable_not_modified = 1;
-
-    rc = ngx_http_send_header(r);
-
-    if (rc == NGX_ERROR || rc > NGX_OK) {
-        ctx->error = 1;
-        ctx->status = rc;
-        croak("ngx_http_send_header() failed");
-    }
+    (void) ngx_http_send_header(r);
 
 
 void
@@ -190,10 +155,9 @@ header_only(r)
     CODE:
 
     dXSTARG;
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
     sv_upgrade(TARG, SVt_IV);
     sv_setiv(TARG, r->header_only);
@@ -206,10 +170,9 @@ uri(r)
     CODE:
 
     dXSTARG;
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
     ngx_http_perl_set_targ(r->uri.data, r->uri.len);
 
     ST(0) = TARG;
@@ -220,10 +183,9 @@ args(r)
     CODE:
 
     dXSTARG;
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
     ngx_http_perl_set_targ(r->args.data, r->args.len);
 
     ST(0) = TARG;
@@ -234,10 +196,9 @@ request_method(r)
     CODE:
 
     dXSTARG;
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
     ngx_http_perl_set_targ(r->method_name.data, r->method_name.len);
 
     ST(0) = TARG;
@@ -248,10 +209,9 @@ remote_addr(r)
     CODE:
 
     dXSTARG;
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
     ngx_http_perl_set_targ(r->connection->addr_text.data,
                            r->connection->addr_text.len);
 
@@ -264,18 +224,18 @@ header_in(r, key)
 
     dXSTARG;
     ngx_http_request_t         *r;
-    ngx_http_perl_ctx_t        *ctx;
     SV                         *key;
     u_char                     *p, *lowcase_key, *value, sep;
     STRLEN                      len;
     ssize_t                     size;
-    ngx_uint_t                  i, hash;
+    ngx_uint_t                  i, n, hash;
+    ngx_array_t                *a;
     ngx_list_part_t            *part;
-    ngx_table_elt_t            *h, *header, **ph;
+    ngx_table_elt_t            *h, **ph;
     ngx_http_header_t          *hh;
     ngx_http_core_main_conf_t  *cmcf;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
     key = ST(1);
 
@@ -289,8 +249,7 @@ header_in(r, key)
 
     lowcase_key = ngx_pnalloc(r->pool, len);
     if (lowcase_key == NULL) {
-        ctx->error = 1;
-        croak("ngx_pnalloc() failed");
+        XSRETURN_UNDEF;
     }
 
     hash = ngx_hash_strlow(lowcase_key, p, len);
@@ -301,22 +260,76 @@ header_in(r, key)
 
     if (hh) {
 
-        if (hh->offset == offsetof(ngx_http_headers_in_t, cookie)) {
+        if (hh->offset == offsetof(ngx_http_headers_in_t, cookies)) {
             sep = ';';
-
-        } else {
-            sep = ',';
+            goto multi;
         }
+#if (NGX_HTTP_X_FORWARDED_FOR)
+        if (hh->offset == offsetof(ngx_http_headers_in_t, x_forwarded_for)) {
+            sep = ',';
+            goto multi;
+        }
+#endif
 
         ph = (ngx_table_elt_t **) ((char *) &r->headers_in + hh->offset);
 
-        goto found;
+        if (*ph) {
+            ngx_http_perl_set_targ((*ph)->value.data, (*ph)->value.len);
+
+            goto done;
+        }
+
+        XSRETURN_UNDEF;
+
+    multi:
+
+        /* Cookie, X-Forwarded-For */
+
+        a = (ngx_array_t *) ((char *) &r->headers_in + hh->offset);
+
+        n = a->nelts;
+
+        if (n == 0) {
+            XSRETURN_UNDEF;
+        }
+
+        ph = a->elts;
+
+        if (n == 1) {
+            ngx_http_perl_set_targ((*ph)->value.data, (*ph)->value.len);
+
+            goto done;
+        }
+
+        size = - (ssize_t) (sizeof("; ") - 1);
+
+        for (i = 0; i < n; i++) {
+            size += ph[i]->value.len + sizeof("; ") - 1;
+        }
+
+        value = ngx_pnalloc(r->pool, size);
+        if (value == NULL) {
+            XSRETURN_UNDEF;
+        }
+
+        p = value;
+
+        for (i = 0; /* void */ ; i++) {
+            p = ngx_copy(p, ph[i]->value.data, ph[i]->value.len);
+
+            if (i == n - 1) {
+                break;
+            }
+
+            *p++ = sep; *p++ = ' ';
+        }
+
+        ngx_http_perl_set_targ(value, size);
+
+        goto done;
     }
 
     /* iterate over all headers */
-
-    sep = ',';
-    ph = &header;
 
     part = &r->headers_in.headers.part;
     h = part->elts;
@@ -339,49 +352,12 @@ header_in(r, key)
             continue;
         }
 
-        *ph = &h[i];
-        ph = &h[i].next;
-    }
+        ngx_http_perl_set_targ(h[i].value.data, h[i].value.len);
 
-    *ph = NULL;
-    ph = &header;
-
-    found:
-
-    if (*ph == NULL) {
-        XSRETURN_UNDEF;
-    }
-
-    if ((*ph)->next == NULL) {
-        ngx_http_perl_set_targ((*ph)->value.data, (*ph)->value.len);
         goto done;
     }
 
-    size = - (ssize_t) (sizeof("; ") - 1);
-
-    for (h = *ph; h; h = h->next) {
-        size += h->value.len + sizeof("; ") - 1;
-    }
-
-    value = ngx_pnalloc(r->pool, size);
-    if (value == NULL) {
-        ctx->error = 1;
-        croak("ngx_pnalloc() failed");
-    }
-
-    p = value;
-
-    for (h = *ph; h; h = h->next) {
-        p = ngx_copy(p, h->value.data, h->value.len);
-
-        if (h->next == NULL) {
-            break;
-        }
-
-        *p++ = sep; *p++ = ' ';
-    }
-
-    ngx_http_perl_set_targ(value, size);
+    XSRETURN_UNDEF;
 
     done:
 
@@ -395,22 +371,14 @@ has_request_body(r, next)
     dXSTARG;
     ngx_http_request_t   *r;
     ngx_http_perl_ctx_t  *ctx;
-    ngx_int_t             rc;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->variable) {
-        croak("has_request_body(): cannot be used in variable handler");
-    }
-
-    if (ctx->next) {
-        croak("has_request_body(): another handler active");
-    }
+    ngx_http_perl_set_request(r);
 
     if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
         XSRETURN_UNDEF;
     }
 
+    ctx = ngx_http_get_module_ctx(r, ngx_http_perl_module);
     ctx->next = SvRV(ST(1));
 
     r->request_body_in_single_buf = 1;
@@ -421,14 +389,7 @@ has_request_body(r, next)
         r->request_body_file_log_level = 0;
     }
 
-    rc = ngx_http_read_client_request_body(r, ngx_http_perl_handle_request);
-
-    if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
-        ctx->error = 1;
-        ctx->status = rc;
-        ctx->next = NULL;
-        croak("ngx_http_read_client_request_body() failed");
-    }
+    ngx_http_read_client_request_body(r, ngx_http_perl_handle_request);
 
     sv_upgrade(TARG, SVt_IV);
     sv_setiv(TARG, 1);
@@ -441,14 +402,13 @@ request_body(r)
     CODE:
 
     dXSTARG;
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
-    u_char               *p, *data;
-    size_t                len;
-    ngx_buf_t            *buf;
-    ngx_chain_t          *cl;
+    ngx_http_request_t  *r;
+    u_char              *p, *data;
+    size_t               len;
+    ngx_buf_t           *buf;
+    ngx_chain_t         *cl;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
     if (r->request_body == NULL
         || r->request_body->temp_file
@@ -476,8 +436,7 @@ request_body(r)
 
     p = ngx_pnalloc(r->pool, len);
     if (p == NULL) {
-        ctx->error = 1;
-        croak("ngx_pnalloc() failed");
+        XSRETURN_UNDEF;
     }
 
     data = p;
@@ -504,10 +463,9 @@ request_body_file(r)
     CODE:
 
     dXSTARG;
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
     if (r->request_body == NULL || r->request_body->temp_file == NULL) {
         XSRETURN_UNDEF;
@@ -523,67 +481,42 @@ void
 discard_request_body(r)
     CODE:
 
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
-    ngx_int_t             rc;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
-    if (ctx->variable) {
-        croak("discard_request_body(): cannot be used in variable handler");
-    }
-
-    rc = ngx_http_discard_request_body(r);
-
-    if (rc != NGX_OK) {
-        ctx->error = 1;
-        ctx->status = rc;
-        croak("ngx_http_discard_request_body() failed");
-    }
+    ngx_http_discard_request_body(r);
 
 
 void
 header_out(r, key, value)
     CODE:
 
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
-    SV                   *key;
-    SV                   *value;
-    ngx_table_elt_t      *header;
+    ngx_http_request_t  *r;
+    SV                  *key;
+    SV                  *value;
+    ngx_table_elt_t     *header;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->error) {
-        croak("header_out(): called after error");
-    }
-
-    if (ctx->variable) {
-        croak("header_out(): cannot be used in variable handler");
-    }
+    ngx_http_perl_set_request(r);
 
     key = ST(1);
     value = ST(2);
 
     header = ngx_list_push(&r->headers_out.headers);
     if (header == NULL) {
-        ctx->error = 1;
-        croak("ngx_list_push() failed");
+        XSRETURN_EMPTY;
     }
 
     header->hash = 1;
-    header->next = NULL;
 
     if (ngx_http_perl_sv2str(aTHX_ r, &header->key, key) != NGX_OK) {
         header->hash = 0;
-        ctx->error = 1;
-        croak("ngx_http_perl_sv2str() failed");
+        XSRETURN_EMPTY;
     }
 
     if (ngx_http_perl_sv2str(aTHX_ r, &header->value, value) != NGX_OK) {
         header->hash = 0;
-        ctx->error = 1;
-        croak("ngx_http_perl_sv2str() failed");
+        XSRETURN_EMPTY;
     }
 
     if (header->key.len == sizeof("Content-Length") - 1
@@ -607,19 +540,19 @@ filename(r)
     CODE:
 
     dXSTARG;
+    size_t                root;
     ngx_http_request_t   *r;
     ngx_http_perl_ctx_t  *ctx;
-    size_t                root;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
+    ctx = ngx_http_get_module_ctx(r, ngx_http_perl_module);
     if (ctx->filename.data) {
         goto done;
     }
 
     if (ngx_http_map_uri_to_path(r, &ctx->filename, &root, 0) == NULL) {
-        ctx->error = 1;
-        croak("ngx_http_map_uri_to_path() failed");
+        XSRETURN_UNDEF;
     }
 
     ctx->filename.len--;
@@ -636,29 +569,15 @@ void
 print(r, ...)
     CODE:
 
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
-    SV                   *sv;
-    int                   i;
-    u_char               *p;
-    size_t                size;
-    STRLEN                len;
-    ngx_int_t             rc;
-    ngx_buf_t            *b;
+    ngx_http_request_t  *r;
+    SV                  *sv;
+    int                  i;
+    u_char              *p;
+    size_t               size;
+    STRLEN               len;
+    ngx_buf_t           *b;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->error) {
-        croak("print(): called after error");
-    }
-
-    if (ctx->variable) {
-        croak("print(): cannot be used in variable handler");
-    }
-
-    if (!ctx->header_sent) {
-        croak("print(): header not sent");
-    }
+    ngx_http_perl_set_request(r);
 
     if (items == 2) {
 
@@ -683,8 +602,7 @@ print(r, ...)
 
             b = ngx_calloc_buf(r->pool);
             if (b == NULL) {
-                ctx->error = 1;
-                croak("ngx_calloc_buf() failed");
+                XSRETURN_EMPTY;
             }
 
             b->memory = 1;
@@ -724,8 +642,7 @@ print(r, ...)
 
     b = ngx_create_temp_buf(r->pool, size);
     if (b == NULL) {
-        ctx->error = 1;
-        croak("ngx_create_temp_buf() failed");
+        XSRETURN_EMPTY;
     }
 
     for (i = 1; i < items; i++) {
@@ -741,12 +658,7 @@ print(r, ...)
 
     out:
 
-    rc = ngx_http_perl_output(r, ctx, b);
-
-    if (rc == NGX_ERROR) {
-        ctx->error = 1;
-        croak("ngx_http_perl_output() failed");
-    }
+    (void) ngx_http_perl_output(r, b);
 
 
 void
@@ -754,29 +666,15 @@ sendfile(r, filename, offset = -1, bytes = 0)
     CODE:
 
     ngx_http_request_t        *r;
-    ngx_http_perl_ctx_t       *ctx;
     char                      *filename;
     off_t                      offset;
     size_t                     bytes;
-    ngx_int_t                  rc;
     ngx_str_t                  path;
     ngx_buf_t                 *b;
     ngx_open_file_info_t       of;
     ngx_http_core_loc_conf_t  *clcf;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->error) {
-        croak("sendfile(): called after error");
-    }
-
-    if (ctx->variable) {
-        croak("sendfile(): cannot be used in variable handler");
-    }
-
-    if (!ctx->header_sent) {
-        croak("sendfile(): header not sent");
-    }
+    ngx_http_perl_set_request(r);
 
     filename = SvPV_nolen(ST(1));
 
@@ -789,22 +687,19 @@ sendfile(r, filename, offset = -1, bytes = 0)
 
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
-        ctx->error = 1;
-        croak("ngx_calloc_buf() failed");
+        XSRETURN_EMPTY;
     }
 
     b->file = ngx_pcalloc(r->pool, sizeof(ngx_file_t));
     if (b->file == NULL) {
-        ctx->error = 1;
-        croak("ngx_pcalloc() failed");
+        XSRETURN_EMPTY;
     }
 
     path.len = ngx_strlen(filename);
 
     path.data = ngx_pnalloc(r->pool, path.len + 1);
     if (path.data == NULL) {
-        ctx->error = 1;
-        croak("ngx_pnalloc() failed");
+        XSRETURN_EMPTY;
     }
 
     (void) ngx_cpystrn(path.data, (u_char *) filename, path.len + 1);
@@ -821,23 +716,19 @@ sendfile(r, filename, offset = -1, bytes = 0)
     of.events = clcf->open_file_cache_events;
 
     if (ngx_http_set_disable_symlinks(r, clcf, &path, &of) != NGX_OK) {
-        ctx->error = 1;
-        croak("ngx_http_set_disable_symlinks() failed");
+        XSRETURN_EMPTY;
     }
 
     if (ngx_open_cached_file(clcf->open_file_cache, &path, &of, r->pool)
         != NGX_OK)
     {
         if (of.err == 0) {
-            ctx->error = 1;
-            croak("ngx_open_cached_file() failed");
+            XSRETURN_EMPTY;
         }
 
         ngx_log_error(NGX_LOG_CRIT, r->connection->log, ngx_errno,
                       "%s \"%s\" failed", of.failed, filename);
-
-        ctx->error = 1;
-        croak("ngx_open_cached_file() failed");
+        XSRETURN_EMPTY;
     }
 
     if (offset == -1) {
@@ -857,53 +748,28 @@ sendfile(r, filename, offset = -1, bytes = 0)
     b->file->log = r->connection->log;
     b->file->directio = of.is_directio;
 
-    rc = ngx_http_perl_output(r, ctx, b);
-
-    if (rc == NGX_ERROR) {
-        ctx->error = 1;
-        croak("ngx_http_perl_output() failed");
-    }
+    (void) ngx_http_perl_output(r, b);
 
 
 void
 flush(r)
     CODE:
 
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
-    ngx_int_t             rc;
-    ngx_buf_t            *b;
+    ngx_http_request_t  *r;
+    ngx_buf_t           *b;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->error) {
-        croak("flush(): called after error");
-    }
-
-    if (ctx->variable) {
-        croak("flush(): cannot be used in variable handler");
-    }
-
-    if (!ctx->header_sent) {
-        croak("flush(): header not sent");
-    }
+    ngx_http_perl_set_request(r);
 
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {
-        ctx->error = 1;
-        croak("ngx_calloc_buf() failed");
+        XSRETURN_EMPTY;
     }
 
     b->flush = 1;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "$r->flush");
 
-    rc = ngx_http_perl_output(r, ctx, b);
-
-    if (rc == NGX_ERROR) {
-        ctx->error = 1;
-        croak("ngx_http_perl_output() failed");
-    }
+    (void) ngx_http_perl_output(r, b);
 
     XSRETURN_EMPTY;
 
@@ -913,24 +779,29 @@ internal_redirect(r, uri)
     CODE:
 
     ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
     SV                   *uri;
+    ngx_uint_t            i;
+    ngx_http_perl_ctx_t  *ctx;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->variable) {
-        croak("internal_redirect(): cannot be used in variable handler");
-    }
-
-    if (ctx->header_sent) {
-        croak("internal_redirect(): header already sent");
-    }
+    ngx_http_perl_set_request(r);
 
     uri = ST(1);
 
+    ctx = ngx_http_get_module_ctx(r, ngx_http_perl_module);
+
     if (ngx_http_perl_sv2str(aTHX_ r, &ctx->redirect_uri, uri) != NGX_OK) {
-        ctx->error = 1;
-        croak("ngx_http_perl_sv2str() failed");
+        XSRETURN_EMPTY;
+    }
+
+    for (i = 0; i < ctx->redirect_uri.len; i++) {
+        if (ctx->redirect_uri.data[i] == '?') {
+
+            ctx->redirect_args.len = ctx->redirect_uri.len - (i + 1);
+            ctx->redirect_args.data = &ctx->redirect_uri.data[i + 1];
+            ctx->redirect_uri.len = i;
+
+            XSRETURN_EMPTY;
+        }
     }
 
 
@@ -938,14 +809,9 @@ void
 allow_ranges(r)
     CODE:
 
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
+    ngx_http_request_t  *r;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->variable) {
-        croak("allow_ranges(): cannot be used in variable handler");
-    }
+    ngx_http_perl_set_request(r);
 
     r->allow_ranges = 1;
 
@@ -955,14 +821,13 @@ unescape(r, text, type = 0)
     CODE:
 
     dXSTARG;
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
-    SV                   *text;
-    int                   type;
-    u_char               *p, *dst, *src;
-    STRLEN                len;
+    ngx_http_request_t  *r;
+    SV                  *text;
+    int                  type;
+    u_char              *p, *dst, *src;
+    STRLEN               len;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
     text = ST(1);
 
@@ -970,8 +835,7 @@ unescape(r, text, type = 0)
 
     p = ngx_pnalloc(r->pool, len + 1);
     if (p == NULL) {
-        ctx->error = 1;
-        croak("ngx_pnalloc() failed");
+        XSRETURN_UNDEF;
     }
 
     dst = p;
@@ -992,16 +856,16 @@ variable(r, name, value = NULL)
 
     dXSTARG;
     ngx_http_request_t         *r;
-    ngx_http_perl_ctx_t        *ctx;
     SV                         *name, *value;
     u_char                     *p, *lowcase;
     STRLEN                      len;
     ngx_str_t                   var, val;
     ngx_uint_t                  i, hash;
     ngx_http_perl_var_t        *v;
+    ngx_http_perl_ctx_t        *ctx;
     ngx_http_variable_value_t  *vv;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
     name = ST(1);
 
@@ -1020,8 +884,7 @@ variable(r, name, value = NULL)
         }
 
         if (ngx_http_perl_sv2str(aTHX_ r, &val, value) != NGX_OK) {
-            ctx->error = 1;
-            croak("ngx_http_perl_sv2str() failed");
+            XSRETURN_UNDEF;
         }
     }
 
@@ -1029,8 +892,7 @@ variable(r, name, value = NULL)
 
     lowcase = ngx_pnalloc(r->pool, len);
     if (lowcase == NULL) {
-        ctx->error = 1;
-        croak("ngx_pnalloc() failed");
+        XSRETURN_UNDEF;
     }
 
     hash = ngx_hash_strlow(lowcase, p, len);
@@ -1050,11 +912,12 @@ variable(r, name, value = NULL)
 
     vv = ngx_http_get_variable(r, &var, hash);
     if (vv == NULL) {
-        ctx->error = 1;
-        croak("ngx_http_get_variable() failed");
+        XSRETURN_UNDEF;
     }
 
     if (vv->not_found) {
+
+        ctx = ngx_http_get_module_ctx(r, ngx_http_perl_module);
 
         if (ctx->variables) {
 
@@ -1084,15 +947,13 @@ variable(r, name, value = NULL)
                 ctx->variables = ngx_array_create(r->pool, 1,
                                                   sizeof(ngx_http_perl_var_t));
                 if (ctx->variables == NULL) {
-                    ctx->error = 1;
-                    croak("ngx_array_create() failed");
+                    XSRETURN_UNDEF;
                 }
             }
 
             v = ngx_array_push(ctx->variables);
             if (v == NULL) {
-                ctx->error = 1;
-                croak("ngx_array_push() failed");
+                XSRETURN_UNDEF;
             }
 
             v->hash = hash;
@@ -1128,23 +989,17 @@ sleep(r, sleep, next)
     CODE:
 
     ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
     ngx_msec_t            sleep;
+    ngx_http_perl_ctx_t  *ctx;
 
-    ngx_http_perl_set_request(r, ctx);
-
-    if (ctx->variable) {
-        croak("sleep(): cannot be used in variable handler");
-    }
-
-    if (ctx->next) {
-        croak("sleep(): another handler active");
-    }
+    ngx_http_perl_set_request(r);
 
     sleep = (ngx_msec_t) SvIV(ST(1));
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "perl sleep: %M", sleep);
+
+    ctx = ngx_http_get_module_ctx(r, ngx_http_perl_module);
 
     ctx->next = SvRV(ST(2));
 
@@ -1159,14 +1014,13 @@ void
 log_error(r, err, msg)
     CODE:
 
-    ngx_http_request_t   *r;
-    ngx_http_perl_ctx_t  *ctx;
-    SV                   *err, *msg;
-    u_char               *p;
-    STRLEN                len;
-    ngx_err_t             e;
+    ngx_http_request_t  *r;
+    SV                  *err, *msg;
+    u_char              *p;
+    STRLEN               len;
+    ngx_err_t            e;
 
-    ngx_http_perl_set_request(r, ctx);
+    ngx_http_perl_set_request(r);
 
     err = ST(1);
 

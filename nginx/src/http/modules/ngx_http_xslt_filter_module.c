@@ -233,7 +233,6 @@ ngx_http_xslt_header_filter(ngx_http_request_t *r)
     ngx_http_set_ctx(r, ctx, ngx_http_xslt_filter_module);
 
     r->main_filter_need_in_memory = 1;
-    r->allow_ranges = 0;
 
     return NGX_OK;
 }
@@ -629,7 +628,7 @@ static ngx_int_t
 ngx_http_xslt_params(ngx_http_request_t *r, ngx_http_xslt_filter_ctx_t *ctx,
     ngx_array_t *params, ngx_uint_t final)
 {
-    u_char                 *p, *value, *dst, *src, **s;
+    u_char                 *p, *last, *value, *dst, *src, **s;
     size_t                  len;
     ngx_uint_t              i;
     ngx_str_t               string;
@@ -699,6 +698,8 @@ ngx_http_xslt_params(ngx_http_request_t *r, ngx_http_xslt_filter_ctx_t *ctx,
             ngx_memcpy(p, string.data, string.len + 1);
         }
 
+        last = p + string.len;
+
         while (p && *p) {
 
             value = p;
@@ -728,7 +729,7 @@ ngx_http_xslt_params(ngx_http_request_t *r, ngx_http_xslt_filter_ctx_t *ctx,
                 *p++ = '\0';
 
             } else {
-                len = ngx_strlen(value);
+                len = last - value;
             }
 
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
@@ -1112,7 +1113,7 @@ ngx_http_xslt_filter_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
                              ngx_http_xslt_default_types)
-        != NGX_CONF_OK)
+        != NGX_OK)
     {
         return NGX_CONF_ERROR;
     }

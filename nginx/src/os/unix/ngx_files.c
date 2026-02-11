@@ -110,8 +110,6 @@ ngx_thread_read(ngx_file_t *file, u_char *buf, size_t size, off_t offset,
             return NGX_ERROR;
         }
 
-        task->event.log = file->log;
-
         file->thread_task = task;
     }
 
@@ -495,8 +493,6 @@ ngx_thread_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl, off_t offset,
             return NGX_ERROR;
         }
 
-        task->event.log = file->log;
-
         file->thread_task = task;
     }
 
@@ -879,26 +875,7 @@ ngx_fs_bsize(u_char *name)
         return 512;
     }
 
-#if (NGX_LINUX)
-    if ((size_t) fs.f_bsize > ngx_pagesize) {
-        return 512;
-    }
-#endif
-
     return (size_t) fs.f_bsize;
-}
-
-
-off_t
-ngx_fs_available(u_char *name)
-{
-    struct statfs  fs;
-
-    if (statfs((char *) name, &fs) == -1) {
-        return NGX_MAX_OFF_T_VALUE;
-    }
-
-    return (off_t) fs.f_bavail * fs.f_bsize;
 }
 
 #elif (NGX_HAVE_STATVFS)
@@ -916,26 +893,7 @@ ngx_fs_bsize(u_char *name)
         return 512;
     }
 
-#if (NGX_LINUX)
-    if ((size_t) fs.f_frsize > ngx_pagesize) {
-        return 512;
-    }
-#endif
-
     return (size_t) fs.f_frsize;
-}
-
-
-off_t
-ngx_fs_available(u_char *name)
-{
-    struct statvfs  fs;
-
-    if (statvfs((char *) name, &fs) == -1) {
-        return NGX_MAX_OFF_T_VALUE;
-    }
-
-    return (off_t) fs.f_bavail * fs.f_frsize;
 }
 
 #else
@@ -944,13 +902,6 @@ size_t
 ngx_fs_bsize(u_char *name)
 {
     return 512;
-}
-
-
-off_t
-ngx_fs_available(u_char *name)
-{
-    return NGX_MAX_OFF_T_VALUE;
 }
 
 #endif

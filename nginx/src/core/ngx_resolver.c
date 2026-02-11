@@ -51,7 +51,9 @@ typedef struct {
 } ngx_resolver_an_t;
 
 
-#define ngx_resolver_node(n)  ngx_rbtree_data(n, ngx_resolver_node_t, node)
+#define ngx_resolver_node(n)                                                 \
+    (ngx_resolver_node_t *)                                                  \
+        ((u_char *) (n) - offsetof(ngx_resolver_node_t, node))
 
 
 static ngx_int_t ngx_udp_connect(ngx_resolver_connection_t *rec);
@@ -157,8 +159,6 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
     cln->handler = ngx_resolver_cleanup;
     cln->data = r;
 
-    r->ipv4 = 1;
-
     ngx_rbtree_init(&r->name_rbtree, &r->name_sentinel,
                     ngx_resolver_rbtree_insert_value);
 
@@ -227,23 +227,6 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
         }
 
 #if (NGX_HAVE_INET6)
-        if (ngx_strncmp(names[i].data, "ipv4=", 5) == 0) {
-
-            if (ngx_strcmp(&names[i].data[5], "on") == 0) {
-                r->ipv4 = 1;
-
-            } else if (ngx_strcmp(&names[i].data[5], "off") == 0) {
-                r->ipv4 = 0;
-
-            } else {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                   "invalid parameter: %V", &names[i]);
-                return NULL;
-            }
-
-            continue;
-        }
-
         if (ngx_strncmp(names[i].data, "ipv6=", 5) == 0) {
 
             if (ngx_strcmp(&names[i].data[5], "on") == 0) {
@@ -291,14 +274,6 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
             rec[j].resolver = r;
         }
     }
-
-#if (NGX_HAVE_INET6)
-    if (r->ipv4 + r->ipv6 == 0) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "\"ipv4\" and \"ipv6\" cannot both be \"off\"");
-        return NULL;
-    }
-#endif
 
     if (n && r->connections.nelts == 0) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "no name servers defined");
@@ -863,7 +838,7 @@ ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx,
         r->last_connection = 0;
     }
 
-    rn->naddrs = r->ipv4 ? (u_short) -1 : 0;
+    rn->naddrs = (u_short) -1;
     rn->tcp = 0;
 #if (NGX_HAVE_INET6)
     rn->naddrs6 = r->ipv6 ? (u_short) -1 : 0;
@@ -997,8 +972,7 @@ ngx_resolve_addr(ngx_resolver_ctx_t *ctx)
 
             name = ngx_resolver_dup(r, rn->name, rn->nlen);
             if (name == NULL) {
-                ngx_resolver_free(r, ctx);
-                return NGX_ERROR;
+                goto failed;
             }
 
             ctx->name.len = rn->nlen;
@@ -1290,7 +1264,7 @@ ngx_resolver_send_query(ngx_resolver_t *r, ngx_resolver_node_t *rn)
         rec->log.action = "resolving";
     }
 
-    if (rn->query && rn->naddrs == (u_short) -1) {
+    if (rn->naddrs == (u_short) -1) {
         rc = rn->tcp ? ngx_resolver_send_tcp_query(r, rec, rn->query, rn->qlen)
                      : ngx_resolver_send_udp_query(r, rec, rn->query, rn->qlen);
 
@@ -1416,7 +1390,6 @@ ngx_resolver_send_tcp_query(ngx_resolver_t *r, ngx_resolver_connection_t *rec,
 
         rec->tcp->data = rec;
         rec->tcp->write->handler = ngx_resolver_tcp_write;
-        rec->tcp->write->cancelable = 1;
         rec->tcp->read->handler = ngx_resolver_tcp_read;
         rec->tcp->read->resolver = 1;
 
@@ -1589,28 +1562,13 @@ ngx_resolver_udp_read(ngx_event_t *rev)
     do {
         n = ngx_udp_recv(c, buf, NGX_RESOLVER_UDP_SIZE);
 
-        if (n == NGX_AGAIN) {
-            break;
-        }
-
-        if (n == NGX_ERROR) {
-            goto failed;
+        if (n < 0) {
+            return;
         }
 
         ngx_resolver_process_response(rec->resolver, buf, n, 0);
 
     } while (rev->ready);
-
-    if (ngx_handle_read_event(rev, 0) != NGX_OK) {
-        goto failed;
-    }
-
-    return;
-
-failed:
-
-    ngx_close_connection(rec->udp);
-    rec->udp = NULL;
 }
 
 
@@ -1792,13 +1750,10 @@ ngx_resolver_process_response(ngx_resolver_t *r, u_char *buf, size_t n,
              q = ngx_queue_next(q))
         {
             rn = ngx_queue_data(q, ngx_resolver_node_t, queue);
+            qident = (rn->query[0] << 8) + rn->query[1];
 
-            if (rn->query) {
-                qident = (rn->query[0] << 8) + rn->query[1];
-
-                if (qident == ident) {
-                    goto dns_error_name;
-                }
+            if (qident == ident) {
+                goto dns_error_name;
             }
 
 #if (NGX_HAVE_INET6)
@@ -1827,12 +1782,6 @@ ngx_resolver_process_response(ngx_resolver_t *r, u_char *buf, size_t n,
     i = sizeof(ngx_resolver_hdr_t);
 
     while (i < (ngx_uint_t) n) {
-
-        if (buf[i] & 0xc0) {
-            err = "unexpected compression pointer in DNS response";
-            goto done;
-        }
-
         if (buf[i] == '\0') {
             goto found;
         }
@@ -1968,7 +1917,7 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t n,
 
     if (rn == NULL) {
         ngx_log_error(r->log_level, r->log, 0,
-                      "unexpected DNS response for %V", &name);
+                      "unexpected response for %V", &name);
         ngx_resolver_free(r, name.data);
         goto failed;
     }
@@ -1980,7 +1929,7 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t n,
 
         if (rn->query6 == NULL || rn->naddrs6 != (u_short) -1) {
             ngx_log_error(r->log_level, r->log, 0,
-                          "unexpected DNS response for %V", &name);
+                          "unexpected response for %V", &name);
             ngx_resolver_free(r, name.data);
             goto failed;
         }
@@ -1999,7 +1948,7 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t n,
 
         if (rn->query == NULL || rn->naddrs != (u_short) -1) {
             ngx_log_error(r->log_level, r->log, 0,
-                          "unexpected DNS response for %V", &name);
+                          "unexpected response for %V", &name);
             ngx_resolver_free(r, name.data);
             goto failed;
         }
@@ -2014,7 +1963,7 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t n,
 
     if (ident != qident) {
         ngx_log_error(r->log_level, r->log, 0,
-                      "wrong ident %ui in DNS response for %V, expect %ui",
+                      "wrong ident %ui response for %V, expect %ui",
                       ident, &name, qident);
         ngx_resolver_free(r, name.data);
         goto failed;
@@ -2199,7 +2148,7 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t n,
 
         if (class != 1) {
             ngx_log_error(r->log_level, r->log, 0,
-                          "unexpected RR class %ui in DNS response", class);
+                          "unexpected RR class %ui", class);
             goto failed;
         }
 
@@ -2268,7 +2217,7 @@ ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t n,
         default:
 
             ngx_log_error(r->log_level, r->log, 0,
-                          "unexpected RR type %ui in DNS response", type);
+                          "unexpected RR type %ui", type);
         }
 
         i += len;
@@ -2617,7 +2566,7 @@ ngx_resolver_process_srv(ngx_resolver_t *r, u_char *buf, size_t n,
 
     if (rn == NULL || rn->query == NULL) {
         ngx_log_error(r->log_level, r->log, 0,
-                      "unexpected DNS response for %V", &name);
+                      "unexpected response for %V", &name);
         ngx_resolver_free(r, name.data);
         goto failed;
     }
@@ -2631,7 +2580,7 @@ ngx_resolver_process_srv(ngx_resolver_t *r, u_char *buf, size_t n,
 
     if (ident != qident) {
         ngx_log_error(r->log_level, r->log, 0,
-                      "wrong ident %ui in DNS response for %V, expect %ui",
+                      "wrong ident %ui response for %V, expect %ui",
                       ident, &name, qident);
         ngx_resolver_free(r, name.data);
         goto failed;
@@ -2741,7 +2690,7 @@ ngx_resolver_process_srv(ngx_resolver_t *r, u_char *buf, size_t n,
 
         if (class != 1) {
             ngx_log_error(r->log_level, r->log, 0,
-                          "unexpected RR class %ui in DNS response", class);
+                          "unexpected RR class %ui", class);
             goto failed;
         }
 
@@ -2784,7 +2733,7 @@ ngx_resolver_process_srv(ngx_resolver_t *r, u_char *buf, size_t n,
         default:
 
             ngx_log_error(r->log_level, r->log, 0,
-                          "unexpected RR type %ui in DNS response", type);
+                          "unexpected RR type %ui", type);
         }
 
         i += len;
@@ -3215,7 +3164,7 @@ valid:
 
     if (rn == NULL || rn->query == NULL) {
         ngx_log_error(r->log_level, r->log, 0,
-                      "unexpected DNS response for %V", &name);
+                      "unexpected response for %V", &name);
         ngx_resolver_free(r, name.data);
         goto failed;
     }
@@ -3224,7 +3173,7 @@ valid:
 
     if (ident != qident) {
         ngx_log_error(r->log_level, r->log, 0,
-                      "wrong ident %ui in DNS response for %V, expect %ui",
+                      "wrong ident %ui response for %V, expect %ui",
                       ident, &name, qident);
         ngx_resolver_free(r, name.data);
         goto failed;
@@ -3306,7 +3255,7 @@ valid:
 
         if (class != 1) {
             ngx_log_error(r->log_level, r->log, 0,
-                          "unexpected RR class %ui in DNS response", class);
+                          "unexpected RR class %ui", class);
             goto failed;
         }
 
@@ -3333,7 +3282,7 @@ valid:
         default:
 
             ngx_log_error(r->log_level, r->log, 0,
-                          "unexpected RR type %ui in DNS response", type);
+                          "unexpected RR type %ui", type);
         }
 
         i += len;
@@ -3675,7 +3624,7 @@ ngx_resolver_create_name_query(ngx_resolver_t *r, ngx_resolver_node_t *rn,
     len = sizeof(ngx_resolver_hdr_t) + nlen + sizeof(ngx_resolver_qs_t);
 
 #if (NGX_HAVE_INET6)
-    p = ngx_resolver_alloc(r, len * (r->ipv4 + r->ipv6));
+    p = ngx_resolver_alloc(r, r->ipv6 ? len * 2 : len);
 #else
     p = ngx_resolver_alloc(r, len);
 #endif
@@ -3688,21 +3637,19 @@ ngx_resolver_create_name_query(ngx_resolver_t *r, ngx_resolver_node_t *rn,
 
 #if (NGX_HAVE_INET6)
     if (r->ipv6) {
-        rn->query6 = r->ipv4 ? (p + len) : p;
+        rn->query6 = p + len;
     }
 #endif
 
     query = (ngx_resolver_hdr_t *) p;
 
-    if (r->ipv4) {
-        ident = ngx_random();
+    ident = ngx_random();
 
-        ngx_log_debug2(NGX_LOG_DEBUG_CORE, r->log, 0,
-                       "resolve: \"%V\" A %i", name, ident & 0xffff);
+    ngx_log_debug2(NGX_LOG_DEBUG_CORE, r->log, 0,
+                   "resolve: \"%V\" A %i", name, ident & 0xffff);
 
-        query->ident_hi = (u_char) ((ident >> 8) & 0xff);
-        query->ident_lo = (u_char) (ident & 0xff);
-    }
+    query->ident_hi = (u_char) ((ident >> 8) & 0xff);
+    query->ident_lo = (u_char) (ident & 0xff);
 
     /* recursion query */
     query->flags_hi = 1; query->flags_lo = 0;
@@ -3763,9 +3710,7 @@ ngx_resolver_create_name_query(ngx_resolver_t *r, ngx_resolver_node_t *rn,
 
     p = rn->query6;
 
-    if (r->ipv4) {
-        ngx_memcpy(p, rn->query, rn->qlen);
-    }
+    ngx_memcpy(p, rn->query, rn->qlen);
 
     query = (ngx_resolver_hdr_t *) p;
 
@@ -3978,11 +3923,11 @@ ngx_resolver_copy(ngx_resolver_t *r, ngx_str_t *name, u_char *buf, u_char *src,
 {
     char        *err;
     u_char      *p, *dst;
-    size_t       len;
+    ssize_t      len;
     ngx_uint_t   i, n;
 
     p = src;
-    len = 0;
+    len = -1;
 
     /*
      * compression pointers allow to create endless loop, so we set limit;
@@ -3997,16 +3942,6 @@ ngx_resolver_copy(ngx_resolver_t *r, ngx_str_t *name, u_char *buf, u_char *src,
         }
 
         if (n & 0xc0) {
-            if ((n & 0xc0) != 0xc0) {
-                err = "invalid label type in DNS response";
-                goto invalid;
-            }
-
-            if (p >= last) {
-                err = "name is out of DNS response";
-                goto invalid;
-            }
-
             n = ((n & 0x3f) << 8) + *p;
             p = &buf[n];
 
@@ -4016,12 +3951,12 @@ ngx_resolver_copy(ngx_resolver_t *r, ngx_str_t *name, u_char *buf, u_char *src,
         }
 
         if (p >= last) {
-            err = "name is out of DNS response";
+            err = "name is out of response";
             goto invalid;
         }
     }
 
-    err = "compression pointers loop in DNS response";
+    err = "compression pointers loop";
 
 invalid:
 
@@ -4035,7 +3970,7 @@ done:
         return NGX_OK;
     }
 
-    if (len == 0) {
+    if (len == -1) {
         ngx_str_null(name);
         return NGX_OK;
     }
@@ -4047,23 +3982,30 @@ done:
 
     name->data = dst;
 
+    n = *src++;
+
     for ( ;; ) {
-        n = *src++;
-
-        if (n == 0) {
-            name->len = dst - name->data - 1;
-            return NGX_OK;
-        }
-
         if (n & 0xc0) {
             n = ((n & 0x3f) << 8) + *src;
             src = &buf[n];
+
+            n = *src++;
 
         } else {
             ngx_strlow(dst, src, n);
             dst += n;
             src += n;
-            *dst++ = '.';
+
+            n = *src++;
+
+            if (n != 0) {
+                *dst++ = '.';
+            }
+        }
+
+        if (n == 0) {
+            name->len = dst - name->data;
+            return NGX_OK;
         }
     }
 }
@@ -4324,15 +4266,7 @@ ngx_resolver_report_srv(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx)
     }
 
     if (naddrs == 0) {
-        ctx->state = srvs[0].state;
-
-        for (i = 0; i < nsrvs; i++) {
-            if (srvs[i].state == NGX_RESOLVE_NXDOMAIN) {
-                ctx->state = NGX_RESOLVE_NXDOMAIN;
-                break;
-            }
-        }
-
+        ctx->state = NGX_RESOLVE_NXDOMAIN;
         ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
 
         ctx->handler(ctx);
@@ -4501,8 +4435,6 @@ ngx_udp_connect(ngx_resolver_connection_t *rec)
 
     c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
 
-    c->start_time = ngx_current_msec;
-
     ngx_log_debug3(NGX_LOG_DEBUG_EVENT, &rec->log, 0,
                    "connect to %V, fd:%d #%uA", &rec->server, s, c->number);
 
@@ -4588,8 +4520,6 @@ ngx_tcp_connect(ngx_resolver_connection_t *rec)
     rec->tcp = c;
 
     c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
-
-    c->start_time = ngx_current_msec;
 
     if (ngx_add_conn) {
         if (ngx_add_conn(c) == NGX_ERROR) {

@@ -138,12 +138,6 @@ ngx_mail_pop3_auth_state(ngx_event_t *rev)
     if (s->out.len) {
         ngx_log_debug0(NGX_LOG_DEBUG_MAIL, c->log, 0, "pop3 send handler busy");
         s->blocked = 1;
-
-        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-            ngx_mail_close_connection(c);
-            return;
-        }
-
         return;
     }
 
@@ -151,16 +145,7 @@ ngx_mail_pop3_auth_state(ngx_event_t *rev)
 
     rc = ngx_mail_read_command(s, c);
 
-    if (rc == NGX_AGAIN) {
-        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-            ngx_mail_session_internal_server_error(s);
-            return;
-        }
-
-        return;
-    }
-
-    if (rc == NGX_ERROR) {
+    if (rc == NGX_AGAIN || rc == NGX_ERROR) {
         return;
     }
 
@@ -262,10 +247,6 @@ ngx_mail_pop3_auth_state(ngx_event_t *rev)
         }
     }
 
-    if (s->buffer->pos < s->buffer->last) {
-        s->blocked = 1;
-    }
-
     switch (rc) {
 
     case NGX_DONE:
@@ -287,19 +268,11 @@ ngx_mail_pop3_auth_state(ngx_event_t *rev)
     case NGX_OK:
 
         s->args.nelts = 0;
-
-        if (s->buffer->pos == s->buffer->last) {
-            s->buffer->pos = s->buffer->start;
-            s->buffer->last = s->buffer->start;
-        }
+        s->buffer->pos = s->buffer->start;
+        s->buffer->last = s->buffer->start;
 
         if (s->state) {
-            s->arg_start = s->buffer->pos;
-        }
-
-        if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-            ngx_mail_session_internal_server_error(s);
-            return;
+            s->arg_start = s->buffer->start;
         }
 
         ngx_mail_send(c->write);
@@ -407,8 +380,6 @@ ngx_mail_pop3_stls(ngx_mail_session_t *s, ngx_connection_t *c)
     if (c->ssl == NULL) {
         sslcf = ngx_mail_get_module_srv_conf(s, ngx_mail_ssl_module);
         if (sslcf->starttls) {
-            s->buffer->pos = s->buffer->start;
-            s->buffer->last = s->buffer->start;
             c->read->handler = ngx_mail_starttls_handler;
             return NGX_OK;
         }

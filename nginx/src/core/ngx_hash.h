@@ -89,15 +89,12 @@ typedef struct {
 } ngx_hash_keys_arrays_t;
 
 
-typedef struct ngx_table_elt_s  ngx_table_elt_t;
-
-struct ngx_table_elt_s {
+typedef struct {
     ngx_uint_t        hash;
     ngx_str_t         key;
     ngx_str_t         value;
     u_char           *lowcase_key;
-    ngx_table_elt_t  *next;
-};
+} ngx_table_elt_t;
 
 
 void *ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len);

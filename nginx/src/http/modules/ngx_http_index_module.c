@@ -163,7 +163,7 @@ ngx_http_index_handler(ngx_http_request_t *r)
 
             name = ngx_http_map_uri_to_path(r, &path, &root, reserve);
             if (name == NULL) {
-                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+                return NGX_ERROR;
             }
 
             allocated = path.data + path.len - name;
@@ -490,7 +490,7 @@ ngx_http_index_set_index(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (value[i].len == 0) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "index \"%V\" in \"index\" directive is invalid",
-                               &value[i]);
+                               &value[1]);
             return NGX_CONF_ERROR;
         }
 

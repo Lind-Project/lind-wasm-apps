@@ -65,9 +65,8 @@ typedef struct ngx_http_core_loc_conf_s  ngx_http_core_loc_conf_t;
 
 
 typedef struct {
-    struct sockaddr           *sockaddr;
+    ngx_sockaddr_t             sockaddr;
     socklen_t                  socklen;
-    ngx_str_t                  addr_text;
 
     unsigned                   set:1;
     unsigned                   default_server:1;
@@ -75,7 +74,6 @@ typedef struct {
     unsigned                   wildcard:1;
     unsigned                   ssl:1;
     unsigned                   http2:1;
-    unsigned                   quic:1;
 #if (NGX_HAVE_INET6)
     unsigned                   ipv6only:1;
 #endif
@@ -87,7 +85,6 @@ typedef struct {
     int                        backlog;
     int                        rcvbuf;
     int                        sndbuf;
-    int                        type;
 #if (NGX_HAVE_SETFIB)
     int                        setfib;
 #endif
@@ -103,6 +100,8 @@ typedef struct {
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
     char                      *accept_filter;
 #endif
+
+    u_char                     addr[NGX_SOCKADDR_STRLEN + 1];
 } ngx_http_listen_opt_t;
 
 
@@ -239,7 +238,6 @@ struct ngx_http_addr_conf_s {
 
     unsigned                   ssl:1;
     unsigned                   http2:1;
-    unsigned                   quic:1;
     unsigned                   proxy_protocol:1;
 };
 
@@ -269,7 +267,6 @@ typedef struct {
 
 typedef struct {
     ngx_int_t                  family;
-    ngx_int_t                  type;
     in_port_t                  port;
     ngx_array_t                addrs;     /* array of ngx_http_conf_addr_t */
 } ngx_http_conf_port_t;
@@ -277,10 +274,6 @@ typedef struct {
 
 typedef struct {
     ngx_http_listen_opt_t      opt;
-
-    unsigned                   protocols:3;
-    unsigned                   protocols_set:1;
-    unsigned                   protocols_changed:1;
 
     ngx_hash_t                 hash;
     ngx_hash_wildcard_t       *wc_head;
@@ -307,7 +300,6 @@ typedef struct {
 
 struct ngx_http_core_loc_conf_s {
     ngx_str_t     name;          /* location name */
-    ngx_str_t     escaped_name;
 
 #if (NGX_PCRE)
     ngx_http_regex_t  *regex;
@@ -358,23 +350,19 @@ struct ngx_http_core_loc_conf_s {
     size_t        client_body_buffer_size; /* client_body_buffer_size */
     size_t        send_lowat;              /* send_lowat */
     size_t        postpone_output;         /* postpone_output */
+    size_t        limit_rate;              /* limit_rate */
+    size_t        limit_rate_after;        /* limit_rate_after */
     size_t        sendfile_max_chunk;      /* sendfile_max_chunk */
     size_t        read_ahead;              /* read_ahead */
     size_t        subrequest_output_buffer_size;
                                            /* subrequest_output_buffer_size */
 
-    ngx_http_complex_value_t  *limit_rate; /* limit_rate */
-    ngx_http_complex_value_t  *limit_rate_after; /* limit_rate_after */
-
     ngx_msec_t    client_body_timeout;     /* client_body_timeout */
     ngx_msec_t    send_timeout;            /* send_timeout */
-    ngx_msec_t    keepalive_time;          /* keepalive_time */
     ngx_msec_t    keepalive_timeout;       /* keepalive_timeout */
-    ngx_msec_t    keepalive_min_timeout;   /* keepalive_min_timeout */
     ngx_msec_t    lingering_time;          /* lingering_time */
     ngx_msec_t    lingering_timeout;       /* lingering_timeout */
     ngx_msec_t    resolver_timeout;        /* resolver_timeout */
-    ngx_msec_t    auth_delay;              /* auth_delay */
 
     ngx_resolver_t  *resolver;             /* resolver */
 
@@ -472,8 +460,8 @@ struct ngx_http_location_tree_node_s {
     ngx_http_core_loc_conf_t        *exact;
     ngx_http_core_loc_conf_t        *inclusive;
 
-    u_short                          len;
     u_char                           auto_redirect;
+    u_char                           len;
     u_char                           name[1];
 };
 
@@ -511,8 +499,8 @@ ngx_int_t ngx_http_gzip_ok(ngx_http_request_t *r);
 
 
 ngx_int_t ngx_http_subrequest(ngx_http_request_t *r,
-    ngx_str_t *uri, ngx_str_t *args, ngx_http_request_t **psr,
-    ngx_http_post_subrequest_t *ps, ngx_uint_t flags);
+    ngx_str_t *uri, ngx_str_t *args, ngx_http_request_t **sr,
+    ngx_http_post_subrequest_t *psr, ngx_uint_t flags);
 ngx_int_t ngx_http_internal_redirect(ngx_http_request_t *r,
     ngx_str_t *uri, ngx_str_t *args);
 ngx_int_t ngx_http_named_location(ngx_http_request_t *r, ngx_str_t *name);
@@ -538,10 +526,8 @@ ngx_int_t ngx_http_set_disable_symlinks(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t *clcf, ngx_str_t *path, ngx_open_file_info_t *of);
 
 ngx_int_t ngx_http_get_forwarded_addr(ngx_http_request_t *r, ngx_addr_t *addr,
-    ngx_table_elt_t *headers, ngx_str_t *value, ngx_array_t *proxies,
+    ngx_array_t *headers, ngx_str_t *value, ngx_array_t *proxies,
     int recursive);
-
-ngx_int_t ngx_http_link_multi_headers(ngx_http_request_t *r);
 
 
 extern ngx_module_t  ngx_http_core_module;

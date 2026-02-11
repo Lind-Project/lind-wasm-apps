@@ -329,7 +329,7 @@ static ngx_http_variable_t  ngx_http_ssi_vars[] = {
 static ngx_int_t
 ngx_http_ssi_header_filter(ngx_http_request_t *r)
 {
-    ngx_http_ssi_ctx_t       *ctx, *mctx;
+    ngx_http_ssi_ctx_t       *ctx;
     ngx_http_ssi_loc_conf_t  *slcf;
 
     slcf = ngx_http_get_module_loc_conf(r, ngx_http_ssi_filter_module);
@@ -340,8 +340,6 @@ ngx_http_ssi_header_filter(ngx_http_request_t *r)
     {
         return ngx_http_next_header_filter(r);
     }
-
-    mctx = ngx_http_get_module_ctx(r->main, ngx_http_ssi_filter_module);
 
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_ssi_ctx_t));
     if (ctx == NULL) {
@@ -369,26 +367,6 @@ ngx_http_ssi_header_filter(ngx_http_request_t *r)
     r->filter_need_in_memory = 1;
 
     if (r == r->main) {
-
-        if (mctx) {
-
-            /*
-             * if there was a shared context previously used as main,
-             * copy variables and blocks
-             */
-
-            ctx->variables = mctx->variables;
-            ctx->blocks = mctx->blocks;
-
-#if (NGX_PCRE)
-            ctx->ncaptures = mctx->ncaptures;
-            ctx->captures = mctx->captures;
-            ctx->captures_data = mctx->captures_data;
-#endif
-
-            mctx->shared = 0;
-        }
-
         ngx_http_clear_content_length(r);
         ngx_http_clear_accept_ranges(r);
 
@@ -401,10 +379,6 @@ ngx_http_ssi_header_filter(ngx_http_request_t *r)
         } else {
             ngx_http_weak_etag(r);
         }
-
-    } else if (mctx == NULL) {
-        ngx_http_set_ctx(r->main, ctx, ngx_http_ssi_filter_module);
-        ctx->shared = 1;
     }
 
     return ngx_http_next_header_filter(r);
@@ -431,7 +405,6 @@ ngx_http_ssi_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ctx = ngx_http_get_module_ctx(r, ngx_http_ssi_filter_module);
 
     if (ctx == NULL
-        || (ctx->shared && r == r->main)
         || (in == NULL
             && ctx->buf == NULL
             && ctx->in == NULL
@@ -482,13 +455,9 @@ ngx_http_ssi_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     while (ctx->in || ctx->buf) {
 
         if (ctx->buf == NULL) {
-
-            cl = ctx->in;
-            ctx->buf = cl->buf;
-            ctx->in = cl->next;
+            ctx->buf = ctx->in->buf;
+            ctx->in = ctx->in->next;
             ctx->pos = ctx->buf->pos;
-
-            ngx_free_chain(r->pool, cl);
         }
 
         if (ctx->state == ssi_start_state) {
@@ -820,7 +789,7 @@ ngx_http_ssi_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
                 }
 
                 for (prm = cmd->params; prm->name.len; prm++) {
-                    if (prm->mandatory && params[prm->index] == NULL) {
+                    if (prm->mandatory && params[prm->index] == 0) {
                         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                                       "mandatory \"%V\" parameter is absent "
                                       "in \"%V\" SSI command",
@@ -1285,9 +1254,9 @@ ngx_http_ssi_parse(ngx_http_request_t *r, ngx_http_ssi_ctx_t *ctx)
             case '-':
                 state = ssi_error_end0_state;
 
+                ctx->param->key.data[ctx->param->key.len++] = ch;
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                              "unexpected \"-\" symbol after \"%V\" "
-                              "parameter in \"%V\" SSI command",
+                              "invalid \"%V\" parameter in \"%V\" SSI command",
                               &ctx->param->key, &ctx->command);
                 break;
 
@@ -2005,7 +1974,7 @@ ngx_http_ssi_regex_match(ngx_http_request_t *r, ngx_str_t *pattern,
 #else
 
     ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
-                  "using regex \"%V\" in SSI requires PCRE library",
+                  "the using of the regex \"%V\" in SSI requires PCRE library",
                   pattern);
     return NGX_HTTP_SSI_ERROR;
 
@@ -2942,7 +2911,7 @@ ngx_http_ssi_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
                              ngx_http_html_default_types)
-        != NGX_CONF_OK)
+        != NGX_OK)
     {
         return NGX_CONF_ERROR;
     }

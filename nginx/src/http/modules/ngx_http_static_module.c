@@ -50,7 +50,6 @@ ngx_http_static_handler(ngx_http_request_t *r)
 {
     u_char                    *last, *location;
     size_t                     root, len;
-    uintptr_t                  escape;
     ngx_str_t                  path;
     ngx_int_t                  rc;
     ngx_uint_t                 level;
@@ -156,18 +155,14 @@ ngx_http_static_handler(ngx_http_request_t *r)
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
-        escape = 2 * ngx_escape_uri(NULL, r->uri.data, r->uri.len,
-                                    NGX_ESCAPE_URI);
+        len = r->uri.len + 1;
 
-        if (!clcf->alias && r->args.len == 0 && escape == 0) {
-            len = r->uri.len + 1;
-            location = path.data + root;
+        if (!clcf->alias && clcf->root_lengths == NULL && r->args.len == 0) {
+            location = path.data + clcf->root.len;
 
             *last = '/';
 
         } else {
-            len = r->uri.len + escape + 1;
-
             if (r->args.len) {
                 len += r->args.len + 1;
             }
@@ -178,13 +173,7 @@ ngx_http_static_handler(ngx_http_request_t *r)
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
-            if (escape) {
-                last = (u_char *) ngx_escape_uri(location, r->uri.data,
-                                                 r->uri.len, NGX_ESCAPE_URI);
-
-            } else {
-                last = ngx_copy(location, r->uri.data, r->uri.len);
-            }
+            last = ngx_copy(location, r->uri.data, r->uri.len);
 
             *last = '/';
 
@@ -195,7 +184,6 @@ ngx_http_static_handler(ngx_http_request_t *r)
         }
 
         r->headers_out.location->hash = 1;
-        r->headers_out.location->next = NULL;
         ngx_str_set(&r->headers_out.location->key, "Location");
         r->headers_out.location->value.len = len;
         r->headers_out.location->value.data = location;
@@ -238,6 +226,10 @@ ngx_http_static_handler(ngx_http_request_t *r)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+    if (r != r->main && of.size == 0) {
+        return ngx_http_send_header(r);
+    }
+
     r->allow_ranges = 1;
 
     /* we need to allocate all before the header would be sent */
@@ -261,10 +253,9 @@ ngx_http_static_handler(ngx_http_request_t *r)
     b->file_pos = 0;
     b->file_last = of.size;
 
-    b->in_file = b->file_last ? 1 : 0;
-    b->last_buf = (r == r->main) ? 1 : 0;
+    b->in_file = b->file_last ? 1: 0;
+    b->last_buf = (r == r->main) ? 1: 0;
     b->last_in_chain = 1;
-    b->sync = (b->last_buf || b->in_file) ? 0 : 1;
 
     b->file->fd = of.fd;
     b->file->name = path;

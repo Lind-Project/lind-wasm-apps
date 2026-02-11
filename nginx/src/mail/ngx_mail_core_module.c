@@ -85,13 +85,6 @@ static ngx_command_t  ngx_mail_core_commands[] = {
       offsetof(ngx_mail_core_srv_conf_t, resolver_timeout),
       NULL },
 
-    { ngx_string("max_errors"),
-      NGX_MAIL_MAIN_CONF|NGX_MAIL_SRV_CONF|NGX_CONF_TAKE1,
-      ngx_conf_set_num_slot,
-      NGX_MAIL_SRV_CONF_OFFSET,
-      offsetof(ngx_mail_core_srv_conf_t, max_errors),
-      NULL },
-
       ngx_null_command
 };
 
@@ -170,8 +163,6 @@ ngx_mail_core_create_srv_conf(ngx_conf_t *cf)
     cscf->timeout = NGX_CONF_UNSET_MSEC;
     cscf->resolver_timeout = NGX_CONF_UNSET_MSEC;
 
-    cscf->max_errors = NGX_CONF_UNSET_UINT;
-
     cscf->resolver = NGX_CONF_UNSET_PTR;
 
     cscf->file_name = cf->conf_file->file.name.data;
@@ -191,7 +182,6 @@ ngx_mail_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->resolver_timeout, prev->resolver_timeout,
                               30000);
 
-    ngx_conf_merge_uint_value(conf->max_errors, prev->max_errors, 5);
 
     ngx_conf_merge_str_value(conf->server_name, prev->server_name, "");
 
@@ -307,8 +297,8 @@ ngx_mail_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_str_t                  *value, size;
     ngx_url_t                   u;
-    ngx_uint_t                  i, n, m;
-    ngx_mail_listen_t          *ls, *als, *nls;
+    ngx_uint_t                  i, m;
+    ngx_mail_listen_t          *ls;
     ngx_mail_module_t          *module;
     ngx_mail_core_main_conf_t  *cmcf;
 
@@ -333,6 +323,22 @@ ngx_mail_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     cmcf = ngx_mail_conf_get_module_main_conf(cf, ngx_mail_core_module);
 
+    ls = cmcf->listen.elts;
+
+    for (i = 0; i < cmcf->listen.nelts; i++) {
+
+        if (ngx_cmp_sockaddr(&ls[i].sockaddr.sockaddr, ls[i].socklen,
+                             (struct sockaddr *) &u.sockaddr, u.socklen, 1)
+            != NGX_OK)
+        {
+            continue;
+        }
+
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "duplicate \"%V\" address and port pair", &u.url);
+        return NGX_CONF_ERROR;
+    }
+
     ls = ngx_array_push(&cmcf->listen);
     if (ls == NULL) {
         return NGX_CONF_ERROR;
@@ -340,9 +346,13 @@ ngx_mail_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_memzero(ls, sizeof(ngx_mail_listen_t));
 
+    ngx_memcpy(&ls->sockaddr.sockaddr, &u.sockaddr, u.socklen);
+
+    ls->socklen = u.socklen;
     ls->backlog = NGX_LISTEN_BACKLOG;
     ls->rcvbuf = -1;
     ls->sndbuf = -1;
+    ls->wildcard = u.wildcard;
     ls->ctx = cf->ctx;
 
 #if (NGX_HAVE_INET6)
@@ -424,24 +434,39 @@ ngx_mail_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         if (ngx_strncmp(value[i].data, "ipv6only=o", 10) == 0) {
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
-            if (ngx_strcmp(&value[i].data[10], "n") == 0) {
-                ls->ipv6only = 1;
+            size_t  len;
+            u_char  buf[NGX_SOCKADDR_STRLEN];
 
-            } else if (ngx_strcmp(&value[i].data[10], "ff") == 0) {
-                ls->ipv6only = 0;
+            if (ls->sockaddr.sockaddr.sa_family == AF_INET6) {
+
+                if (ngx_strcmp(&value[i].data[10], "n") == 0) {
+                    ls->ipv6only = 1;
+
+                } else if (ngx_strcmp(&value[i].data[10], "ff") == 0) {
+                    ls->ipv6only = 0;
+
+                } else {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                       "invalid ipv6only flags \"%s\"",
+                                       &value[i].data[9]);
+                    return NGX_CONF_ERROR;
+                }
+
+                ls->bind = 1;
 
             } else {
+                len = ngx_sock_ntop(&ls->sockaddr.sockaddr, ls->socklen, buf,
+                                    NGX_SOCKADDR_STRLEN, 1);
+
                 ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                                   "invalid ipv6only flags \"%s\"",
-                                   &value[i].data[9]);
-                return NGX_CONF_ERROR;
+                                   "ipv6only is not supported "
+                                   "on addr \"%*s\", ignored", len, buf);
             }
 
-            ls->bind = 1;
             continue;
 #else
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "ipv6only is not supported "
+                               "bind ipv6only is not supported "
                                "on this platform");
             return NGX_CONF_ERROR;
 #endif
@@ -558,63 +583,9 @@ ngx_mail_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 #endif
         }
 
-        if (ngx_strcmp(value[i].data, "proxy_protocol") == 0) {
-            ls->proxy_protocol = 1;
-            continue;
-        }
-
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "invalid parameter \"%V\"", &value[i]);
+                           "the invalid \"%V\" parameter", &value[i]);
         return NGX_CONF_ERROR;
-    }
-
-    for (n = 0; n < u.naddrs; n++) {
-
-        for (i = 0; i < n; i++) {
-            if (ngx_cmp_sockaddr(u.addrs[n].sockaddr, u.addrs[n].socklen,
-                                 u.addrs[i].sockaddr, u.addrs[i].socklen, 1)
-                == NGX_OK)
-            {
-                goto next;
-            }
-        }
-
-        if (n != 0) {
-            nls = ngx_array_push(&cmcf->listen);
-            if (nls == NULL) {
-                return NGX_CONF_ERROR;
-            }
-
-            *nls = *ls;
-
-        } else {
-            nls = ls;
-        }
-
-        nls->sockaddr = u.addrs[n].sockaddr;
-        nls->socklen = u.addrs[n].socklen;
-        nls->addr_text = u.addrs[n].name;
-        nls->wildcard = ngx_inet_wildcard(nls->sockaddr);
-
-        als = cmcf->listen.elts;
-
-        for (i = 0; i < cmcf->listen.nelts - 1; i++) {
-
-            if (ngx_cmp_sockaddr(als[i].sockaddr, als[i].socklen,
-                                 nls->sockaddr, nls->socklen, 1)
-                != NGX_OK)
-            {
-                continue;
-            }
-
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "duplicate \"%V\" address and port pair",
-                               &nls->addr_text);
-            return NGX_CONF_ERROR;
-        }
-
-    next:
-        continue;
     }
 
     return NGX_CONF_OK;

@@ -52,14 +52,12 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
 #if (NGX_HAVE_EPOLLRDHUP)
 
-    if ((ngx_event_flags & NGX_USE_EPOLL_EVENT)
-        && ngx_use_epoll_rdhup)
-    {
+    if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
         ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
                        "recv: eof:%d, avail:%d",
                        rev->pending_eof, rev->available);
 
-        if (rev->available == 0 && !rev->pending_eof) {
+        if (!rev->available && !rev->pending_eof) {
             rev->ready = 0;
             return NGX_AGAIN;
         }
@@ -114,40 +112,6 @@ ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
                 }
 
                 return n;
-            }
-
-#endif
-
-#if (NGX_HAVE_FIONREAD)
-
-            if (rev->available >= 0) {
-                rev->available -= n;
-
-                /*
-                 * negative rev->available means some additional bytes
-                 * were received between kernel notification and recv(),
-                 * and therefore ev->ready can be safely reset even for
-                 * edge-triggered event methods
-                 */
-
-                if (rev->available < 0) {
-                    rev->available = 0;
-                    rev->ready = 0;
-                }
-
-                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                               "recv: avail:%d", rev->available);
-
-            } else if ((size_t) n == size) {
-
-                if (ngx_socket_nread(c->fd, &rev->available) == -1) {
-                    n = ngx_connection_error(c, ngx_socket_errno,
-                                             ngx_socket_nread_n " failed");
-                    break;
-                }
-
-                ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                               "recv: avail:%d", rev->available);
             }
 
 #endif

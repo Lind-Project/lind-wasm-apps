@@ -250,7 +250,9 @@ ngx_eventport_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 
         ngx_memzero(&sev, sizeof(struct sigevent));
         sev.sigev_notify = SIGEV_PORT;
+#if !(NGX_TEST_BUILD_EVENTPORT)
         sev.sigev_value.sival_ptr = &pn;
+#endif
 
         if (timer_create(CLOCK_REALTIME, &sev, &event_timer) == -1) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
@@ -399,7 +401,7 @@ ngx_eventport_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
             return NGX_ERROR;
         }
 
-    } else if (ev->active) {
+    } else {
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                        "eventport del event: fd:%d", c->fd);
 
@@ -559,7 +561,6 @@ ngx_eventport_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 
             if (revents & POLLIN) {
                 rev->ready = 1;
-                rev->available = -1;
 
                 if (flags & NGX_POST_EVENTS) {
                     queue = rev->accept ? &ngx_posted_accept_events

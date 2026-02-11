@@ -20,8 +20,6 @@ typedef struct ngx_http_file_cache_s  ngx_http_file_cache_t;
 typedef struct ngx_http_log_ctx_s     ngx_http_log_ctx_t;
 typedef struct ngx_http_chunked_s     ngx_http_chunked_t;
 typedef struct ngx_http_v2_stream_s   ngx_http_v2_stream_t;
-typedef struct ngx_http_v3_parse_s    ngx_http_v3_parse_t;
-typedef struct ngx_http_v3_session_s  ngx_http_v3_session_t;
 
 typedef ngx_int_t (*ngx_http_header_handler_pt)(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
@@ -39,9 +37,6 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 
 #if (NGX_HTTP_V2)
 #include <ngx_http_v2.h>
-#endif
-#if (NGX_HTTP_V3)
-#include <ngx_http_v3.h>
 #endif
 #if (NGX_HTTP_CACHE)
 #include <ngx_http_cache.h>
@@ -93,10 +88,6 @@ void ngx_http_close_connection(ngx_connection_t *c);
 #if (NGX_HTTP_SSL && defined SSL_CTRL_SET_TLSEXT_HOSTNAME)
 int ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg);
 #endif
-#if (NGX_HTTP_SSL && defined SSL_R_CERT_CB_ERROR)
-int ngx_http_ssl_certificate(ngx_ssl_conn_t *ssl_conn, void *arg);
-#endif
-
 
 ngx_int_t ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b);
 ngx_int_t ngx_http_parse_uri(ngx_http_request_t *r);
@@ -108,16 +99,16 @@ ngx_int_t ngx_http_parse_unsafe_uri(ngx_http_request_t *r, ngx_str_t *uri,
     ngx_str_t *args, ngx_uint_t *flags);
 ngx_int_t ngx_http_parse_header_line(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_uint_t allow_underscores);
-ngx_table_elt_t *ngx_http_parse_multi_header_lines(ngx_http_request_t *r,
-    ngx_table_elt_t *headers, ngx_str_t *name, ngx_str_t *value);
-ngx_table_elt_t *ngx_http_parse_set_cookie_lines(ngx_http_request_t *r,
-    ngx_table_elt_t *headers, ngx_str_t *name, ngx_str_t *value);
+ngx_int_t ngx_http_parse_multi_header_lines(ngx_array_t *headers,
+    ngx_str_t *name, ngx_str_t *value);
+ngx_int_t ngx_http_parse_set_cookie_lines(ngx_array_t *headers,
+    ngx_str_t *name, ngx_str_t *value);
 ngx_int_t ngx_http_arg(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value);
 void ngx_http_split_args(ngx_http_request_t *r, ngx_str_t *uri,
     ngx_str_t *args);
 ngx_int_t ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
-    ngx_http_chunked_t *ctx, ngx_uint_t keep_trailers);
+    ngx_http_chunked_t *ctx);
 
 
 ngx_http_request_t *ngx_http_create_request(ngx_connection_t *c);
@@ -129,11 +120,6 @@ void ngx_http_handler(ngx_http_request_t *r);
 void ngx_http_run_posted_requests(ngx_connection_t *c);
 ngx_int_t ngx_http_post_request(ngx_http_request_t *r,
     ngx_http_posted_request_t *pr);
-ngx_int_t ngx_http_set_virtual_server(ngx_http_request_t *r,
-    ngx_str_t *host);
-ngx_int_t ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool,
-    ngx_uint_t alloc);
-void ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc);
 void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc);
 void ngx_http_free_request(ngx_http_request_t *r, ngx_int_t rc);
 
@@ -174,14 +160,6 @@ ngx_int_t ngx_http_set_default_types(ngx_conf_t *cf, ngx_array_t **types,
 
 #if (NGX_HTTP_DEGRADATION)
 ngx_uint_t  ngx_http_degraded(ngx_http_request_t *);
-#endif
-
-
-#if (NGX_HTTP_V2 || NGX_HTTP_V3)
-ngx_int_t ngx_http_huff_decode(u_char *state, u_char *src, size_t len,
-    u_char **dst, ngx_uint_t last, ngx_log_t *log);
-size_t ngx_http_huff_encode(u_char *src, size_t len, u_char *dst,
-    ngx_uint_t lower);
 #endif
 
 
