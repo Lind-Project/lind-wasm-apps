@@ -79,3 +79,19 @@ cd ~/lind-wasm-apps/coreutils
 make -C tests check VERBOSE=yes
 ```
 
+
+## Additional Error Found During Full Test Run
+
+### Error #4: Memory Allocation Failure in rm
+
+**Symptom:**
+```
+wasm trap: wasm `unreachable` instruction executed
+Caused by: error in sysmalloc -> _int_malloc -> __libc_malloc
+```
+
+**Cause:** The `rm` binary is attempting to allocate memory via `malloc()` but hitting an assertion failure in the allocator, triggering an `unreachable` instruction.
+
+**Impact:** Many rm tests crash completely rather than just failing
+
+**Root cause:** Likely related to Lind's memory management or heap size limits in WASM
