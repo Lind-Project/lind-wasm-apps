@@ -65,11 +65,6 @@ Need TWO sets of utilities:
 
 Current approach sandboxes everything, breaking the test framework.
 
-## Recommended Solutions
-
-**Short term**: Modify individual test scripts to wrap only the tested binary
-**Long term**: Mount host filesystem in Lind sandbox
-
 ## Files in This PR
 
 - `run_coreutils_tests_lind.sh` - Demonstration script
