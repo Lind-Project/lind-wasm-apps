@@ -179,41 +179,40 @@ fi
 
 # If we couldn't get the size by running, detect via compile-time checks
 if [ -z "$ngx_size" ]; then
-    echo " (cross-compile detection)"
+    # Detect sizeof via compile-time check. The compiler already knows
+    # the target ABI from --target and --sysroot flags.
+    # Compilation succeeds only when sizeof(type) == test_size.
+    for ngx_test_size in 1 2 4 8 16; do
+        cat << END > $NGX_AUTOTEST.c
+#include <sys/types.h>
+#include <sys/time.h>
+$NGX_INCLUDE_UNISTD_H
+#include <signal.h>
+#include <sys/resource.h>
+$NGX_INCLUDE_INTTYPES_H
+$NGX_INCLUDE_AUTO_CONFIG_H
 
-    # For wasm32, int/long are 4 bytes, pointers are 4 bytes
-    # off_t and time_t are typically 8 bytes in wasm32-wasi
-    case "$ngx_type" in
-        int)
-            ngx_size=4
-        ;;
-        long)
-            ngx_size=4
-        ;;
-        "long long")
-            ngx_size=8
-        ;;
-        "void *")
-            ngx_size=4
-        ;;
-        "size_t")
-            ngx_size=4
-        ;;
-        "off_t")
-            ngx_size=8
-        ;;
-        "time_t")
-            ngx_size=8
-        ;;
-        "sig_atomic_t")
-            ngx_size=4
-        ;;
-        *)
-            # Default to 4 for unknown types on wasm32
-            ngx_size=4
-        ;;
-    esac
-    echo " $ngx_size bytes (assumed for wasm32)"
+int test[sizeof($ngx_type) == $ngx_test_size ? 1 : -1];
+END
+
+        ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS \
+                  -c -o $NGX_AUTOTEST.o $NGX_AUTOTEST.c"
+
+        if eval "$ngx_test >> $NGX_AUTOCONF_ERR 2>&1"; then
+            ngx_size=$ngx_test_size
+            break
+        fi
+    done
+
+    rm -f $NGX_AUTOTEST.o
+
+    if [ -z "$ngx_size" ]; then
+        echo
+        echo "$0: error: can not detect $ngx_type size"
+        exit 1
+    fi
+
+    echo " $ngx_size bytes (compile-time detection)"
 else
     echo " $ngx_size bytes"
 fi
