@@ -56,6 +56,31 @@ for wasm in "$WASM_DIR"/*.opt.wasm; do
 done
 echo "  * Copied $wasm_count .opt.wasm binaries into lindfs"
 
+# Set up bind mounts so sandbox can access host filesystem
+echo "  * Setting up bind mounts for sandbox filesystem access..."
+sudo /bin/mkdir -p "$LINDFS_ROOT/home" "$LINDFS_ROOT/tmp" "$LINDFS_ROOT/usr" "$LINDFS_ROOT/proc"
+# Unmount first in case they're already mounted from a previous run
+sudo umount "$LINDFS_ROOT/home" 2>/dev/null || true
+sudo umount "$LINDFS_ROOT/tmp" 2>/dev/null || true
+sudo umount "$LINDFS_ROOT/usr" 2>/dev/null || true
+sudo umount "$LINDFS_ROOT/proc" 2>/dev/null || true
+sudo mount --bind /home "$LINDFS_ROOT/home"
+sudo mount --bind /tmp "$LINDFS_ROOT/tmp"
+sudo mount --bind /usr "$LINDFS_ROOT/usr"
+sudo mount --bind /proc "$LINDFS_ROOT/proc" 2>/dev/null || true
+echo "  * Bind mounts ready"
+
+# Cleanup function to unmount on exit
+cleanup() {
+    echo ""
+    echo "Cleaning up bind mounts..."
+    sudo umount "$LINDFS_ROOT/home" 2>/dev/null || true
+    sudo umount "$LINDFS_ROOT/tmp" 2>/dev/null || true
+    sudo umount "$LINDFS_ROOT/usr" 2>/dev/null || true
+    sudo umount "$LINDFS_ROOT/proc" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 # ── Step 2: Set up ALL utilities as native symlinks ──────────────────────────
 cd "$COREUTILS_ROOT"
 echo ""
