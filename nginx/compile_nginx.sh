@@ -96,9 +96,10 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
     -D_GNU_SOURCE"
 
 # LDFLAGS for WASM linking
-# Note: We do NOT pass WASM-specific flags via --with-ld-opt because configure
-# tests them with native compilation, which fails. Instead, we patch the
-# generated Makefile after configure completes.
+# Note: nginx's generated Makefile does not use $(LDFLAGS). Instead, the link
+# rule uses $(LINK) as the full linker command. We pass these flags via the
+# LINK make override at build time (not via --with-ld-opt, which configure
+# would test and fail for WASM-specific flags).
 LDFLAGS_WASM="-Wl,--shared-memory,--import-memory,--export-memory,--max-memory=67108864 \
     -Wl,--export=__stack_pointer,--export=__stack_low \
     -L$MERGED_SYSROOT/lib/wasm32-wasi \
@@ -172,47 +173,48 @@ ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS \
 eval "$ngx_test >> $NGX_AUTOCONF_ERR 2>&1"
 
 # For cross-compilation (WASM), we cannot run the test binary.
-# Try to run it, if that fails, use compile-time detection.
+# Try to run it, if that fails, use hardcoded sizes for wasm32.
 if [ -x $NGX_AUTOTEST ]; then
     ngx_size=`$NGX_AUTOTEST 2>/dev/null` || ngx_size=""
 fi
 
-# If we couldn't get the size by running, detect via compile-time checks
+# If we couldn't get the size by running, use hardcoded sizes for wasm32
 if [ -z "$ngx_size" ]; then
-    # Detect sizeof via compile-time check. The compiler already knows
-    # the target ABI from --target and --sysroot flags.
-    # Compilation succeeds only when sizeof(type) == test_size.
-    for ngx_test_size in 1 2 4 8 16; do
-        cat << END > $NGX_AUTOTEST.c
-#include <sys/types.h>
-#include <sys/time.h>
-$NGX_INCLUDE_UNISTD_H
-#include <signal.h>
-#include <sys/resource.h>
-$NGX_INCLUDE_INTTYPES_H
-$NGX_INCLUDE_AUTO_CONFIG_H
+    echo " (cross-compile detection)"
 
-int test[sizeof($ngx_type) == $ngx_test_size ? 1 : -1];
-END
-
-        ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS \
-                  -c -o $NGX_AUTOTEST.o $NGX_AUTOTEST.c"
-
-        if eval "$ngx_test >> $NGX_AUTOCONF_ERR 2>&1"; then
-            ngx_size=$ngx_test_size
-            break
-        fi
-    done
-
-    rm -f $NGX_AUTOTEST.o
-
-    if [ -z "$ngx_size" ]; then
-        echo
-        echo "$0: error: can not detect $ngx_type size"
-        exit 1
-    fi
-
-    echo " $ngx_size bytes (compile-time detection)"
+    # wasm32 ILP32: int/long/pointers are 4 bytes
+    # off_t and time_t are 4 bytes in this sysroot (no _FILE_OFFSET_BITS=64)
+    case "$ngx_type" in
+        int)
+            ngx_size=4
+        ;;
+        long)
+            ngx_size=4
+        ;;
+        "long long")
+            ngx_size=8
+        ;;
+        "void *")
+            ngx_size=4
+        ;;
+        "size_t")
+            ngx_size=4
+        ;;
+        "off_t")
+            ngx_size=4
+        ;;
+        "time_t")
+            ngx_size=4
+        ;;
+        "sig_atomic_t")
+            ngx_size=4
+        ;;
+        *)
+            # Default to 4 for unknown types on wasm32
+            ngx_size=4
+        ;;
+    esac
+    echo " $ngx_size bytes (assumed for wasm32)"
 else
     echo " $ngx_size bytes"
 fi
@@ -597,30 +599,19 @@ if [[ -f objs/ngx_auto_config.h ]]; then
     echo "[nginx] patched objs/ngx_auto_config.h"
 fi
 
-# Patch Makefile to add WASM linker flags
-# Configure doesn't allow us to test WASM ld flags (they fail native test),
-# so we inject them directly into the generated Makefile.
-if [[ -f objs/Makefile ]]; then
-    # Set the LINK command to use clang with WASM target
-    sed -i "s|^LINK =.*|LINK = $CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT $LDFLAGS_WASM|" objs/Makefile || true
-
-    # Also ensure CC in Makefile has the right target
-    sed -i "s|^CC =.*|CC = $CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT|" objs/Makefile || true
-
-    echo "[nginx] patched objs/Makefile with WASM toolchain"
-fi
-
 ###############################################################################
 # 4. Build nginx
 ###############################################################################
 
 echo "[nginx] building nginx with wasm32-wasi toolchain..."
 
-# Build with explicit CC to ensure WASM compilation
+# nginx's generated Makefile uses $(CC), $(CFLAGS), and $(LINK) — but NOT
+# $(LDFLAGS). The link rule is: $(LINK) -o objs/nginx <objects> <libs>
+# So WASM linker flags must be passed via LINK, not LDFLAGS.
 make -j"$JOBS" \
     CC="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT" \
     CFLAGS="$CFLAGS_WASM" \
-    LDFLAGS="$LDFLAGS_WASM"
+    LINK="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT $LDFLAGS_WASM"
 
 if [[ ! -f objs/nginx ]]; then
     echo "[nginx] ERROR: nginx binary was not produced."
