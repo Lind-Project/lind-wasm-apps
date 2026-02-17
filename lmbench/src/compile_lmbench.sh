@@ -238,5 +238,7 @@ for f in "${stage_bins[@]}"; do
     fi
   fi
 
+done
+
 echo "[lmbench] post-processing complete."
 

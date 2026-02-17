@@ -11,7 +11,7 @@ set -euo pipefail
 #   - Disable mountlist fatal (no mtab/mount table on WASI)
 #   - Patch a few gnulib portability #error sites to WASI-safe fallbacks
 #   - Stage produced wasm binaries even if some targets fail to link
-#   - wasm-opt + wasmtime compile (best-effort) on staged binaries
+#   - wasm-opt compile (best-effort) on staged binaries
 ###############################################################################
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
