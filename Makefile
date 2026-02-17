@@ -118,7 +118,7 @@ merge-sysroot: libtirpc gnulib
 	rsync -a '$(APPS_OVERLAY)/lib/wasm32-wasi/'     '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
 
 # ---------------- lmbench (via compile_lmbench.sh) ---------------------------
-lmbench: libtirpc
+lmbench: libtirpc merge-sysroot
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/lmbench/src/compile_lmbench.sh'
 
