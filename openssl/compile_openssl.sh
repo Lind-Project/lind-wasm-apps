@@ -33,7 +33,7 @@ CC="$CC_WASI" AR="$AR" RANLIB="$RANLIB" \
 CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g" \
 LDFLAGS="--sysroot=$BASE_SYSROOT" \
 ./Configure linux-generic32 \
-  no-asm no-shared no-dso no-async no-threads \
+  no-asm no-shared no-dso no-async \
   no-engine no-afalgeng no-ui-console no-tests \
   --prefix="$INSTALL_DIR" --openssldir="$INSTALL_DIR/ssl"
 
