@@ -58,6 +58,7 @@ AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
 RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
@@ -397,6 +398,18 @@ if [[ -x "$WASM_OPT" ]]; then
   BASH_WASM="$OPT_WASM"
 else
   echo "[bash] NOTE: wasm-opt not found; skipping optimization step."
+fi
+
+###############################################################################
+# 9. cwasm generation (best-effort)
+###############################################################################
+
+if [[ -x "$LIND_BOOT" ]]; then
+  echo "[bash] generating cwasm via lind-boot --precompile..."
+  "$LIND_BOOT" --precompile "$BASH_WASM" || \
+    echo "[bash] WARNING: lind-boot --precompile failed; skipping cwasm generation."
+else
+  echo "[bash] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
 fi
 
 popd >/dev/null
