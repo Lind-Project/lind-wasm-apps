@@ -62,10 +62,10 @@ mkdir -p "$STAGE_DIR"
 # ----------------------------------------------------------------------
 # 2) WASM toolchain flags
 # ----------------------------------------------------------------------
-CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
+CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
 
 CFLAGS_WASM=(
-  -O2 -g -std=gnu99
+  -O2 -g -std=gnu99 -pthread
   -I"$MERGED_SYSROOT/include"
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
