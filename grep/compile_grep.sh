@@ -131,7 +131,22 @@ PY
 patch_fpending
 
 # ----------------------------------------------------------------------
-# 5) Configure
+# 5) Prevent autotools regeneration (no aclocal/automake/autoconf needed)
+#    Touch generated files in dependency order so make won't re-run them.
+# ----------------------------------------------------------------------
+(
+  cd "$GREP_ROOT"
+  # Autoconf/automake chain: configure.ac → aclocal.m4 → configure → Makefile.in
+  touch aclocal.m4
+  touch configure
+  find . -name Makefile.in -exec touch {} +
+  # Texinfo/man: *.texi → *.info, prevent makeinfo invocation
+  find . -name '*.info' -exec touch {} +
+  find doc -name '*.1' -o -name '*.in.1' 2>/dev/null | xargs -r touch
+)
+
+# ----------------------------------------------------------------------
+# 6) Configure
 # ----------------------------------------------------------------------
 BUILD_TRIPLET="$("$GREP_ROOT/build-aux/config.guess" 2>/dev/null || echo x86_64-unknown-linux-gnu)"
 HOST_TRIPLET="wasm32-unknown-linux-gnu"
@@ -142,9 +157,6 @@ echo "[grep] configuring…"
   ./configure \
     --build="$BUILD_TRIPLET" \
     --host="$HOST_TRIPLET" \
-    --disable-shared \
-    --enable-static \
-    --disable-libtool-lock \
     --disable-nls \
     CC="$CC_WASM" \
     AR="$AR" \
@@ -160,13 +172,13 @@ if [[ ! -f "$GREP_ROOT/Makefile" ]]; then
 fi
 
 # ----------------------------------------------------------------------
-# 6) Build
+# 7) Build
 # ----------------------------------------------------------------------
 echo "[grep] building…"
 make -C "$GREP_ROOT" -j"$JOBS" V=1
 
 # ----------------------------------------------------------------------
-# 7) Stage binary
+# 8) Stage binary
 # ----------------------------------------------------------------------
 GREP_BIN="$GREP_ROOT/src/grep"
 if [[ ! -f "$GREP_BIN" ]]; then
@@ -178,7 +190,7 @@ cp "$GREP_BIN" "$STAGE_DIR/grep.wasm"
 echo "[grep] staged grep.wasm → $STAGE_DIR/grep.wasm"
 
 # ----------------------------------------------------------------------
-# 8) wasm-opt (best-effort)
+# 9) wasm-opt (best-effort)
 # ----------------------------------------------------------------------
 if [[ -x "$WASM_OPT" ]]; then
   echo "[grep] running wasm-opt…"
@@ -189,7 +201,7 @@ else
 fi
 
 # ----------------------------------------------------------------------
-# 9) cwasm generation (best-effort) via lind-boot --precompile
+# 10) cwasm generation (best-effort) via lind-boot --precompile
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[grep] generating cwasm via lind-boot --precompile…"
