@@ -126,6 +126,9 @@ HAVE_SYNC_FILE_RANGE =
 # getrandom(2) may not be available in WASI; fall back to openssl
 CSPRNG_METHOD = openssl
 
+# Fuzz programs use --allow-multiple-definition which wasm-ld doesn't support
+LINK_FUZZ_PROGRAMS =
+
 # WASI stubs for missing POSIX functions (getpgid, etc.)
 COMPAT_OBJS += compat/wasi-stubs.o
 CONFIGMAK
