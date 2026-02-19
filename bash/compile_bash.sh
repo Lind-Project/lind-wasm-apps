@@ -406,8 +406,16 @@ fi
 
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[bash] generating cwasm via lind-boot --precompile..."
-  "$LIND_BOOT" --precompile "$BASH_WASM" || \
+  if "$LIND_BOOT" --precompile "$BASH_WASM"; then
+    # Rename foo.opt.cwasm → foo.cwasm (drop .opt)
+    OPT_CWASM="${BASH_WASM%.wasm}.cwasm"
+    CLEAN_CWASM="${OPT_CWASM/.opt/}"
+    if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
+      mv "$OPT_CWASM" "$CLEAN_CWASM"
+    fi
+  else
     echo "[bash] WARNING: lind-boot --precompile failed; skipping cwasm generation."
+  fi
 else
   echo "[bash] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
 fi

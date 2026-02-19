@@ -251,8 +251,16 @@ if [[ -x "$LIND_BOOT" ]]; then
   shopt -u nullglob
   for w in "${opt_files[@]}"; do
     echo "[lmbench]   precompile: $(basename "$w")"
-    "$LIND_BOOT" --precompile "$w" || \
+    if "$LIND_BOOT" --precompile "$w"; then
+      # Rename foo.opt.cwasm → foo.cwasm (drop .opt)
+      OPT_CWASM="${w%.wasm}.cwasm"
+      CLEAN_CWASM="${OPT_CWASM/.opt/}"
+      if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
+        mv "$OPT_CWASM" "$CLEAN_CWASM"
+      fi
+    else
       echo "[lmbench]   WARNING: lind-boot --precompile failed for '$(basename "$w")'; skipping."
+    fi
   done
 else
   echo "[lmbench] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
