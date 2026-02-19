@@ -242,17 +242,17 @@ for f in "${stage_bins[@]}"; do
 done
 
 # ----------------------------------------------------------------------
-# 6) cwasm generation via lind-boot --allow-precompile
+# 6) cwasm generation via lind-boot --precompile
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
-  echo "[lmbench] generating cwasm via lind-boot --allow-precompile..."
+  echo "[lmbench] generating cwasm via lind-boot --precompile..."
   shopt -s nullglob
   opt_files=("$OUT_DIR"/*.opt.wasm)
   shopt -u nullglob
   for w in "${opt_files[@]}"; do
     echo "[lmbench]   precompile: $(basename "$w")"
-    "$LIND_BOOT" --allow-precompile "$w" || \
-      echo "[lmbench]   WARNING: lind-boot --allow-precompile failed for '$(basename "$w")'; skipping."
+    "$LIND_BOOT" --precompile "$w" || \
+      echo "[lmbench]   WARNING: lind-boot --precompile failed for '$(basename "$w")'; skipping."
   done
 else
   echo "[lmbench] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."

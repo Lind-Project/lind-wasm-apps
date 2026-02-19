@@ -405,9 +405,9 @@ fi
 ###############################################################################
 
 if [[ -x "$LIND_BOOT" ]]; then
-  echo "[bash] generating cwasm via lind-boot --allow-precompile..."
-  "$LIND_BOOT" --allow-precompile "$BASH_WASM" || \
-    echo "[bash] WARNING: lind-boot --allow-precompile failed; skipping cwasm generation."
+  echo "[bash] generating cwasm via lind-boot --precompile..."
+  "$LIND_BOOT" --precompile "$BASH_WASM" || \
+    echo "[bash] WARNING: lind-boot --precompile failed; skipping cwasm generation."
 else
   echo "[bash] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
 fi

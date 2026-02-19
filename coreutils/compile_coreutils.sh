@@ -461,23 +461,23 @@ else
 fi
 
 # ----------------------------------------------------------------------
-# 9) cwasm generation (best-effort) via lind-boot --allow-precompile
+# 9) cwasm generation (best-effort) via lind-boot --precompile
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
-  echo "[coreutils] generating cwasm via lind-boot --allow-precompile..."
+  echo "[coreutils] generating cwasm via lind-boot --precompile..."
   shopt -s nullglob
   opt_files=("$STAGE_DIR"/*.opt.wasm)
   shopt -u nullglob
   if (( ${#opt_files[@]} > 0 )); then
     for w in "${opt_files[@]}"; do
-      "$LIND_BOOT" --allow-precompile "$w" || \
-        echo "[coreutils] WARNING: lind-boot --allow-precompile failed for '$(basename "$w")'; skipping."
+      "$LIND_BOOT" --precompile "$w" || \
+        echo "[coreutils] WARNING: lind-boot --precompile failed for '$(basename "$w")'; skipping."
     done
   else
     # fall back to raw .wasm if no opt files were produced
     for w in "${wasm_files[@]}"; do
-      "$LIND_BOOT" --allow-precompile "$w" || \
-        echo "[coreutils] WARNING: lind-boot --allow-precompile failed for '$(basename "$w")'; skipping."
+      "$LIND_BOOT" --precompile "$w" || \
+        echo "[coreutils] WARNING: lind-boot --precompile failed for '$(basename "$w")'; skipping."
     done
   fi
 else

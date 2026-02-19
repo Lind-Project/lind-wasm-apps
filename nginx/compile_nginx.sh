@@ -640,9 +640,9 @@ fi
 
 NGINX_WASM="$NGINX_OUT_DIR/nginx.opt.wasm"
 if [[ -x "$LIND_BOOT" ]]; then
-    echo "[nginx] generating cwasm via lind-boot --allow-precompile..."
-    "$LIND_BOOT" --allow-precompile "$NGINX_WASM" || \
-        echo "[nginx] WARNING: lind-boot --allow-precompile failed; skipping cwasm generation."
+    echo "[nginx] generating cwasm via lind-boot --precompile..."
+    "$LIND_BOOT" --precompile "$NGINX_WASM" || \
+        echo "[nginx] WARNING: lind-boot --precompile failed; skipping cwasm generation."
 else
     echo "[nginx] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
 fi
