@@ -48,6 +48,7 @@ RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
 # Wasm optimization and precompilation tools
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
@@ -634,7 +635,20 @@ else
 fi
 
 ###############################################################################
-# 6. Copy configuration files
+# 6. cwasm generation (best-effort)
+###############################################################################
+
+NGINX_WASM="$NGINX_OUT_DIR/nginx.opt.wasm"
+if [[ -x "$LIND_BOOT" ]]; then
+    echo "[nginx] generating cwasm via lind-boot --allow-precompile..."
+    "$LIND_BOOT" --allow-precompile "$NGINX_WASM" || \
+        echo "[nginx] WARNING: lind-boot --allow-precompile failed; skipping cwasm generation."
+else
+    echo "[nginx] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+fi
+
+###############################################################################
+# 7. Copy configuration files
 ###############################################################################
 
 echo "[nginx] copying configuration files..."
