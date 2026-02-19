@@ -27,7 +27,6 @@ fi
 APPS_BUILD="$REPO_ROOT/build"
 APPS_OVERLAY="$APPS_BUILD/sysroot_overlay"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-APPS_LIB_DIR="$APPS_BUILD/lib"
 APPS_BIN_ROOT="$APPS_BUILD/bin/lmbench"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 MAX_WASM_MEMORY="${MAX_WASM_MEMORY:-67108864}"
@@ -100,8 +99,8 @@ echo "[lmbench] extracting base libc objects…"
 echo "[lmbench] adding libtirpc objects from $TIRPC_MERGE_DIR…"
 cp "${tirpc_objs[@]}" "$COMB_DIR/"
 
-mkdir -p "$APPS_LIB_DIR"
-COMBINED_LIBC="$APPS_LIB_DIR/libc.a"
+mkdir -p "$APPS_BUILD/lib"
+COMBINED_LIBC="$APPS_BUILD/lib/libc.a"
 
 echo "[lmbench] creating combined libc.a → $COMBINED_LIBC"
 (
