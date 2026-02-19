@@ -49,14 +49,6 @@ RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 # Wasm optimization and precompilation tools
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 
-WASMTIME_PROFILE="${WASMTIME_PROFILE:-release}"
-WASMTIME="${WASMTIME:-$LIND_WASM_ROOT/src/wasmtime/target/${WASMTIME_PROFILE}/wasmtime}"
-# Fallback to release if the requested profile isn't built yet
-if [[ ! -x "$WASMTIME" ]]; then
-    ALT="$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime"
-    [[ -x "$ALT" ]] && WASMTIME="$ALT"
-fi
-
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
 # Output location
@@ -642,25 +634,7 @@ else
 fi
 
 ###############################################################################
-# 6. Precompile with wasmtime
-###############################################################################
-
-if [[ -x "$WASMTIME" ]]; then
-    echo "[nginx] running wasmtime compile..."
-    "$WASMTIME" compile \
-        "$NGINX_OUT_DIR/nginx.opt.wasm" \
-        -o "$NGINX_OUT_DIR/nginx.cwasm" || {
-        echo "[nginx] WARNING: wasmtime compile failed; continuing without .cwasm"
-    }
-    if [[ -f "$NGINX_OUT_DIR/nginx.cwasm" ]]; then
-        echo "[nginx] precompiled: $NGINX_OUT_DIR/nginx.cwasm"
-    fi
-else
-    echo "[nginx] NOTE: wasmtime not found at $WASMTIME; skipping precompilation."
-fi
-
-###############################################################################
-# 7. Copy configuration files
+# 6. Copy configuration files
 ###############################################################################
 
 echo "[nginx] copying configuration files..."
@@ -719,10 +693,10 @@ popd >/dev/null
 
 echo
 echo "[nginx] build complete. Outputs:"
-ls -lh "$NGINX_OUT_DIR"/*.wasm "$NGINX_OUT_DIR"/*.cwasm 2>/dev/null || true
+ls -lh "$NGINX_OUT_DIR"/*.wasm 2>/dev/null || true
 echo
 echo "To run nginx in Lind:"
-echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.cwasm -c /etc/nginx/nginx.conf"
+echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.opt.wasm -c /etc/nginx/nginx.conf"
 echo
 echo "Or with the test config:"
-echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.cwasm -c conf/nginx-wasm.conf"
+echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.opt.wasm -c conf/nginx-wasm.conf"
