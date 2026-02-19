@@ -19,13 +19,12 @@ set -euo pipefail
 #   3. Delete host-built *.o / *.a for the parts we rebuild as WASM,
 #      but KEEP mkbuiltins and mkbuiltins.o as native tools.
 #
-#   4. Rebuild core bash objects and libs with the wasm32-wasi toolchain,
-#      skipping xmalloc helpers that conflict with the WASI glibc sysroot.
+#   4. Rebuild core bash objects and libs with the wasm32-wasi toolchain.
 #
 #   5. Provide small WASI stubs (termcap, locale, getgroups).
 #
 #   6. Link bash.wasm into build/bin/bash/wasm32-wasi/bash.wasm and
-#      run wasm-opt + wasmtime compile (best-effort).
+#      run wasm-opt compile (best-effort).
 ###############################################################################
 
 # --- basic paths -------------------------------------------------------------
@@ -51,23 +50,14 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
+BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/build/sysroot}"
 MERGED_SYSROOT="${APPS_MERGED:-$APPS_ROOT/build/sysroot_merged}"
 
 LLVM_BIN_DIR="$(dirname "$CLANG")"
 AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
 RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
-# We follow lind_compile's convention for WASMTIME_PROFILE (debug vs release)
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
-
-WASMTIME_PROFILE="${WASMTIME_PROFILE:-release}"
-WASMTIME="${WASMTIME:-$LIND_WASM_ROOT/src/wasmtime/target/${WASMTIME_PROFILE}/wasmtime}"
-# Fallback to release if the requested profile isn't built yet.
-if [[ ! -x "$WASMTIME" ]]; then
-  ALT="$LIND_WASM_ROOT/src/wasmtime/target/release/wasmtime"
-  [[ -x "$ALT" ]] && WASMTIME="$ALT"
-fi
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
@@ -204,7 +194,7 @@ make -j1 \
   trap.o input.o unwind_prot.o pathexp.o sig.o test.o version.o \
   alias.o array.o arrayfunc.o assoc.o braces.o bracecomp.o \
   bashhist.o bashline.o siglist.o list.o stringlib.o locale.o \
-  findcmd.o redir.o pcomplete.o pcomplib.o syntax.o
+  findcmd.o redir.o pcomplete.o pcomplib.o syntax.o xmalloc.o
 
 ###############################################################################
 # 5. WASM build: libraries in subdirectories
@@ -243,8 +233,7 @@ make -j1 -C lib/readline \
   libreadline.a libhistory.a
 
 # Avoid duplicate xmalloc/xrealloc by dropping readline's xmalloc.o from both
-# libreadline.a and libhistory.a. For now we rely on the sysroot libc's
-# xmalloc/xrealloc. TODO: replace this with a cleaner configure-time option.
+# libreadline.a and libhistory.a. bash's own xmalloc.o is built and linked directly instead
 for archive in libreadline.a libhistory.a; do
   if [[ -f "./lib/readline/$archive" ]]; then
     echo "[bash] [wasm] stripping xmalloc.o from ./lib/readline/$archive to avoid duplicate xmalloc/xrealloc (TODO: cleaner config option)."
@@ -387,7 +376,7 @@ $CC_WASM \
   trap.o input.o unwind_prot.o pathexp.o sig.o test.o version.o \
   alias.o array.o arrayfunc.o assoc.o braces.o bracecomp.o \
   bashhist.o bashline.o siglist.o list.o stringlib.o locale.o \
-  findcmd.o redir.o pcomplete.o pcomplib.o syntax.o \
+  findcmd.o redir.o pcomplete.o pcomplib.o syntax.o xmalloc.o \
   "$TPUTS_STUB_O" \
   -lbuiltins -lglob -lsh -lreadline -lhistory -ltilde
 
@@ -397,7 +386,7 @@ if [[ ! -f "$BASH_WASM" ]]; then
 fi
 
 ###############################################################################
-# 8. wasm-opt + wasmtime compile (best-effort)
+# 8. wasm-opt compile (best-effort)
 ###############################################################################
 
 if [[ -x "$WASM_OPT" ]]; then
@@ -408,15 +397,6 @@ if [[ -x "$WASM_OPT" ]]; then
   BASH_WASM="$OPT_WASM"
 else
   echo "[bash] NOTE: wasm-opt not found; skipping optimization step."
-fi
-
-if [[ -x "$WASMTIME" ]]; then
-  echo "[bash] running wasmtime compile (best-effort)..."
-  BASH_CWASM="$BASH_OUT_DIR/bash.cwasm"
-  "$WASMTIME" compile "$BASH_WASM" -o "$BASH_CWASM" || \
-    echo "[bash] WARNING: wasmtime compile failed; continuing."
-else
-  echo "[bash] NOTE: wasmtime not found; skipping .cwasm compilation."
 fi
 
 popd >/dev/null
