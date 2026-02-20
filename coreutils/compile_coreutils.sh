@@ -140,6 +140,18 @@ fu_cv_sys_mounted_vmount=no
 
 # Some configure scripts look for listmntent(3)
 ac_cv_func_listmntent=no
+
+# ---- WASI: force gnulib replacement for openat/fstatat ----
+# WASI headers declare these but don't implement them. Without this,
+# configure takes the "no replacement needed" branch in openat.m4
+# (yes+yes case) and the rpl_* objects never get compiled, causing
+# undefined symbol errors at link time.
+ac_cv_func_openat=no
+ac_cv_func_fstatat=no
+
+# ---- WASI: no inotify support ----
+# Prevents tail from trying to use inotify_add_watch/inotify_rm_watch.
+ac_cv_header_sys_inotify_h=no
 EOF
 
 export CONFIG_SITE="$CONFIG_SITE_FILE"
