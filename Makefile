@@ -20,7 +20,7 @@ TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
 JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils clean clean-all
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils test-nginx clean clean-all
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -158,6 +158,10 @@ bash: merge-sysroot
 nginx: merge-sysroot
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/nginx/compile_nginx.sh'
+
+# ---------------- nginx test suite --------------------------------------------
+test-nginx: nginx
+	'$(APPS_ROOT)/nginx/test_nginx.sh'
 
 # ---------------- coreutils (WASM build) --------------------------------------
 # Uses coreutils/compile_coreutils.sh and requires the merged sysroot.
