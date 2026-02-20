@@ -1,0 +1,1 @@
+/home/lind/lind-wasm/src/wasmtime/target/debug/wasmtime run --wasi threads=y --wasi preview2=n --preload env=/lib/libc.so --preload env=/lib/libm.so --preload env=/lib/libpython3.14.so python.wasm pytests/add.py
