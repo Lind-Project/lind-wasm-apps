@@ -15,12 +15,13 @@ APPS_OVERLAY   := $(APPS_BUILD)/sysroot_overlay
 MERGED_SYSROOT := $(APPS_BUILD)/sysroot_merged
 APPS_BIN_DIR   := $(APPS_BUILD)/bin
 APPS_LIB_DIR   := $(APPS_BUILD)/lib
+LINDFS         := $(LIND_WASM_ROOT)/src/tmp
 
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
 JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils clean clean-all
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils install clean clean-all
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -164,6 +165,60 @@ nginx: merge-sysroot
 coreutils: merge-sysroot
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/coreutils/compile_coreutils.sh'
+
+# ---------------- install (copy built apps to LIND_ROOT) ----------------------
+install:
+	@echo "[install] installing to $(LINDFS) ..."
+	mkdir -p '$(LINDFS)/bin'
+	# --- bash ---
+	@if [ -d '$(APPS_BIN_DIR)/bash/wasm32-wasi' ]; then \
+	  best=$$([ -f '$(APPS_BIN_DIR)/bash/wasm32-wasi/bash.opt.wasm' ] && \
+	    echo '$(APPS_BIN_DIR)/bash/wasm32-wasi/bash.opt.wasm' || \
+	    echo '$(APPS_BIN_DIR)/bash/wasm32-wasi/bash.wasm'); \
+	  cp "$$best" '$(LINDFS)/bin/bash'; \
+	  echo "[install]   bash → $(LINDFS)/bin/bash"; \
+	fi
+	# --- coreutils ---
+	@if [ -d '$(APPS_BIN_DIR)/coreutils/wasm32-wasi' ]; then \
+	  for f in '$(APPS_BIN_DIR)/coreutils/wasm32-wasi'/*.opt.wasm; do \
+	    [ -f "$$f" ] || continue; \
+	    name=$$(basename "$$f" .opt.wasm); \
+	    cp "$$f" '$(LINDFS)/bin/'"$$name"; \
+	  done; \
+	  for f in '$(APPS_BIN_DIR)/coreutils/wasm32-wasi'/*.wasm; do \
+	    [ -f "$$f" ] || continue; \
+	    name=$$(basename "$$f" .wasm); \
+	    [ -f '$(LINDFS)/bin/'"$$name" ] && continue; \
+	    cp "$$f" '$(LINDFS)/bin/'"$$name"; \
+	  done; \
+	  echo "[install]   coreutils → $(LINDFS)/bin/"; \
+	fi
+	# --- lmbench ---
+	@if [ -d '$(APPS_BIN_DIR)/lmbench/wasm32-wasi' ]; then \
+	  for f in '$(APPS_BIN_DIR)/lmbench/wasm32-wasi'/*; do \
+	    [ -f "$$f" ] || continue; \
+	    case "$$f" in *.opt.wasm|*.cwasm|*.o|*.a) continue;; esac; \
+	    name=$$(basename "$$f"); \
+	    best="$$f"; \
+	    [ -f "$$f.opt.wasm" ] && best="$$f.opt.wasm"; \
+	    cp "$$best" '$(LINDFS)/bin/'"$$name"; \
+	  done; \
+	  echo "[install]   lmbench → $(LINDFS)/bin/"; \
+	fi
+	# --- nginx ---
+	@if [ -d '$(APPS_BIN_DIR)/nginx/wasm32-wasi' ]; then \
+	  mkdir -p '$(LINDFS)/nginx'; \
+	  best=$$([ -f '$(APPS_BIN_DIR)/nginx/wasm32-wasi/nginx.opt.wasm' ] && \
+	    echo '$(APPS_BIN_DIR)/nginx/wasm32-wasi/nginx.opt.wasm' || \
+	    echo '$(APPS_BIN_DIR)/nginx/wasm32-wasi/nginx.wasm'); \
+	  cp "$$best" '$(LINDFS)/nginx/nginx'; \
+	  cp -r '$(APPS_BIN_DIR)/nginx/wasm32-wasi/conf' '$(LINDFS)/nginx/' 2>/dev/null || true; \
+	  cp -r '$(APPS_BIN_DIR)/nginx/wasm32-wasi/html' '$(LINDFS)/nginx/' 2>/dev/null || true; \
+	  echo "[install]   nginx → $(LINDFS)/nginx/"; \
+	fi
+	# --- runtime directories ---
+	mkdir -p '$(LINDFS)/var/run' '$(LINDFS)/var/log/nginx'
+	@echo "[install] done."
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
