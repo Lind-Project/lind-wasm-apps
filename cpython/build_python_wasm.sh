@@ -23,7 +23,7 @@ if [ ! -f "Makefile" ]; then
     -pthread \
     --target=wasm32-unknown-wasi \
     --sysroot /home/lind/lind-wasm/src/glibc/sysroot \
-    -Wl,--import-memory,--export-memory,--max-memory=2147483648,-z,stack-size=1073741824,--export=__stack_pointer,--export=__stack_low -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0" \
+    -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC" \
     ac_cv_func_working_mktime=yes \
     ac_cv_func_mmap_fixed_mapped=yes \
     bash_cv_func_sigsetjmp=no \
@@ -48,8 +48,8 @@ make clean
 make AR="llvm-ar" ARFLAGS="crs"
 
 # install nescessary files into lind filesystem
-make install DESTDIR=/home/lind/lind-wasm/src/tmp
+sudo make install DESTDIR=/home/lind/lind-wasm/lindfs
 
 # apply wasm-opt
-/home/lind/lind-wasm/tools/binaryen/bin/wasm-opt --epoch-injection --asyncify -O2 --debuginfo python.wasm -o python.wasm
-/home/lind/lind-wasm/src/wasmtime/target/debug/wasmtime compile python.wasm -o python.cwasm
+# /home/lind/lind-wasm/tools/binaryen/bin/wasm-opt --epoch-injection --asyncify -O2 --debuginfo python.wasm -o python.wasm
+# /home/lind/lind-wasm/src/wasmtime/target/debug/wasmtime compile python.wasm -o python.cwasm
