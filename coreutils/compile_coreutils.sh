@@ -158,7 +158,11 @@ ac_cv_func_readlinkat=no
 
 # ---- WASI: no inotify support ----
 # Prevents tail from trying to use inotify_add_watch/inotify_rm_watch.
-ac_cv_header_sys_inotify_h=no
+ac_cv_func_inotify_init=no
+
+# ---- WASI: no libcrypt ----
+# Prevents su from trying to link against crypt().
+ac_cv_search_crypt=no
 EOF
 
 export CONFIG_SITE="$CONFIG_SITE_FILE"
