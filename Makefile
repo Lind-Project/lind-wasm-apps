@@ -19,8 +19,10 @@ APPS_LIB_DIR   := $(APPS_BUILD)/lib
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
 JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 
+LINDFS_ROOT    ?= /home/lind/lind-wasm/lindfs
+
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -188,6 +190,14 @@ grep: merge-sysroot
 sed: merge-sysroot
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/sed/compile_sed.sh'
+
+# ---------------- install (copy built artifacts into LINDFS_ROOT) -------------
+install:
+	mkdir -p '$(LINDFS_ROOT)/bin' '$(LINDFS_ROOT)/etc/nginx' '$(LINDFS_ROOT)/html' \
+	         '$(LINDFS_ROOT)/var/log/nginx' '$(LINDFS_ROOT)/var/run'
+	cp '$(APPS_BIN_DIR)/nginx/wasm32-wasi/nginx.cwasm' '$(LINDFS_ROOT)/bin/nginx.cwasm'
+	cp -r '$(APPS_BIN_DIR)/nginx/wasm32-wasi/conf/.' '$(LINDFS_ROOT)/etc/nginx/'
+	cp -r '$(APPS_BIN_DIR)/nginx/wasm32-wasi/html/.' '$(LINDFS_ROOT)/html/'
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
