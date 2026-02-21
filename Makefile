@@ -193,11 +193,7 @@ sed: merge-sysroot
 
 # ---------------- install (copy built artifacts into LINDFS_ROOT) -------------
 install:
-	mkdir -p '$(LINDFS_ROOT)/bin' '$(LINDFS_ROOT)/etc/nginx' '$(LINDFS_ROOT)/html' \
-	         '$(LINDFS_ROOT)/var/log/nginx' '$(LINDFS_ROOT)/var/run'
-	cp '$(APPS_BIN_DIR)/nginx/wasm32-wasi/nginx.cwasm' '$(LINDFS_ROOT)/bin/nginx'
-	cp -r '$(APPS_BIN_DIR)/nginx/wasm32-wasi/conf/.' '$(LINDFS_ROOT)/etc/nginx/'
-	cp -r '$(APPS_BIN_DIR)/nginx/wasm32-wasi/html/.' '$(LINDFS_ROOT)/html/'
+	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)'
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
