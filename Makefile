@@ -19,7 +19,7 @@ APPS_LIB_DIR   := $(APPS_BUILD)/lib
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
 JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 
-LINDFS_ROOT    ?= /home/lind/lind-wasm/lindfs
+LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
 # -------- Phonies -------------------------------------------------------------
 .PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install
