@@ -19,8 +19,10 @@ APPS_LIB_DIR   := $(APPS_BUILD)/lib
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
 JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 
+LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
+
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install-bash
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install-bash install-nginx
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -191,6 +193,9 @@ sed: merge-sysroot
 
 install-bash:
 	'$(APPS_ROOT)/bash/bash_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)'
+
+install-nginx:
+	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)'
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
