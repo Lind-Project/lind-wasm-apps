@@ -22,7 +22,7 @@ JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install-nginx
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -191,8 +191,7 @@ sed: merge-sysroot
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/sed/compile_sed.sh'
 
-# ---------------- install (copy built artifacts into LINDFS_ROOT) -------------
-install:
+install-nginx:
 	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)'
 
 clean:
