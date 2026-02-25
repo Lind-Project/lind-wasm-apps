@@ -303,3 +303,35 @@ int ppoll(void *fds, unsigned long nfds, const void *tmo_p, const void *sigmask)
     errno = ENOSYS;
     return -1;
 }
+
+/* ----------------------------------------------------------------
+ * _Unwind_* stubs — pulled in by libc's backtrace.o; the WASI
+ * target has no stack unwinder so these are no-ops.
+ * ---------------------------------------------------------------- */
+typedef unsigned int _Unwind_Reason_Code;
+typedef void *_Unwind_Context;
+typedef _Unwind_Reason_Code (*_Unwind_Trace_Fn)(_Unwind_Context *, void *);
+
+_Unwind_Reason_Code _Unwind_Backtrace(_Unwind_Trace_Fn fn, void *arg)
+{
+    (void)fn; (void)arg;
+    return 0; /* _URC_NO_REASON — just report no frames */
+}
+
+unsigned long _Unwind_GetIP(_Unwind_Context *ctx)
+{
+    (void)ctx;
+    return 0;
+}
+
+unsigned long _Unwind_GetGR(_Unwind_Context *ctx, int index)
+{
+    (void)ctx; (void)index;
+    return 0;
+}
+
+unsigned long _Unwind_GetCFA(_Unwind_Context *ctx)
+{
+    (void)ctx;
+    return 0;
+}
