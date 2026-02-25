@@ -64,15 +64,7 @@ int setrlimit(int resource, const struct rlimit *rlim)
     return 0;
 }
 
-/* ----------------------------------------------------------------
- * getpeereid — not meaningful in WASI.
- * ---------------------------------------------------------------- */
-int getpeereid(int sock, uid_t *euid, gid_t *egid)
-{
-    (void)sock; (void)euid; (void)egid;
-    errno = ENOSYS;
-    return -1;
-}
+/* getpeereid — provided by libpgport_srv.a(getpeereid_srv.o), not stubbed here */
 
 /* ----------------------------------------------------------------
  * getpwuid_r / getpwnam_r — return "not found" (no passwd db).
@@ -264,17 +256,13 @@ int sigsuspend(const void *mask)
  * Miscellaneous stubs
  * ---------------------------------------------------------------- */
 
-/* getpgrp / setpgid — process groups don't exist in WASI */
+/* getpgrp — process groups don't exist in WASI */
 pid_t getpgrp(void)
 {
     return 1;
 }
 
-int setpgid(pid_t pid, pid_t pgid)
-{
-    (void)pid; (void)pgid;
-    return 0;
-}
+/* setpgid — provided by libc.a, not stubbed here */
 
 pid_t setsid(void)
 {
