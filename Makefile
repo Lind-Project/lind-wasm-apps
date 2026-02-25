@@ -22,7 +22,7 @@ JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed postgres clean clean-all install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-postgres install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -191,6 +191,14 @@ sed: merge-sysroot
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/sed/compile_sed.sh'
 
+# ---------------- postgres (WASM build) ---------------------------------------
+# Uses postgres/compile_postgres.sh to build the PostgreSQL backend as a
+# wasm32-wasi binary using the merged sysroot and toolchain detected by
+# preflight, and stages artifacts under build/bin/postgres/wasm32-wasi/.
+postgres: merge-sysroot
+	. '$(TOOL_ENV)'
+	'$(APPS_ROOT)/postgres/compile_postgres.sh'
+
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' bash
 
@@ -215,7 +223,10 @@ install-lmbench:
 install-coreutils:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' coreutils
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils
+install-postgres:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' postgres
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-postgres
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
