@@ -88,10 +88,7 @@ CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
 CFLAGS_WASM="-O2 -g -pthread \
   -include $WASM_COMPAT_H \
   -I$MERGED_SYSROOT/include \
-  -I$MERGED_SYSROOT/include/wasm32-wasi \
-  -D_WASI_EMULATED_SIGNAL \
-  -D_WASI_EMULATED_MMAN \
-  -D_WASI_EMULATED_PROCESS_CLOCKS"
+  -I$MERGED_SYSROOT/include/wasm32-wasi"
 
 # 256 MB max memory — PG allocates shared buffers even in single-user mode
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,\
@@ -225,27 +222,31 @@ pgac_cv_gcc_sync_int64_cas=${pgac_cv_gcc_sync_int64_cas=yes}
 pgac_cv_gcc_atomic_int32_cas=${pgac_cv_gcc_atomic_int32_cas=yes}
 pgac_cv_gcc_atomic_int64_cas=${pgac_cv_gcc_atomic_int64_cas=yes}
 
-# Functions not available in WASI
-ac_cv_func_getifaddrs=${ac_cv_func_getifaddrs=no}
-ac_cv_func_posix_fallocate=${ac_cv_func_posix_fallocate=no}
-ac_cv_func_ppoll=${ac_cv_func_ppoll=no}
-ac_cv_func_sync_file_range=${ac_cv_func_sync_file_range=no}
-ac_cv_func_fork=${ac_cv_func_fork=no}
-ac_cv_func_vfork=${ac_cv_func_vfork=no}
+# Functions provided by lind-wasm sysroot (tell configure they exist)
+ac_cv_func_getifaddrs=${ac_cv_func_getifaddrs=yes}
+ac_cv_func_posix_fallocate=${ac_cv_func_posix_fallocate=yes}
+ac_cv_func_ppoll=${ac_cv_func_ppoll=yes}
+ac_cv_func_sync_file_range=${ac_cv_func_sync_file_range=yes}
+ac_cv_func_fork=${ac_cv_func_fork=yes}
+ac_cv_func_vfork=${ac_cv_func_vfork=yes}
+ac_cv_func_shmget=${ac_cv_func_shmget=yes}
+ac_cv_func_getrlimit=${ac_cv_func_getrlimit=yes}
+ac_cv_func_setrlimit=${ac_cv_func_setrlimit=yes}
+ac_cv_func_syslog=${ac_cv_func_syslog=yes}
+ac_cv_func_getpwuid_r=${ac_cv_func_getpwuid_r=yes}
+ac_cv_func_getaddrinfo=${ac_cv_func_getaddrinfo=yes}
+ac_cv_func_posix_fadvise=${ac_cv_func_posix_fadvise=yes}
+ac_cv_func_kill=${ac_cv_func_kill=yes}
+ac_cv_func_getrusage=${ac_cv_func_getrusage=yes}
+ac_cv_func_getpgrp=${ac_cv_func_getpgrp=yes}
+ac_cv_func_setsid=${ac_cv_func_setsid=yes}
+
+# Functions genuinely not available in WASI
 ac_cv_func_shm_open=${ac_cv_func_shm_open=no}
-ac_cv_func_shmget=${ac_cv_func_shmget=no}
-ac_cv_func_getpeereid=${ac_cv_func_getpeereid=no}
-ac_cv_func_getrlimit=${ac_cv_func_getrlimit=no}
-ac_cv_func_setrlimit=${ac_cv_func_setrlimit=no}
 ac_cv_func_dlopen=${ac_cv_func_dlopen=no}
-ac_cv_func_syslog=${ac_cv_func_syslog=no}
 ac_cv_func_setproctitle=${ac_cv_func_setproctitle=no}
 ac_cv_func_setproctitle_fast=${ac_cv_func_setproctitle_fast=no}
-ac_cv_func_getpwuid_r=${ac_cv_func_getpwuid_r=no}
-ac_cv_func_getaddrinfo=${ac_cv_func_getaddrinfo=no}
-
-# Cross-compilation: assume these run-tests are not available
-ac_cv_func_posix_fadvise=${ac_cv_func_posix_fadvise=no}
+ac_cv_func_getpeereid=${ac_cv_func_getpeereid=no}
 pgac_cv_rint_is_c99_compliant=${pgac_cv_rint_is_c99_compliant=yes}
 ac_cv_working_alloca=${ac_cv_working_alloca=yes}
 
@@ -256,8 +257,8 @@ pgac_cv_snprintf_size_t_support=${pgac_cv_snprintf_size_t_support=yes}
 # Large file support
 ac_cv_sys_largefile_CC=${ac_cv_sys_largefile_CC=no}
 
-# POSIX shared memory type — use mmap (we stub it out anyway)
-pgac_cv_ipc_shmem_kind=${pgac_cv_ipc_shmem_kind=mmap}
+# Shared memory type — sysroot provides sysv shm
+pgac_cv_ipc_shmem_kind=${pgac_cv_ipc_shmem_kind=sysv}
 PREFERRED_SEMAPHORES=${PREFERRED_SEMAPHORES=UNNAMED_POSIX}
 
 # Locale — minimal support
