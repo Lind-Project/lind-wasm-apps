@@ -22,7 +22,7 @@ JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install-bash install-nginx install-git install-curl install-grep install-sed
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -192,22 +192,30 @@ sed: merge-sysroot
 	'$(APPS_ROOT)/sed/compile_sed.sh'
 
 install-bash:
-	'$(APPS_ROOT)/scripts/post_install_apps.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' bash
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' bash
 
 install-nginx:
 	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)'
 
 install-git:
-	'$(APPS_ROOT)/scripts/post_install_apps.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' git
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' git
 
 install-curl:
-	'$(APPS_ROOT)/scripts/post_install_apps.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' curl
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' curl
 
 install-grep:
-	'$(APPS_ROOT)/scripts/post_install_apps.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' grep
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' grep
 
 install-sed:
-	'$(APPS_ROOT)/scripts/post_install_apps.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' sed
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' sed
+
+install-lmbench:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' lmbench
+
+install-coreutils:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' coreutils
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
