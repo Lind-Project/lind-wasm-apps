@@ -153,6 +153,15 @@ bash: merge-sysroot
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/bash/compile_bash.sh'
 
+
+# ---------------- bash (WASM build) -------------------------------------------
+# Uses bash/compile_bash.sh to build bash as a wasm32-wasi binary using the
+# merged sysroot and toolchain detected by preflight, and stages artifacts
+# under build/bin/bash/wasm32-wasi/.
+bash-dynamic: merge-sysroot
+	. '$(TOOL_ENV)'
+	'$(APPS_ROOT)/bash/compile_bash_dynamic.sh'
+
 # ---------------- nginx (WASM build) -------------------------------------------
 # Uses nginx/compile_nginx.sh to build nginx as a wasm32-wasi binary using the
 # merged sysroot and toolchain detected by preflight, and stages artifacts
