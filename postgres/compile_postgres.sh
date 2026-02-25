@@ -378,7 +378,7 @@ make -C src/backend all -j"$JOBS" \
   LDFLAGS="$LDFLAGS_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
-  LIBS="$WASI_STUBS_O" || {
+  LIBS="$WASI_STUBS_O -lm" || {
     echo "[postgres] WARNING: backend build had errors (best-effort, continuing)."
 }
 
