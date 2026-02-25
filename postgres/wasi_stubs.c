@@ -196,61 +196,7 @@ int sem_trywait(sem_t *sem)
     return 0;
 }
 
-/* ----------------------------------------------------------------
- * Signal stubs — WASI doesn't support POSIX signals; provide
- * no-op implementations so that PG's signal-handling code links.
- * ---------------------------------------------------------------- */
-typedef void (*sighandler_t)(int);
-struct sigaction_stub { int dummy; };
-
-sighandler_t signal(int signum, sighandler_t handler)
-{
-    (void)signum; (void)handler;
-    return (sighandler_t)0;
-}
-
-int sigaction(int signum, const void *act, void *oldact)
-{
-    (void)signum; (void)act; (void)oldact;
-    return 0;
-}
-
-int sigprocmask(int how, const void *set, void *oldset)
-{
-    (void)how; (void)set; (void)oldset;
-    return 0;
-}
-
-int sigemptyset(void *set)
-{
-    (void)set;
-    return 0;
-}
-
-int sigfillset(void *set)
-{
-    (void)set;
-    return 0;
-}
-
-int sigaddset(void *set, int signum)
-{
-    (void)set; (void)signum;
-    return 0;
-}
-
-int sigdelset(void *set, int signum)
-{
-    (void)set; (void)signum;
-    return 0;
-}
-
-int sigsuspend(const void *mask)
-{
-    (void)mask;
-    errno = EINTR;
-    return -1;
-}
+/* Signal functions — provided by the lind-wasm sysroot, not stubbed here */
 
 /* ----------------------------------------------------------------
  * Miscellaneous stubs
