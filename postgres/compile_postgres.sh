@@ -339,6 +339,14 @@ if [[ -f "$PG_CONFIG_H" ]]; then
   fi
 fi
 
+# Patch out the root-user check — inside the Lind sandbox geteuid() returns 0
+# but the security concern doesn't apply.
+MAIN_C="$PG_ROOT/src/backend/main/main.c"
+if grep -q 'if (geteuid() == 0)' "$MAIN_C" 2>/dev/null; then
+  echo "[postgres] [wasm] patching out root-user check in main.c..."
+  sed -i 's/if (geteuid() == 0)/if (0 \/* geteuid() == 0 -- disabled for WASI *\/)/' "$MAIN_C"
+fi
+
 # --- Compile WASI stubs -----------------------------------------------------
 
 WASI_STUBS_C="$PG_ROOT/wasi_stubs.c"
@@ -384,66 +392,114 @@ make -C src/backend all -j"$JOBS" \
 }
 
 ###############################################################################
-# Stage the binary
+# Build initdb and its dependencies (best-effort)
+###############################################################################
+
+echo "[postgres] [wasm] building libpq..."
+make -C src/interfaces/libpq -j"$JOBS" \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  LDFLAGS="$LDFLAGS_WASM" \
+  AR="$AR" \
+  RANLIB="$RANLIB" || {
+    echo "[postgres] WARNING: libpq build had errors (best-effort, continuing)."
+}
+
+echo "[postgres] [wasm] building fe_utils..."
+make -C src/fe_utils -j"$JOBS" \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  LDFLAGS="$LDFLAGS_WASM" \
+  AR="$AR" \
+  RANLIB="$RANLIB" || {
+    echo "[postgres] WARNING: fe_utils build had errors (best-effort, continuing)."
+}
+
+echo "[postgres] [wasm] building initdb..."
+make -C src/bin/initdb -j"$JOBS" \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  LDFLAGS="$LDFLAGS_WASM" \
+  AR="$AR" \
+  RANLIB="$RANLIB" \
+  LIBS="$WASI_STUBS_O -lm" || {
+    echo "[postgres] WARNING: initdb build had errors (best-effort, continuing)."
+}
+
+###############################################################################
+# Stage binaries
 ###############################################################################
 
 PG_BINARY="$PG_ROOT/src/backend/postgres"
+INITDB_BINARY="$PG_ROOT/src/bin/initdb/initdb"
+
+STAGED_BINARIES=()
 
 if [[ -f "$PG_BINARY" ]]; then
   cp "$PG_BINARY" "$STAGE_DIR/postgres.wasm"
+  STAGED_BINARIES+=("postgres")
   echo "[postgres] staged: $STAGE_DIR/postgres.wasm"
 else
   echo "[postgres] WARNING: postgres binary was not produced."
+fi
+
+if [[ -f "$INITDB_BINARY" ]]; then
+  cp "$INITDB_BINARY" "$STAGE_DIR/initdb.wasm"
+  STAGED_BINARIES+=("initdb")
+  echo "[postgres] staged: $STAGE_DIR/initdb.wasm"
+else
+  echo "[postgres] WARNING: initdb binary was not produced."
+fi
+
+if [[ ${#STAGED_BINARIES[@]} -eq 0 ]]; then
+  echo "[postgres] No binaries were produced."
   echo "[postgres] This is expected during initial porting — check build errors above."
-  echo "[postgres] Build artifacts (if any) are in $PG_ROOT/src/backend/"
   exit 0
 fi
 
 ###############################################################################
-# wasm-opt (best-effort)
+# wasm-opt + cwasm (best-effort, for each staged binary)
 ###############################################################################
 
-if [[ -x "$WASM_OPT" ]]; then
-  echo "[postgres] running wasm-opt (asyncify + optimization)..."
-  "$WASM_OPT" \
-    --epoch-injection \
-    --asyncify \
-    --debuginfo \
-    -O2 \
-    "$STAGE_DIR/postgres.wasm" \
-    -o "$STAGE_DIR/postgres.opt.wasm" || {
-      echo "[postgres] WARNING: wasm-opt failed; skipping optimization."
-    }
-else
-  echo "[postgres] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
-fi
+for bin_name in "${STAGED_BINARIES[@]}"; do
+  RAW_WASM="$STAGE_DIR/${bin_name}.wasm"
 
-###############################################################################
-# cwasm generation (best-effort)
-###############################################################################
+  if [[ -x "$WASM_OPT" ]]; then
+    echo "[postgres] running wasm-opt on ${bin_name} (asyncify + optimization)..."
+    "$WASM_OPT" \
+      --epoch-injection \
+      --asyncify \
+      --debuginfo \
+      -O2 \
+      "$RAW_WASM" \
+      -o "$STAGE_DIR/${bin_name}.opt.wasm" || {
+        echo "[postgres] WARNING: wasm-opt failed for ${bin_name}; skipping optimization."
+        continue
+      }
+  else
+    echo "[postgres] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+    continue
+  fi
 
-if [[ -x "$LIND_BOOT" ]]; then
-  echo "[postgres] generating cwasm via lind-boot --precompile..."
-  OPT_WASM="$STAGE_DIR/postgres.opt.wasm"
-  if [[ -f "$OPT_WASM" ]]; then
-    if "$LIND_BOOT" --precompile "$OPT_WASM"; then
-      # Rename postgres.opt.cwasm → postgres.cwasm (drop .opt)
-      OPT_CWASM="${OPT_WASM%.wasm}.cwasm"
-      CLEAN_CWASM="${OPT_CWASM/.opt/}"
-      if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-        mv "$OPT_CWASM" "$CLEAN_CWASM"
+  if [[ -x "$LIND_BOOT" ]]; then
+    echo "[postgres] generating cwasm for ${bin_name} via lind-boot --precompile..."
+    OPT_WASM="$STAGE_DIR/${bin_name}.opt.wasm"
+    if [[ -f "$OPT_WASM" ]]; then
+      if "$LIND_BOOT" --precompile "$OPT_WASM"; then
+        # Rename foo.opt.cwasm → foo.cwasm (drop .opt)
+        OPT_CWASM="${OPT_WASM%.wasm}.cwasm"
+        CLEAN_CWASM="${OPT_CWASM/.opt/}"
+        if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
+          mv "$OPT_CWASM" "$CLEAN_CWASM"
+        fi
+      else
+        echo "[postgres] WARNING: lind-boot --precompile failed for ${bin_name}."
       fi
-    else
-      echo "[postgres] WARNING: lind-boot --precompile failed; skipping cwasm generation."
     fi
   else
-    echo "[postgres] NOTE: no optimized wasm found; trying raw binary..."
-    "$LIND_BOOT" --precompile "$STAGE_DIR/postgres.wasm" || \
-      echo "[postgres] WARNING: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[postgres] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
   fi
-else
-  echo "[postgres] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-fi
+done
 
 echo
 echo "[postgres] build complete. Outputs under:"
