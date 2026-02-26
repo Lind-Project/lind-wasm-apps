@@ -298,6 +298,7 @@ echo "[postgres] [wasm] configuring for wasm32-wasi..."
   --disable-tap-tests \
   --disable-thread-safety \
   --disable-rpath \
+  --disable-shared \
   CC="$CC_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
