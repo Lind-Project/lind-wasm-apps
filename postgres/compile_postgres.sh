@@ -442,7 +442,7 @@ make -C src/bin/initdb -j"$JOBS" \
   LDFLAGS="$LDFLAGS_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
-  LIBS="$WASI_STUBS_O -lm" || {
+  LIBS="-lpgcommon -lpgport $WASI_STUBS_O -lm" || {
     echo "[postgres] WARNING: initdb build had errors (best-effort, continuing)."
 }
 
