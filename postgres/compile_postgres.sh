@@ -298,7 +298,6 @@ echo "[postgres] [wasm] configuring for wasm32-wasi..."
   --disable-tap-tests \
   --disable-thread-safety \
   --disable-rpath \
-  --disable-shared \
   CC="$CC_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
@@ -308,6 +307,26 @@ echo "[postgres] [wasm] configuring for wasm32-wasi..."
   PKG_CONFIG=false
 
 # --- Post-configure fixups ---------------------------------------------------
+
+# wasm-ld cannot build shared libraries (no --version-script, no --shared with
+# --export-memory, no crt1-reactor.o).  Neuter the shared-lib targets in
+# Makefile.shlib so that only static libraries are produced.
+MAKEFILE_SHLIB="$PG_ROOT/src/Makefile.shlib"
+if [[ -f "$MAKEFILE_SHLIB" ]]; then
+  echo "[postgres] [wasm] patching Makefile.shlib to disable shared libraries..."
+  sed -i 's/^all-lib: all-shared-lib/#all-lib: all-shared-lib  # disabled for WASI/' "$MAKEFILE_SHLIB"
+fi
+
+# Also patch libpq's Makefile: libpq-refs-stamp depends on $(shlib) and runs a
+# Perl symbol check.  Replace it with a trivial no-op so `all` doesn't pull in
+# the shared lib.
+LIBPQ_MAKEFILE="$PG_ROOT/src/interfaces/libpq/Makefile"
+if [[ -f "$LIBPQ_MAKEFILE" ]]; then
+  echo "[postgres] [wasm] patching libpq Makefile to skip shared-lib ref check..."
+  sed -i '/^libpq-refs-stamp:/,/touch \$@/{
+    s/^libpq-refs-stamp: .*/libpq-refs-stamp:/
+  }' "$LIBPQ_MAKEFILE"
+fi
 
 PG_CONFIG_H="$PG_ROOT/src/include/pg_config.h"
 
