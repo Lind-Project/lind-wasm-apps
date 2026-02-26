@@ -439,10 +439,10 @@ echo "[postgres] [wasm] building initdb..."
 make -C src/bin/initdb -j"$JOBS" \
   CC="$CC_WASM" \
   CFLAGS="$CFLAGS_WASM" \
-  LDFLAGS="$LDFLAGS_WASM" \
+  LDFLAGS="-L$PG_ROOT/src/port -L$PG_ROOT/src/common -L$PG_ROOT/src/fe_utils -L$PG_ROOT/src/interfaces/libpq $LDFLAGS_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
-  LIBS="-lpgcommon -lpgport $WASI_STUBS_O -lm" || {
+  LIBS="-lpgfeutils -lpq -lpgcommon -lpgport $WASI_STUBS_O -lm" || {
     echo "[postgres] WARNING: initdb build had errors (best-effort, continuing)."
 }
 
