@@ -79,7 +79,7 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
   -I$MERGED_SYSROOT/include/wasm32-wasi"
 
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
-  -Wl,--export=__stack_pointer,--export=__stack_low,--shared-memory \
+  -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base,--shared-memory \
   -L$MERGED_SYSROOT/lib/wasm32-wasi \
   -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
 
