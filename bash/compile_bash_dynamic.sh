@@ -37,7 +37,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/build/sysroot}"
+SYSROOT="${SYSROOT:-$LIND_WASM_ROOT/build/sysroot}"
 MERGED_SYSROOT="${APPS_MERGED:-$APPS_ROOT/build/sysroot_merged}"
 LINDFS_ROOT="${LINDFS_ROOT:-$LIND_WASM_ROOT/lindfs}"
 
@@ -57,8 +57,8 @@ WASM_COMPAT_H="$BASH_ROOT/wasm_compat.h"
 
 # --- sanity checks -----------------------------------------------------------
 
-if [[ ! -d "$MERGED_SYSROOT" ]]; then
-  echo "[bash] ERROR: merged sysroot '$MERGED_SYSROOT' not found."
+if [[ ! -d "$SYSROOT" ]]; then
+  echo "[bash] ERROR: sysroot '$SYSROOT' not found."
   exit 1
 fi
 
@@ -69,14 +69,16 @@ fi
 
 # --- WASM dynamic toolchain flags --------------------------------------------
 
-CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
+CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$SYSROOT -pthread"
 
 # Added -fPIC for Position Independent Code
-CFLAGS_WASM="-O2 -g -std=gnu89 -pthread -fPIC \
+CFLAGS_WASM="-D _FILE_OFFSET_BITS=64 \
+    -D __USE_LARGEFILE64 \
+    -g -O0 -std=gnu89 -pthread -fPIC \
   -DHAVE_STRSIGNAL=1 -DHAVE_MKTIME=1 \
   -include $WASM_COMPAT_H \
-  -I$MERGED_SYSROOT/include \
-  -I$MERGED_SYSROOT/include/wasm32-wasi"
+  -I$SYSROOT/include \
+  -I$SYSROOT/include/wasm32-wasi"
 
 # Dynamic/PIE linker flags are added
 LDFLAGS_WASM="-fPIC -Wl,-pie \
@@ -88,10 +90,10 @@ LDFLAGS_WASM="-fPIC -Wl,-pie \
 -Wl,--export=__stack_low \
 -Wl,--allow-undefined \
 -Wl,--unresolved-symbols=import-dynamic \
--Wl,--export-dynamic \
--Wl,--experimental-pic \
--L$MERGED_SYSROOT/lib/wasm32-wasi \
--L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+-z stack-size=16777216 \
+-Wl,--initial-memory=41943040 \
+-L$SYSROOT/lib \
+-L$SYSROOT/lib/wasm32-wasi"
 
 echo "[bash] using CLANG       = $CLANG"
 echo "[bash] building dynamically with -fPIC and -pie"
@@ -278,16 +280,36 @@ $CC_WASM $CFLAGS_WASM -c "$GROUPS_STUB_C" -o "$GROUPS_STUB_O"
 BASH_WASM="$BASH_OUT_DIR/bash.wasm"
 
 # KEY CHANGE 3: Linked as PIE and appended -ldl to support dlopen if the sysroot has it.
+# echo "[bash] [wasm] dynamically linking bash → $BASH_WASM ..."
+# $CC_WASM \
+#  -L./builtins -L./lib/readline -L./lib/glob -L./lib/tilde -L./lib/sh \
+#  $LDFLAGS_WASM \
+#  -o "$BASH_WASM" \
+#  "$BASH_ROOT/locale_stub.o" \
+#  "$BASH_ROOT/getgroups_stub.o" \
+#  shell.o eval.o y.tab.o general.o make_cmd.o print_cmd.o dispose_cmd.o execute_cmd.o variables.o copy_cmd.o error.o expr.o flags.o nojobs.o subst.o hashcmd.o hashlib.o mailcheck.o trap.o input.o unwind_prot.o pathexp.o sig.o test.o version.o alias.o array.o arrayfunc.o assoc.o braces.o bracecomp.o bashhist.o bashline.o siglist.o list.o stringlib.o locale.o findcmd.o redir.o pcomplete.o pcomplib.o syntax.o xmalloc.o \
+#  "$BASH_ROOT/tputs_stub.o" \
+#  -lbuiltins -lglob -lsh -lreadline -lhistory -ltilde -ldl
+
+# 7. Link bash.wasm
 echo "[bash] [wasm] dynamically linking bash → $BASH_WASM ..."
 $CC_WASM \
-  -L./builtins -L./lib/readline -L./lib/glob -L./lib/tilde -L./lib/sh \
   $LDFLAGS_WASM \
   -o "$BASH_WASM" \
   "$BASH_ROOT/locale_stub.o" \
   "$BASH_ROOT/getgroups_stub.o" \
   shell.o eval.o y.tab.o general.o make_cmd.o print_cmd.o dispose_cmd.o execute_cmd.o variables.o copy_cmd.o error.o expr.o flags.o nojobs.o subst.o hashcmd.o hashlib.o mailcheck.o trap.o input.o unwind_prot.o pathexp.o sig.o test.o version.o alias.o array.o arrayfunc.o assoc.o braces.o bracecomp.o bashhist.o bashline.o siglist.o list.o stringlib.o locale.o findcmd.o redir.o pcomplete.o pcomplib.o syntax.o xmalloc.o \
   "$BASH_ROOT/tputs_stub.o" \
-  -lbuiltins -lglob -lsh -lreadline -lhistory -ltilde -ldl
+  "./builtins/libbuiltins.a" \
+  "./lib/glob/libglob.a" \
+  "./lib/sh/libsh.a" \
+  "./lib/readline/libreadline.a" \
+  "./lib/readline/libhistory.a" \
+  "./lib/tilde/libtilde.a" \
+  -ldl -lpthread 
+# -ldl -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lpthread
+
+
 
 if [[ ! -f "$BASH_WASM" ]]; then
   echo "[bash] ERROR: bash.wasm was not produced."
