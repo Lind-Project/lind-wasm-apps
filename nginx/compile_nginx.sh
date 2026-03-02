@@ -94,7 +94,7 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
 # LINK make override at build time (not via --with-ld-opt, which configure
 # would test and fail for WASM-specific flags).
 LDFLAGS_WASM="-Wl,--shared-memory,--import-memory,--export-memory,--max-memory=67108864 \
-    -Wl,--export=__stack_pointer,--export=__stack_low \
+    -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base \
     -L$MERGED_SYSROOT/lib/wasm32-wasi \
     -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
 
