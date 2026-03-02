@@ -154,12 +154,12 @@ bash: merge-sysroot
 	'$(APPS_ROOT)/bash/compile_bash.sh'
 
 # ---------------- nginx (WASM build) -------------------------------------------
-# Uses nginx/compile_nginx.sh to build nginx as a wasm32-wasi binary using the
-# merged sysroot and toolchain detected by preflight, and stages artifacts
-# under build/bin/nginx/wasm32-wasi/.
+# Uses nginx/compile_nginx_dynamic.sh to build nginx as a PIE wasm32-wasi binary
+# with dynamic loading support (dlopen/dlsym/dlclose via Lind's runtime loader),
+# and stages artifacts under build/bin/nginx/wasm32-wasi/.
 nginx: merge-sysroot
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/nginx/compile_nginx.sh'
+	'$(APPS_ROOT)/nginx/compile_nginx_dynamic.sh'
 
 # ---------------- coreutils (WASM build) --------------------------------------
 # Uses coreutils/compile_coreutils.sh and requires the merged sysroot.
