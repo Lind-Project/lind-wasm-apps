@@ -103,7 +103,7 @@ preflight: $(TOOL_ENV)
 # ---------------- libtirpc (via compile_libtirpc.sh) -------------------------
 $(LIBTIRPC_STAMP): $(APPS_ROOT)/libtirpc/compile_libtirpc.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/libtirpc/compile_libtirpc.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/libtirpc/compile_libtirpc.sh'
 	touch '$@'
 
 libtirpc: $(LIBTIRPC_STAMP)
@@ -111,7 +111,7 @@ libtirpc: $(LIBTIRPC_STAMP)
 # ---------------- gnulib (via compile_gnulib.sh) -----------------------------
 $(GNULIB_STAMP): $(APPS_ROOT)/gnulib/compile_gnulib.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/gnulib/compile_gnulib.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/gnulib/compile_gnulib.sh'
 	touch '$@'
 
 gnulib: $(GNULIB_STAMP)
@@ -119,7 +119,7 @@ gnulib: $(GNULIB_STAMP)
 # ---------------- zlib (via compile_zlib.sh) ----------------------------------
 $(ZLIB_STAMP): $(APPS_ROOT)/zlib/compile_zlib.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/zlib/compile_zlib.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/zlib/compile_zlib.sh'
 	touch '$@'
 
 zlib: $(ZLIB_STAMP)
@@ -127,7 +127,7 @@ zlib: $(ZLIB_STAMP)
 # ---------------- openssl (via compile_openssl.sh) ----------------------------
 $(OPENSSL_STAMP): $(APPS_ROOT)/openssl/compile_openssl.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/openssl/compile_openssl.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/openssl/compile_openssl.sh'
 	touch '$@'
 
 openssl: $(OPENSSL_STAMP)
@@ -190,7 +190,7 @@ merge-sysroot: $(MERGE_ALL_STAMP)
 # ---------------- lmbench (via compile_lmbench.sh) ---------------------------
 lmbench: $(MERGE_TIRPC_STAMP)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/lmbench/src/compile_lmbench.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/lmbench/src/compile_lmbench.sh'
 
 # ---------------- bash (WASM build) -------------------------------------------
 # Uses bash/compile_bash.sh to build bash as a wasm32-wasi binary using the
@@ -198,7 +198,7 @@ lmbench: $(MERGE_TIRPC_STAMP)
 # under build/bin/bash/wasm32-wasi/.
 bash: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/bash/compile_bash.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/bash/compile_bash.sh'
 
 # ---------------- nginx (WASM build) -------------------------------------------
 # Uses nginx/compile_nginx.sh to build nginx as a wasm32-wasi binary using the
@@ -206,13 +206,13 @@ bash: $(MERGE_BASE_STAMP)
 # under build/bin/nginx/wasm32-wasi/.
 nginx: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/nginx/compile_nginx.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/nginx/compile_nginx.sh'
 
 # ---------------- coreutils (WASM build) --------------------------------------
 # Uses coreutils/compile_coreutils.sh and requires the merged sysroot.
 coreutils: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/coreutils/compile_coreutils.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/coreutils/compile_coreutils.sh'
 
 # ---------------- git (WASM build) --------------------------------------------
 # Uses git/compile_git.sh to build git as a wasm32-wasi binary using the
@@ -220,23 +220,23 @@ coreutils: $(MERGE_BASE_STAMP)
 # under build/bin/git/wasm32-wasi/.
 git: $(MERGE_OPENSSL_STAMP)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/git/compile_git.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/git/compile_git.sh'
 
 # ---------------- curl (WASM build) -------------------------------------------
 # Uses curl/compile_curl.sh and requires the merged sysroot (OpenSSL + zlib).
 curl: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/curl/compile_curl.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/curl/compile_curl.sh'
 
 # ---------------- grep (WASM build) -------------------------------------------
 grep: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/grep/compile_grep.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/grep/compile_grep.sh'
 
 # ---------------- sed (WASM build) --------------------------------------------
 sed: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/sed/compile_sed.sh'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/sed/compile_sed.sh'
 
 rebuild-libs:
 	rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' \
