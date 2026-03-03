@@ -2,6 +2,9 @@ options:
   logging: CLOUD_LOGGING_ONLY
   machineType: E2_HIGHCPU_32
 
+substitutions:
+  _ARTIFACT_MODE: "full"
+
 steps:
   - name: 'gcr.io/cloud-builders/git'
     id: Get Short SHA
@@ -24,31 +27,28 @@ steps:
       - 'DOCKER_PASSWORD'
 
   - name: 'gcr.io/cloud-builders/docker'
-    id: Build Image
+    id: Build & Push (buildx)
     entrypoint: 'bash'
-    env:
-      - 'DOCKER_BUILDKIT=1'
     args:
       - '-c'
       - |
+        set -euo pipefail
         source /workspace/commit.env
-        docker build \
+
+        # Create or reuse buildx builder
+        docker buildx create --use --name cbuilder || docker buildx use cbuilder
+
+        docker buildx build \
+          --platform=linux/amd64 \
           --progress=plain \
+          --pull \
+          --build-arg ARTIFACT_MODE=${_ARTIFACT_MODE} \
+          --cache-from=type=registry,ref=docker.io/$$DOCKER_USERNAME/lind-wasm-apps:buildcache \
+          --cache-to=type=registry,ref=docker.io/$$DOCKER_USERNAME/lind-wasm-apps:buildcache,mode=max \
           -t docker.io/$$DOCKER_USERNAME/lind-wasm-apps:latest \
           -t docker.io/$$DOCKER_USERNAME/lind-wasm-apps:sha-$SHORT_SHA \
+          --push \
           .
-    secretEnv:
-      - 'DOCKER_USERNAME'
-
-  - name: 'gcr.io/cloud-builders/docker'
-    id: Push Image
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        source /workspace/commit.env
-        docker push docker.io/$$DOCKER_USERNAME/lind-wasm-apps:latest
-        docker push docker.io/$$DOCKER_USERNAME/lind-wasm-apps:sha-$SHORT_SHA
     secretEnv:
       - 'DOCKER_USERNAME'
 
