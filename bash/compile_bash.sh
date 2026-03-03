@@ -221,19 +221,23 @@ fi
 
 ##################
 # The previous script built a full native bash binary just to obtain a small
-# set of generator tools and generated headers. That extra work is not needed:
-# these explicit targets are the host-side prerequisites the WASM build uses,
-# so building them directly cuts time without changing bash's makefiles.
+# set of generator tools and generated headers. That extra work is not needed.
+# One subtlety, though, is that `mkbuiltins` and `builtext.h` are managed by
+# the `builtins/Makefile`, and asking the top-level make plus the subdir make
+# to build them concurrently can race at high `-j`. We therefore keep the
+# top-level generated headers parallel, but route the builtins generator path
+# through a dedicated submake so the dependency graph stays coherent.
 ##################
 echo "[bash] [host] building targeted native prerequisites..."
 make -j"$JOBS" \
-  builtins/mkbuiltins \
-  builtins/builtext.h \
   signames.h \
   pathnames.h \
   version.h \
   y.tab.h \
   syntax.c
+make -j1 -C builtins \
+  mkbuiltins \
+  builtext.h
 
 if [[ ! -x builtins/mkbuiltins ]]; then
   echo "[bash] ERROR: host builtins/mkbuiltins was not produced."
