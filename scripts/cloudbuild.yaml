@@ -53,13 +53,13 @@ steps:
           -t docker.io/$$DOCKER_USERNAME/lind-wasm-apps:latest \
           -t docker.io/$$DOCKER_USERNAME/lind-wasm-apps:sha-$SHORT_SHA \
           --push \
-          . 2>&1 | tee "$BUILD_LOG"
-        BUILD_RC=${PIPESTATUS[0]}
+          . 2>&1 | tee "$$BUILD_LOG"
+        BUILD_RC=$${PIPESTATUS[0]}
         set -e
 
-        printf '%s\n' "$BUILD_RC" > /workspace/artifacts/buildx.exitcode
-        gzip -f "$BUILD_LOG"
-        echo "BUILD_RC=$BUILD_RC"
+        printf '%s\n' "$$BUILD_RC" > /workspace/artifacts/buildx.exitcode
+        gzip -f "$$BUILD_LOG"
+        echo "BUILD_RC=$$BUILD_RC"
     secretEnv:
       - 'DOCKER_USERNAME'
 
@@ -71,18 +71,18 @@ steps:
       - |
         set -euo pipefail
         LOG_BUCKET="gs://${PROJECT_ID}-cloudbuild-artifacts"
-        LOG_PREFIX="${LOG_BUCKET}/lind-wasm-apps/${BUILD_ID}"
+        LOG_PREFIX="$${LOG_BUCKET}/lind-wasm-apps/${BUILD_ID}"
 
-        if ! gsutil ls -b "$LOG_BUCKET" >/dev/null 2>&1; then
-          gsutil mb -p "$PROJECT_ID" -l us-central1 "$LOG_BUCKET" >/dev/null 2>&1 || true
+        if ! gsutil ls -b "$$LOG_BUCKET" >/dev/null 2>&1; then
+          gsutil mb -p "$PROJECT_ID" -l us-central1 "$$LOG_BUCKET" >/dev/null 2>&1 || true
         fi
 
         gsutil -m cp \
           /workspace/artifacts/buildx.log.gz \
           /workspace/artifacts/buildx.exitcode \
-          "${LOG_PREFIX}/" || true
+          "$${LOG_PREFIX}/" || true
 
-        echo "Build log artifact path: ${LOG_PREFIX}/"
+        echo "Build log artifact path: $${LOG_PREFIX}/"
 
   - name: 'gcr.io/cloud-builders/docker'
     id: Finalize Build Result
@@ -91,11 +91,11 @@ steps:
       - '-c'
       - |
         set -euo pipefail
-        BUILD_RC="$(cat /workspace/artifacts/buildx.exitcode)"
-        if [[ "$BUILD_RC" != "0" ]]; then
+        BUILD_RC="$$(cat /workspace/artifacts/buildx.exitcode)"
+        if [[ "$$BUILD_RC" != "0" ]]; then
           echo "Build failed. Captured log: /workspace/artifacts/buildx.log.gz"
           echo "If upload succeeded, the Cloud Storage path was printed in the previous step."
-          exit "$BUILD_RC"
+          exit "$$BUILD_RC"
         fi
 
 availableSecrets:
