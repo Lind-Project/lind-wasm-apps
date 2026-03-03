@@ -26,11 +26,14 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     id: Build Image
     entrypoint: 'bash'
+    env:
+      - 'DOCKER_BUILDKIT=1'
     args:
       - '-c'
       - |
         source /workspace/commit.env
         docker build \
+          --progress=plain \
           -t docker.io/$$DOCKER_USERNAME/lind-wasm-apps:latest \
           -t docker.io/$$DOCKER_USERNAME/lind-wasm-apps:sha-$SHORT_SHA \
           .
