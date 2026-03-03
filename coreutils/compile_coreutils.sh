@@ -2,16 +2,14 @@
 set -euo pipefail
 
 ###############################################################################
-# coreutils WASI build helper for lind-wasm-apps (best-effort / partial OK)
+# coreutils WASI build helper for lind-wasm-apps
 #
-# Goals:
-#   - Use merged sysroot (build/sysroot_merged)
-#   - Force static-only (avoid wasm-ld: --export-memory incompatible with --shared)
-#   - Avoid configure running conftest binaries (cross compile)
-#   - Disable mountlist fatal (no mtab/mount table on WASI)
-#   - Patch a few gnulib portability #error sites to WASI-safe fallbacks
-#   - Stage produced wasm binaries even if some targets fail to link
-#   - wasm-opt compile (best-effort) on staged binaries
+# High-level strategy:
+#   1. Prepare a cross-compiling configure environment for WASI.
+#   2. Apply a small set of source/configure patches needed for this target.
+#   3. Reuse configure state when those inputs are unchanged.
+#   4. Build and stage the raw wasm outputs.
+#   5. Treat optimization and precompilation as an optional full-artifact mode.
 ###############################################################################
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,7 +23,6 @@ BUILD_DIR="$BUILD_ROOT/build"
 STAGE_DIR="$APPS_BUILD/bin/coreutils/wasm32-wasi"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
-# Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
@@ -34,10 +31,24 @@ WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
+##################
+# These flags define the new runtime policy for the script. The default is a
+# faster path that stops after raw `.wasm` outputs, but we keep explicit
+# switches for from-scratch rebuilds and for the old richer artifact set.
+##################
+ARTIFACT_MODE="${ARTIFACT_MODE:-fast}"
+FORCE_CLEAN="${FORCE_CLEAN:-0}"
+FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
+CACHE_REVISION="2"
+STATE_DIR="$BUILD_ROOT/.state"
+CONFIG_SIG_FILE="$STATE_DIR/config.sig"
+##################
+# coreutils spends a lot of time in its configure and patch pipeline. The
+# state directory stores a signature for that pipeline so repeated runs can
+# skip it when the relevant inputs are unchanged.
+##################
+mkdir -p "$STATE_DIR"
 
-# ----------------------------------------------------------------------
-# 1) Load toolchain from Makefile preflight
-# ----------------------------------------------------------------------
 if [[ -r "$TOOL_ENV" ]]; then
   # shellcheck disable=SC1090
   . "$TOOL_ENV"
@@ -50,7 +61,6 @@ fi
 : "${AR:?missing AR in $TOOL_ENV}"
 : "${RANLIB:?missing RANLIB in $TOOL_ENV}"
 
-# Sanity
 if [[ ! -d "$COREUTILS_ROOT" ]]; then
   echo "[coreutils] ERROR: coreutils source dir not found at: $COREUTILS_ROOT" >&2
   exit 1
@@ -62,8 +72,6 @@ fi
 
 mkdir -p "$BUILD_DIR" "$STAGE_DIR"
 
-# Optional compat header (like bash’s wasm_compat.h). If you add one later,
-# the script will automatically include it.
 WASM_COMPAT_H="$COREUTILS_ROOT/wasm_compat.h"
 WASM_COMPAT_INC=()
 if [[ -f "$WASM_COMPAT_H" ]]; then
@@ -72,15 +80,11 @@ else
   echo "[coreutils] NOTE: $WASM_COMPAT_H missing; continuing without -include."
 fi
 
-# ----------------------------------------------------------------------
-# 2) WASM toolchain flags (match bash style)
-#    NOTE: configure wants C99+ for some probes; use gnu99 here.
-# ----------------------------------------------------------------------
 CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
 
 CFLAGS_WASM=(
   -O2 -g -std=gnu99 -pthread
-  -DHAVE_STRSIGNAL=1 -DHAVE_MKTIME=1 # needed to bypass some configure checks
+  -DHAVE_STRSIGNAL=1 -DHAVE_MKTIME=1
   -DSLOW_BUT_NO_HACKS=1
   "${WASM_COMPAT_INC[@]}"
   -I"$MERGED_SYSROOT/include"
@@ -96,34 +100,104 @@ LDFLAGS_WASM=(
 echo "[coreutils] using CLANG       = $CLANG"
 echo "[coreutils] using AR          = $AR"
 echo "[coreutils] using RANLIB      = $RANLIB"
-echo "[coreutils] LIND_WASM_ROOT    = $LIND_WASM_ROOT"
 echo "[coreutils] merged sysroot    = $MERGED_SYSROOT"
 echo "[coreutils] build dir         = $BUILD_DIR"
 echo "[coreutils] stage dir         = $STAGE_DIR"
-echo "[coreutils] CC_WASM           = $CC_WASM"
+echo "[coreutils] artifact mode     = $ARTIFACT_MODE"
 echo
 
-# ----------------------------------------------------------------------
-# 3) Force static-only (prevent wasm-ld seeing --shared)
-# ----------------------------------------------------------------------
+##################
+# These helpers keep the incremental logic understandable. `hash_file` feeds
+# the configure signature, `write_if_changed` avoids pointless timestamp
+# updates, and the bounded background helpers let full-mode post-processing use
+# parallelism without launching an unbounded number of jobs.
+##################
+hash_file() {
+  local path="$1"
+  if [[ -e "$path" ]]; then
+    sha256sum "$path" | awk '{print $1}'
+  else
+    echo "missing"
+  fi
+}
+
+write_if_changed() {
+  local dest="$1"
+  local tmp
+  tmp="$(mktemp)"
+  cat >"$tmp"
+  if [[ -f "$dest" ]] && cmp -s "$tmp" "$dest"; then
+    rm -f "$tmp"
+    return 0
+  fi
+  mkdir -p "$(dirname "$dest")"
+  mv "$tmp" "$dest"
+  return 0
+}
+
+run_limited() {
+  local limit="$1"
+  shift
+  while (( $(jobs -rp | wc -l) >= limit )); do
+    wait -n || true
+  done
+  "$@" &
+}
+
+wait_for_background_jobs() {
+  local rc=0
+  while [[ -n "$(jobs -rp)" ]]; do
+    if ! wait -n; then
+      rc=1
+    fi
+  done
+  return "$rc"
+}
+
+run_wasm_opt_replace() {
+  local src="$1"
+  local raw="$2"
+  local out="$3"
+  local tmp="${out}.tmp"
+  cp "$src" "$raw"
+  if "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
+    mv "$tmp" "$out"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
+publish_stage_dir() {
+  local src_dir="$1"
+  mkdir -p "$STAGE_DIR"
+  find "$STAGE_DIR" -maxdepth 1 -type f \( -name '*.wasm' -o -name '*.raw.wasm' -o -name '*.opt.wasm' -o -name '*.cwasm' \) -delete
+  cp -a "$src_dir"/. "$STAGE_DIR"/
+}
+
+##################
+# We force static-only behavior here because shared-library assumptions are a
+# poor match for this wasm build and tend to produce linker behavior we do not
+# want. Setting these cache variables up front gives configure a consistent
+# cross-compilation story.
+##################
 export enable_shared=no
 export enable_static=yes
 export lt_cv_prog_compiler_pic_works=no
 export lt_cv_prog_compiler_static_works=yes
 export ac_cv_prog_cc_pic_works=no
-
-# Keep shared out even if something injects defaults
 export CFLAGS="${CFLAGS:-} ${CFLAGS_WASM[*]}"
 export CPPFLAGS="${CPPFLAGS:-} -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi"
 export LDFLAGS="${LDFLAGS:-} ${LDFLAGS_WASM[*]}"
 
-# ----------------------------------------------------------------------
-# 4) config.site: force cross-compile behavior and disable mountlist
-# ----------------------------------------------------------------------
 CONFIG_SITE_FILE="$BUILD_ROOT/config.site"
-mkdir -p "$BUILD_ROOT"
-
-cat >"$CONFIG_SITE_FILE" <<EOF
+##################
+# `config.site` is how we teach configure about the constraints of this target
+# without modifying upstream build logic. Writing it with `write_if_changed`
+# matters because a needless rewrite would make the signature look stale and
+# force us back through configure for no technical reason.
+##################
+write_if_changed "$CONFIG_SITE_FILE" <<'EOF'
 # coreutils on WASI: do not attempt to run test executables
 cross_compiling=yes
 
@@ -138,14 +212,7 @@ fu_cv_sys_mounted_mnttab=no
 fu_cv_sys_mounted_vfstab=no
 fu_cv_sys_mounted_vmount=no
 
-# Some configure scripts look for listmntent(3)
 ac_cv_func_listmntent=no
-
-# ---- WASI: force gnulib replacements for *at() functions ----
-# WASI headers declare these but don't implement them. Without this,
-# configure takes the "no replacement needed" branch in openat.m4
-# (yes+yes case) and the rpl_* objects never get compiled, causing
-# undefined symbol errors at link time.
 ac_cv_func_openat=no
 ac_cv_func_fstatat=no
 ac_cv_func_unlinkat=no
@@ -155,32 +222,25 @@ ac_cv_func_fchownat=no
 ac_cv_func_linkat=no
 ac_cv_func_symlinkat=no
 ac_cv_func_readlinkat=no
-
-# ---- WASI: no inotify support ----
-# Prevents tail from trying to use inotify_add_watch/inotify_rm_watch.
 ac_cv_func_inotify_init=no
-
-# ---- WASI: no libcrypt ----
-# Prevents su from trying to link against crypt().
 ac_cv_search_crypt=no
 EOF
-
 export CONFIG_SITE="$CONFIG_SITE_FILE"
 
-# ----------------------------------------------------------------------
-# 5) Patches (all done without perl quoting hell; use python)
-# ----------------------------------------------------------------------
+##################
+# This patch keeps coreutils from treating the lack of a traditional mount table
+# as a fatal configure error. The key detail is that we rewrite the patched
+# configure script only when its content actually changes, so the configure
+# cache can remain stable across repeated invocations.
+##################
 patch_mountlist_fatal() {
   local in="$COREUTILS_ROOT/configure"
   local out="$BUILD_ROOT/configure.patched"
-
-  cp "$in" "$out"
-
-  python3 - <<'PY' "$out"
+  python3 - <<'PY' "$in" "$out"
 import pathlib, re, sys
-p = pathlib.Path(sys.argv[1])
-s = p.read_text(errors="ignore")
-
+inp = pathlib.Path(sys.argv[1])
+out = pathlib.Path(sys.argv[2])
+s = inp.read_text(errors="ignore")
 needle = r'as_fn_error\s+\$\?\s+"could not determine how to read list of mounted file systems"\s+"\$LINENO"\s+5'
 repl = r'''{ echo "configure: WARNING: disabling mountlist on WASI (no mount table support)" >&2; }
 fu_cv_mounted_fs_supported=no
@@ -193,119 +253,67 @@ fu_cv_sys_mounted_mnttab=no
 fu_cv_sys_mounted_vfstab=no
 fu_cv_sys_mounted_vmount=no
 '''
-
-new_s, n = re.subn(needle, repl, s)
-if n:
-  p.write_text(new_s)
-else:
-  print(f"[coreutils] WARN: mountlist fatal pattern not found in {p}", file=sys.stderr)
+s2, _ = re.subn(needle, repl, s)
+if out.exists() and out.read_text(errors="ignore") == s2:
+    sys.exit(0)
+out.write_text(s2)
+out.chmod(0o755)
 PY
-
-  chmod +x "$out"
-  echo "[coreutils] [patch] disable mountlist AC_MSG_ERROR: $out"
 }
 
-patch_gnulib_slow_but_no_hacks() {
-  # freadahead/freadptr/freadseek: if SLOW_BUT_NO_HACKS is defined, do a safe fallback
-  # (don’t abort(), don’t #error)
+##################
+# Several gnulib files need small WASI-specific edits. We keep those edits in
+# the script, but make them content-preserving so the source tree is only
+# rewritten when the effective patch result changes.
+##################
+patch_file_if_needed() {
+  local target="$1"
+  local code="$2"
+  python3 - <<'PY' "$target" "$code"
+import pathlib, re, sys
+p = pathlib.Path(sys.argv[1])
+code = sys.argv[2]
+s = p.read_text(errors="ignore")
+ns = {"re": re, "s": s}
+exec(code, ns)
+s2 = ns.get("s2", s)
+if s2 != s:
+    p.write_text(s2)
+PY
+}
+
+##################
+# The portability patches are intentionally narrow: they only address the
+# gnulib cases that currently block the WASI build. That keeps the script
+# understandable for students while still making repeat builds cheaper by
+# avoiding unconditional rewrites of the same files.
+##################
+patch_portability_sources() {
+  local f
   for f in "$COREUTILS_ROOT/lib/freadahead.c" "$COREUTILS_ROOT/lib/freadptr.c" "$COREUTILS_ROOT/lib/freadseek.c"; do
     [[ -f "$f" ]] || continue
-    python3 - <<'PY' "$f"
-import pathlib, re, sys
-p = pathlib.Path(sys.argv[1])
-s = p.read_text(errors="ignore")
-
-# Replace the SLOW_BUT_NO_HACKS branch body (commonly "abort(); return 0;")
-# with a WASI-safe return.
-s2 = re.sub(
-  r'(#elif\s+defined\s+SLOW_BUT_NO_HACKS\s*/\*[^*]*\*/\s*\n)(.*?\n)(#else\s*\n\s*#error\s+"Please port gnulib .*?\n\s*#endif)',
-  lambda m: m.group(1) + "  /* WASI fallback: no stdio internals; behave conservatively. */\n  return 0;\n" + m.group(3),
-  s,
-  flags=re.S
-)
-
-# Some variants have SLOW_BUT_NO_HACKS without /* comment */
-s2 = re.sub(
-  r'(#elif\s+defined\s+SLOW_BUT_NO_HACKS\s*\n)(.*?\n)(#else\s*\n\s*#error\s+"Please port gnulib .*?\n\s*#endif)',
-  lambda m: m.group(1) + "  /* WASI fallback: no stdio internals; behave conservatively. */\n  return 0;\n" + m.group(3),
-  s2,
-  flags=re.S
-)
-
-if s2 != s:
-  p.write_text(s2)
-PY
-    echo "[coreutils] [patch] make SLOW_BUT_NO_HACKS a safe fallback: $f"
+    patch_file_if_needed "$f" $'s2 = re.sub(\n  r\'(#elif\\s+defined\\s+SLOW_BUT_NO_HACKS\\s*/\\*[^*]*\\*/\\s*\\n)(.*?\\n)(#else\\s*\\n\\s*#error\\s+\\"Please port gnulib .*?\\n\\s*#endif)\',\n  lambda m: m.group(1) + "  /* WASI fallback: no stdio internals; behave conservatively. */\\n  return 0;\\n" + m.group(3),\n  s,\n  flags=re.S\n)\ns2 = re.sub(\n  r\'(#elif\\s+defined\\s+SLOW_BUT_NO_HACKS\\s*\\n)(.*?\\n)(#else\\s*\\n\\s*#error\\s+\\"Please port gnulib .*?\\n\\s*#endif)\',\n  lambda m: m.group(1) + "  /* WASI fallback: no stdio internals; behave conservatively. */\\n  return 0;\\n" + m.group(3),\n  s2,\n  flags=re.S\n)'
   done
 
-  # fseterr.c: avoid hard fail on unknown stdio internals; no-op on WASI
   local fseterr="$COREUTILS_ROOT/lib/fseterr.c"
   if [[ -f "$fseterr" ]]; then
-    python3 - <<'PY' "$fseterr"
-import pathlib, re, sys
-p = pathlib.Path(sys.argv[1])
-s = p.read_text(errors="ignore")
-
-# Insert a __wasi__ branch right before the final #else #error.
-pat = r'(#elif\s+defined\s+__MINT__[^#]*\n\s*fp->__error\s*=\s*1;\s*\n)(#elif\s+0\s*/\*\s*unknown\s*\*/|#else\s*\n\s*#error)'
-m = re.search(pat, s, flags=re.S)
-if m and "#elif defined __wasi__" not in s:
-  insert = m.group(1) + "#elif defined __wasi__\n  (void)fp; /* WASI: no FILE internals; best-effort no-op. */\n"
-  s = s[:m.start(1)] + insert + s[m.end(1):]
-  p.write_text(s)
-PY
-    echo "[coreutils] [patch] avoid hard fail in fseterr portability hack: $fseterr"
+    patch_file_if_needed "$fseterr" $'pat = r\'(#elif\\s+defined\\s+__MINT__[^#]*\\n\\s*fp->__error\\s*=\\s*1;\\s*\\n)(#elif\\s+0\\s*/\\*\\s*unknown\\s*\\*/|#else\\s*\\n\\s*#error)\'\nm = re.search(pat, s, flags=re.S)\ns2 = s\nif m and "#elif defined __wasi__" not in s:\n  insert = m.group(1) + "#elif defined __wasi__\\n  (void)fp; /* WASI: no FILE internals; best-effort no-op. */\\n"\n  s2 = s[:m.start(1)] + insert + s[m.end(1):]'
   fi
 
-  # fseeko.c: replace final portability #error with simple fallback
   local fseeko="$COREUTILS_ROOT/lib/fseeko.c"
   if [[ -f "$fseeko" ]]; then
-    python3 - <<'PY' "$fseeko"
-import pathlib, re, sys
-p = pathlib.Path(sys.argv[1])
-s = p.read_text(errors="ignore")
-
-pat = r'#else\s*\n\s*#error\s+"Please port gnulib fseeko\.c[^"]*"\s*\n\s*#endif'
-repl = (
-  "#else\n"
-  "  /* WASI fallback: no stdio internals; just call the underlying fseeko/fseek. */\n"
-  "  return fseeko (fp, offset, whence);\n"
-  "#endif"
-)
-s2, n = re.subn(pat, repl, s, flags=re.M)
-if n:
-  p.write_text(s2)
-PY
-    echo "[coreutils] [patch] avoid hard fail in fseeko portability hack: $fseeko"
+    patch_file_if_needed "$fseeko" $'pat = r\'(?ms)^#else\\s*\\n\\s*#error\\s+\\"Please port gnulib fseeko\\.c.*?\\"\\s*\\n#endif\'\nrepl = "#else\\n  /* WASI fallback: no stdio internals; just call the underlying fseeko/fseek. */\\n  return fseeko (fp, offset, whence);\\n#endif"\ns2 = re.sub(pat, repl, s, count=1)'
   fi
 
-  # unlinkat.c: ensure stdlib.h is included (malloc/free prototypes)
   local unlinkat="$COREUTILS_ROOT/lib/unlinkat.c"
   if [[ -f "$unlinkat" ]]; then
-    python3 - <<'PY' "$unlinkat"
-import pathlib, re, sys
-p = pathlib.Path(sys.argv[1])
-s = p.read_text(errors="ignore")
-if "<stdlib.h>" not in s:
-  # Put it near other system includes.
-  s2 = re.sub(r'(#include\s+<unistd\.h>\s*\n)', r'\1#include <stdlib.h>\n', s, count=1)
-  if s2 == s:
-    s2 = re.sub(r'(#include\s+<config\.h>\s*\n)', r'\1#include <stdlib.h>\n', s, count=1)
-  p.write_text(s2)
-PY
-    echo "[coreutils] [patch] add <stdlib.h> for malloc/free: $unlinkat"
+    patch_file_if_needed "$unlinkat" $'s2 = s\nif "<stdlib.h>" not in s:\n  s2 = re.sub(r\'(#include\\s+<unistd\\.h>\\s*\\n)\', r\'\\1#include <stdlib.h>\\n\', s, count=1)\n  if s2 == s:\n    s2 = re.sub(r\'(#include\\s+<config\\.h>\\s*\\n)\', r\'\\1#include <stdlib.h>\\n\', s, count=1)'
   fi
 
-  # sigaction.c: gnulib version is Win32-tailored; replace with WASI stub.
   local sigaction_c="$COREUTILS_ROOT/lib/sigaction.c"
   if [[ -f "$sigaction_c" ]]; then
-    cat >"$sigaction_c" <<'EOF'
-/* WASI stub for gnulib sigaction module.
- *
- * coreutils pulls this in via gnulib on some platforms. On WASI/Lind, signals
- * are not fully supported in a POSIX way; provide a minimal stub so we can
- * build userland tools.
- */
+    write_if_changed "$sigaction_c" <<'EOF'
+/* WASI stub for gnulib sigaction module. */
 #include <config.h>
 #include <signal.h>
 #include <errno.h>
@@ -320,88 +328,123 @@ int sigaction (int sig, const struct sigaction *restrict act,
   return -1;
 }
 EOF
-    echo "[coreutils] [patch] replace gnulib sigaction() with WASI stub: $sigaction_c"
   fi
 }
 
 patch_generated_signal_h_after_configure() {
-  # After configure, gnulib may generate build/lib/signal.h that defines
-  # `struct sigaction` even though WASI headers already define it.
   local gen="$BUILD_DIR/lib/signal.h"
   [[ -f "$gen" ]] || return 0
-
   python3 - <<'PY' "$gen"
 import pathlib, re, sys
 p = pathlib.Path(sys.argv[1])
 s = p.read_text(errors="ignore")
-
-# Wrap the "struct sigaction { ... };" block in #ifndef __wasi__
-# (only the first one we hit).
 m = re.search(r'\nstruct sigaction\s*\{.*?\n\};\n', s, flags=re.S)
 if not m:
-  sys.exit(0)
-
+    sys.exit(0)
 block = m.group(0)
 wrapped = "\n#ifndef __wasi__\n" + block + "#endif\n"
 s2 = s[:m.start()] + wrapped + s[m.end():]
-p.write_text(s2)
+if s2 != s:
+    p.write_text(s2)
 PY
-
-  echo "[coreutils] [patch] avoid struct sigaction redefinition: $gen"
 }
 
-# ----------------------------------------------------------------------
-# 6) Configure + build (best-effort)
-# ----------------------------------------------------------------------
 patch_mountlist_fatal
-patch_gnulib_slow_but_no_hacks
+patch_portability_sources
 
 HOST_TRIPLET="${HOST_TRIPLET:-wasm32-unknown-linux-gnu}"
 BUILD_TRIPLET="${BUILD_TRIPLET:-$(./config.guess 2>/dev/null || echo x86_64-unknown-linux-gnu)}"
-# IMPORTANT: --build != --host so configure knows it's cross and won't run conftest.
 
-echo "[coreutils] configuring (best-effort; may still warn)"
-(
-  cd "$BUILD_DIR"
+##################
+# The configure signature is the teaching point for the optimization: if the
+# config.site content, patched sources, toolchain, and key flags are all the
+# same, then rerunning configure is busywork rather than useful computation.
+##################
+config_signature() {
+  cat <<EOF | sha256sum | awk '{print $1}'
+rev=$CACHE_REVISION
+config_site=$(hash_file "$CONFIG_SITE_FILE")
+configure_patched=$(hash_file "$BUILD_ROOT/configure.patched")
+configure=$(hash_file "$COREUTILS_ROOT/configure")
+freadahead=$(hash_file "$COREUTILS_ROOT/lib/freadahead.c")
+freadptr=$(hash_file "$COREUTILS_ROOT/lib/freadptr.c")
+freadseek=$(hash_file "$COREUTILS_ROOT/lib/freadseek.c")
+fseterr=$(hash_file "$COREUTILS_ROOT/lib/fseterr.c")
+fseeko=$(hash_file "$COREUTILS_ROOT/lib/fseeko.c")
+unlinkat=$(hash_file "$COREUTILS_ROOT/lib/unlinkat.c")
+sigaction=$(hash_file "$COREUTILS_ROOT/lib/sigaction.c")
+clang=$CLANG
+ar=$AR
+ranlib=$RANLIB
+host=$HOST_TRIPLET
+build=$BUILD_TRIPLET
+cflags=${CFLAGS_WASM[*]}
+ldflags=${LDFLAGS_WASM[*]}
+EOF
+}
 
-  # Make sure we start clean-ish if the user reruns.
-  rm -f config.cache || true
+##################
+# This is the central reuse decision. Instead of always deleting configure
+# outputs and starting over, we only rerun configure when the signature says
+# the inputs changed, when the user forces it, or when the generated Makefile
+# is missing.
+##################
+current_config_sig="$(config_signature)"
+need_configure=0
+if [[ "$FORCE_CLEAN" == "1" || "$FORCE_CONFIGURE" == "1" ]]; then
+  need_configure=1
+fi
+if [[ ! -f "$CONFIG_SIG_FILE" ]] || [[ "$(cat "$CONFIG_SIG_FILE" 2>/dev/null || true)" != "$current_config_sig" ]]; then
+  need_configure=1
+fi
+if [[ ! -f "$BUILD_DIR/Makefile" ]]; then
+  need_configure=1
+fi
 
-  # Run patched configure out-of-tree with explicit srcdir
-  "$BUILD_ROOT/configure.patched" \
-    --srcdir="$COREUTILS_ROOT" \
-    --build="$BUILD_TRIPLET" \
-    --host="$HOST_TRIPLET" \
-    --disable-shared \
-    --enable-static \
-    --disable-libtool-lock \
-    --without-selinux \
-    --without-libcap \
-    CC="$CC_WASM" \
-    AR="$AR" \
-    RANLIB="$RANLIB" \
-    CFLAGS="${CFLAGS_WASM[*]}" \
-    CPPFLAGS="$CPPFLAGS" \
-    LDFLAGS="${LDFLAGS_WASM[*]}" \
-    || echo "[coreutils] WARNING: configure exited nonzero ($?)."
-)
-
-# If configure produced a generated signal.h, patch it now.
-patch_generated_signal_h_after_configure
+if (( need_configure )); then
+  echo "[coreutils] configuring (best-effort; may still warn)"
+  (
+    cd "$BUILD_DIR"
+    rm -f config.cache || true
+    "$BUILD_ROOT/configure.patched" \
+      --srcdir="$COREUTILS_ROOT" \
+      --build="$BUILD_TRIPLET" \
+      --host="$HOST_TRIPLET" \
+      --disable-shared \
+      --enable-static \
+      --disable-libtool-lock \
+      --without-selinux \
+      --without-libcap \
+      CC="$CC_WASM" \
+      AR="$AR" \
+      RANLIB="$RANLIB" \
+      CFLAGS="${CFLAGS_WASM[*]}" \
+      CPPFLAGS="$CPPFLAGS" \
+      LDFLAGS="${LDFLAGS_WASM[*]}" \
+      || echo "[coreutils] WARNING: configure exited nonzero ($?)."
+  )
+  patch_generated_signal_h_after_configure
+  printf '%s\n' "$current_config_sig" >"$CONFIG_SIG_FILE"
+else
+  echo "[coreutils] reusing existing configure state"
+fi
 
 if [[ ! -f "$BUILD_DIR/Makefile" ]]; then
   echo "[coreutils] ERROR: configure failed before producing Makefile." >&2
   if [[ -f "$BUILD_DIR/config.log" ]]; then
-    echo "[coreutils] --- first 'Exec format error' or 'error:' from config.log ---" >&2
     grep -n -m1 -E 'Exec format error|configure: error:|: error:|cannot execute binary file' "$BUILD_DIR/config.log" >&2 || true
   fi
   exit 1
 fi
 
+##################
+# The actual build still goes through coreutils' own makefiles unchanged. The
+# goal here is not to outsmart them, only to avoid paying the setup cost on
+# every run and to preserve the existing best-effort staging behavior.
+##################
 echo "[coreutils] building (best-effort; partial failures allowed)"
 (
   cd "$BUILD_DIR"
-  # coreutils link failures (crypt/fmod/etc.) are expected for some targets; don't stop the world.
   set +e
   make -j"$JOBS" V=1 \
     CC="$CC_WASM" \
@@ -418,105 +461,136 @@ echo "[coreutils] building (best-effort; partial failures allowed)"
   fi
 )
 
-# ----------------------------------------------------------------------
-# 7) Stage produced wasm binaries (even if named without .wasm)
-#    coreutils builds in build/src/; binaries are plain names like "ls".
-# ----------------------------------------------------------------------
-echo "[coreutils] staging wasm binaries…"
-
+echo "[coreutils] staging wasm binaries..."
 SRC_BIN_DIR="$BUILD_DIR/src"
 if [[ ! -d "$SRC_BIN_DIR" ]]; then
   echo "[coreutils] ERROR: expected build output dir '$SRC_BIN_DIR' not found" >&2
   exit 1
 fi
 
-python3 - <<'PY' "$SRC_BIN_DIR" "$STAGE_DIR"
-import os, sys
+TMP_STAGE_DIR="$(mktemp -d "$BUILD_ROOT/stage.XXXXXX")"
+trap 'rm -rf "$TMP_STAGE_DIR"' EXIT
 
+##################
+# The public stage directory should only change once we know we actually have a
+# coherent set of outputs to publish. Staging into a temporary directory first
+# avoids the failure mode where we delete the old outputs and then discover
+# that this build produced nothing usable.
+##################
+staged_count="$(
+python3 - <<'PY' "$SRC_BIN_DIR" "$TMP_STAGE_DIR"
+import os, sys
 src = sys.argv[1]
 dst = sys.argv[2]
 os.makedirs(dst, exist_ok=True)
-
-def is_wasm(path: str) -> bool:
-  try:
-    with open(path, "rb") as f:
-      return f.read(4) == b"\0asm"
-  except Exception:
-    return False
-
 count = 0
 for name in sorted(os.listdir(src)):
-  p = os.path.join(src, name)
-  if not os.path.isfile(p):
-    continue
-  # Skip obvious non-binaries
-  if name.endswith((".o", ".a", ".la", ".lo", ".Plo")):
-    continue
-  if is_wasm(p):
+    p = os.path.join(src, name)
+    if not os.path.isfile(p) or name.endswith((".o", ".a", ".la", ".lo", ".Plo")):
+        continue
+    try:
+        with open(p, "rb") as f:
+            if f.read(4) != b"\0asm":
+                continue
+    except Exception:
+        continue
     out = os.path.join(dst, name + ".wasm")
     with open(p, "rb") as fi, open(out, "wb") as fo:
-      fo.write(fi.read())
+        fo.write(fi.read())
     count += 1
-
-print(f"[coreutils] staged {count} wasm binaries into {dst}")
+print(count)
 PY
+)"
 
-# ----------------------------------------------------------------------
-# 8) wasm-opt (best-effort) for each staged .wasm
-# ----------------------------------------------------------------------
+if [[ "$staged_count" == "0" ]]; then
+  echo "[coreutils] ERROR: staging found no wasm binaries in '$SRC_BIN_DIR'; leaving existing staged outputs untouched." >&2
+  exit 1
+fi
+
+echo "[coreutils] staged $staged_count wasm binaries into temporary dir $TMP_STAGE_DIR"
+
 shopt -s nullglob
-wasm_files=("$STAGE_DIR"/*.wasm)
+wasm_files=("$TMP_STAGE_DIR"/*.wasm)
 shopt -u nullglob
-
 if (( ${#wasm_files[@]} == 0 )); then
-  echo "[coreutils] WARNING: no staged .wasm files found in $STAGE_DIR"
+  echo "[coreutils] ERROR: temporary staging dir contains no .wasm files; leaving existing staged outputs untouched." >&2
+  exit 1
+fi
+
+##################
+# Lind expects the runtime module to include the epoch-injection transform, so
+# the staged raw `.wasm` files are intermediate compiler outputs rather than
+# the final default artifacts. We therefore preserve those raw binaries as
+# `.raw.wasm` files and rewrite the traditional `.wasm` names to be the
+# runnable optimized modules.
+##################
+if [[ ! -x "$WASM_OPT" ]]; then
+  echo "[coreutils] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifacts."
+  exit 1
+fi
+
+##################
+# We can safely parallelize the expensive per-binary post-process steps because
+# each output file is independent. The worker limiter keeps that concurrency
+# tied to `JOBS` instead of spawning one process per staged binary.
+##################
+echo "[coreutils] running wasm-opt to produce runnable staged .wasm files..."
+for w in "${wasm_files[@]}"; do
+  raw="${w%.wasm}.raw.wasm"
+  run_limited "$JOBS" run_wasm_opt_replace "$w" "$raw" "$w"
+done
+wait_for_background_jobs
+
+##################
+# Full mode still preserves the historical `.opt.wasm` names expected by some
+# tooling, but the default `.wasm` names are now already runnable. Fast mode
+# therefore skips only the cwasm layer.
+##################
+if [[ "$ARTIFACT_MODE" != "full" ]]; then
+  echo "[coreutils] artifact mode is fast; keeping staged .wasm files runnable and skipping cwasm generation."
+  publish_stage_dir "$TMP_STAGE_DIR"
   exit 0
 fi
 
-if [[ -x "$WASM_OPT" ]]; then
-  echo "[coreutils] running wasm-opt (best-effort) on staged binaries…"
-  for w in "${wasm_files[@]}"; do
-    out="${w%.wasm}.opt.wasm"
-    "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$w" -o "$out" || true
-  done
-else
-  echo "[coreutils] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
-fi
+shopt -s nullglob
+wasm_files=("$TMP_STAGE_DIR"/*.wasm)
+shopt -u nullglob
+for w in "${wasm_files[@]}"; do
+  cp "$w" "${w%.wasm}.opt.wasm"
+done
 
-# ----------------------------------------------------------------------
-# 9) cwasm generation (best-effort) via lind-boot --precompile
-# ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[coreutils] generating cwasm via lind-boot --precompile..."
   shopt -s nullglob
-  opt_files=("$STAGE_DIR"/*.opt.wasm)
+  opt_files=("$TMP_STAGE_DIR"/*.opt.wasm)
   shopt -u nullglob
   if (( ${#opt_files[@]} > 0 )); then
     for w in "${opt_files[@]}"; do
-      if "$LIND_BOOT" --precompile "$w"; then
-        # Rename foo.opt.cwasm → foo.cwasm (drop .opt)
-        OPT_CWASM="${w%.wasm}.cwasm"
-        CLEAN_CWASM="${OPT_CWASM/.opt/}"
-        if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-          mv "$OPT_CWASM" "$CLEAN_CWASM"
-        fi
-      else
-        echo "[coreutils] WARNING: lind-boot --precompile failed for '$(basename "$w")'; skipping."
+      run_limited "$JOBS" "$LIND_BOOT" --precompile "$w"
+    done
+    wait_for_background_jobs
+    for w in "${opt_files[@]}"; do
+      OPT_CWASM="${w%.wasm}.cwasm"
+      CLEAN_CWASM="${OPT_CWASM/.opt/}"
+      if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
+        mv "$OPT_CWASM" "$CLEAN_CWASM"
       fi
     done
   else
-    # fall back to raw .wasm if no opt files were produced
     for w in "${wasm_files[@]}"; do
-      "$LIND_BOOT" --precompile "$w" || \
-        echo "[coreutils] WARNING: lind-boot --precompile failed for '$(basename "$w")'; skipping."
+      run_limited "$JOBS" "$LIND_BOOT" --precompile "$w"
     done
+    wait_for_background_jobs
   fi
 else
   echo "[coreutils] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
 fi
 
+publish_stage_dir "$TMP_STAGE_DIR"
+trap - EXIT
+rm -rf "$TMP_STAGE_DIR"
+
 echo
 echo "[coreutils] build complete. Outputs under:"
 echo "  $STAGE_DIR"
 ls -lh "$STAGE_DIR" || true
-
