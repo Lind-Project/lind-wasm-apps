@@ -5,12 +5,10 @@ set -uo pipefail
 #
 # Verifies that postgres and initdb binaries are installed correctly
 # and can handle basic invocations (--version, --help).
-#
-# Functional tests (initdb -D, postgres --single) are not yet possible
-# due to missing lind-wasm syscalls — see postgres/FINDINGS.md for details.
 
 LIND_WASM_ROOT="${LIND_WASM_ROOT:-/home/lind/lind-wasm}"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
+LIND_RUN="sudo $LIND_WASM_ROOT/scripts/lind_run"
 
 cd "$LINDFS_ROOT"
 
@@ -53,16 +51,16 @@ fi
 # 2. postgres --version
 echo "--- Version checks ---"
 
-ACTUAL=$(lind_run bin/postgres --version 2>/dev/null)
+ACTUAL=$($LIND_RUN /bin/postgres --version 2>/dev/null)
 check_result "postgres --version" "postgres (PostgreSQL) 19devel" "$ACTUAL"
 
-ACTUAL=$(lind_run bin/initdb --version 2>/dev/null)
+ACTUAL=$($LIND_RUN /bin/initdb --version 2>/dev/null)
 check_result "initdb --version" "initdb (PostgreSQL) 19devel" "$ACTUAL"
 
 # 3. postgres --help (check that it produces usage output)
 echo "--- Help output checks ---"
 
-HELP_OUTPUT=$(lind_run bin/postgres --help 2>/dev/null)
+HELP_OUTPUT=$($LIND_RUN /bin/postgres --help 2>/dev/null)
 if echo "$HELP_OUTPUT" | grep -q "postgres is the PostgreSQL server"; then
     echo "[PASS] postgres --help produces expected output"
 else
