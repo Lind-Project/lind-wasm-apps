@@ -29,8 +29,10 @@ MERGE_ALL_STAMP     := $(APPS_BUILD)/.stamp_merge_sysroot
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
 JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 
+LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
+
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -254,6 +256,32 @@ cpython: merge-sysroot
 # Placeholder target to preserve the per-app staging/layering pattern.
 postgres: merge-sysroot
 	mkdir -p '$(APPS_BIN_DIR)/postgres/wasm32-wasi'
+
+install-bash:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' bash
+
+install-nginx:
+	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)'
+
+install-git:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' git
+
+install-curl:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' curl
+
+install-grep:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' grep
+
+install-sed:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' sed
+
+install-lmbench:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' lmbench
+
+install-coreutils:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' coreutils
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true

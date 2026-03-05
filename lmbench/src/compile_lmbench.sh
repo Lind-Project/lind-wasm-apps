@@ -173,7 +173,7 @@ mkdir -p "$LM_BENCH_BIN_DIR"
 REAL_CC="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
 CFLAGS="-O2 -g -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -I$MERGED_SYSROOT/include/tirpc"
 LDFLAGS_WASM=(
-  "-Wl,--import-memory,--export-memory,--max-memory=${MAX_WASM_MEMORY},--export=__stack_pointer,--export=__stack_low"
+  "-Wl,--import-memory,--export-memory,--max-memory=${MAX_WASM_MEMORY},--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
   "-L$MERGED_SYSROOT/lib/wasm32-wasi"
   "-L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
 )
