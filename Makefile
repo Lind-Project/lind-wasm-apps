@@ -216,9 +216,9 @@ coreutils: $(MERGE_BASE_STAMP)
 
 # ---------------- git (WASM build) --------------------------------------------
 # Uses git/compile_git.sh to build git as a wasm32-wasi binary using the
-# merged sysroot and toolchain detected by preflight, and stages artifacts
-# under build/bin/git/wasm32-wasi/.
-git: $(MERGE_OPENSSL_STAMP)
+# merged sysroot and toolchain detected by preflight (zlib + OpenSSL), and
+# stages artifacts under build/bin/git/wasm32-wasi/.
+git: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/git/compile_git.sh'
 

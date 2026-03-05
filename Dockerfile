@@ -26,6 +26,26 @@ ARG ARTIFACT_MODE
 RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
     make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" coreutils
 
+FROM shared AS git-build
+ARG ARTIFACT_MODE
+RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" git
+
+FROM shared AS curl-build
+ARG ARTIFACT_MODE
+RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" curl
+
+FROM shared AS grep-build
+ARG ARTIFACT_MODE
+RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" grep
+
+FROM shared AS sed-build
+ARG ARTIFACT_MODE
+RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" sed
+
 FROM shared AS lmbench-build
 ARG ARTIFACT_MODE
 RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
@@ -53,6 +73,32 @@ COPY --from=coreutils-build --chown=lind:lind \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/coreutils \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/coreutils
 
+COPY --from=git-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/git \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/git
+
+COPY --from=curl-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/curl \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/curl
+
+COPY --from=grep-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/grep \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/grep
+
+COPY --from=sed-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/sed \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/sed
+
 COPY --from=lmbench-build --chown=lind:lind \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/lmbench \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/lmbench
+
+# 3) Ensure lindfs exists in the final image.
+WORKDIR /home/lind/lind-wasm
+RUN make -Otarget lindfs && \
+    mkdir -p lindfs/dev && \
+    rm -f lindfs/dev/null && \
+    (mknod lindfs/dev/null c 1 3 || touch lindfs/dev/null) && \
+    chmod 666 lindfs/dev/null
+
+WORKDIR /home/lind/lind-wasm/lind-wasm-apps
