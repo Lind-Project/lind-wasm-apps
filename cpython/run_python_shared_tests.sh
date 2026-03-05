@@ -42,7 +42,7 @@ TARGET_MAKEFILE="Makefile"
 if [[ -f "$TARGET_MAKEFILE" ]]; then
     sed -i \
     -e "s|../build-native/python|$PYTHON_SRC_DIR/python|g" \
-    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= sudo $LIND_BOOT --preload env=lib/libc.cwasm --preload env=lib/libm.so --preload env=lib/libpython3.14.cwasm|" \
+    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= sudo $LIND_BOOT --preload env=lib/libc.cwasm --preload env=lib/libm.cwasm --preload env=lib/libpython3.14.cwasm|" \
     -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='sudo $LIND_BOOT --preload env=lib/libc.cwasm --preload env=lib/libm.so --preload env=lib/libpython3.14.cwasm'|" \
     "$TARGET_MAKEFILE"
 else
