@@ -30,7 +30,7 @@ TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
 JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils git curl grep sed clean clean-all rebuild-libs rebuild-sysroot
+.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -244,6 +244,16 @@ rebuild-libs:
 
 rebuild-sysroot:
 	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
+
+# ---------------- cpython (WASM build) ----------------------------------------
+# Placeholder target to preserve the per-app staging/layering pattern.
+cpython: merge-sysroot
+	mkdir -p '$(APPS_BIN_DIR)/cpython/wasm32-wasi'
+
+# ---------------- postgres (WASM build) ---------------------------------------
+# Placeholder target to preserve the per-app staging/layering pattern.
+postgres: merge-sysroot
+	mkdir -p '$(APPS_BIN_DIR)/postgres/wasm32-wasi'
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
