@@ -72,41 +72,46 @@ mkdir -p "$LINDFS_ROOT/bin"
 cp "$BUILD_WASM/python_shared.wasm" "$LINDFS_ROOT/bin/python.wasm"
 
 
+# Since currently dynamic loading doesn't support signals, we do not apply
+# optimizations and directly produce .cwasm from .wasm
+
+"$LIND_BOOT" --precompile "$BUILD_WASM/python_shared.wasm"
+cp "$BUILD_WASM/python_shared.cwasm" "$LINDFS_ROOT/bin/python.cwasm"
+
 # --- Optimization & Precompilation Pipeline ---
-echo "=> Running wasm-opt (best-effort)..."
-TARGET_WASM="python_shared.wasm"
-WASM_OPT="$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt"
-if [[ -x "$WASM_OPT" ]]; then
-    "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
-        "$BUILD_WASM/python_shared.wasm" -o "$BUILD_WASM/python_shared.opt.wasm"
+#echo "=> Running wasm-opt (best-effort)..."
+#TARGET_WASM="python_shared.wasm"
+#WASM_OPT="$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt"
+#if [[ -x "$WASM_OPT" ]]; then
+#    "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
+#        "$BUILD_WASM/python_shared.wasm" -o "$BUILD_WASM/python_shared.opt.wasm"
 
-    TARGET_WASM="python_shared.opt.wasm"
-else
-    echo "=> NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization step."
-fi
+#    TARGET_WASM="python_shared.opt.wasm"
+#else
+#    echo "=> NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization step."
+#fi
 
+#echo "=> Generating cwasm via lind-boot --precompile..."
+#if [[ -x "$LIND_BOOT" ]]; then
+#    pushd "$BUILD_WASM" > /dev/null
 
-echo "=> Generating cwasm via lind-boot --precompile..."
-if [[ -x "$LIND_BOOT" ]]; then
-    pushd "$BUILD_WASM" > /dev/null
+#    if "$LIND_BOOT" --precompile "$TARGET_WASM"; then
+#        OPT_CWASM="${TARGET_WASM%.wasm}.cwasm"
+#        CLEAN_CWASM="${OPT_CWASM/.opt/}"
 
-    if "$LIND_BOOT" --precompile "$TARGET_WASM"; then
-        OPT_CWASM="${TARGET_WASM%.wasm}.cwasm"
-        CLEAN_CWASM="${OPT_CWASM/.opt/}"
+#        if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
+#            mv "$OPT_CWASM" "$CLEAN_CWASM"
+#        fi
 
-        if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-            mv "$OPT_CWASM" "$CLEAN_CWASM"
-        fi
+#        echo "=> Successfully generated $CLEAN_CWASM"
+#        cp "$CLEAN_CWASM" "$LINDFS_ROOT/bin/python.cwasm"
+#    else
+#        echo "=> WARNING: lind-boot --precompile failed."
+#    fi
 
-        echo "=> Successfully generated $CLEAN_CWASM"
-        cp "$CLEAN_CWASM" "$LINDFS_ROOT/bin/python.cwasm"
-    else
-        echo "=> WARNING: lind-boot --precompile failed."
-    fi
-
-    popd > /dev/null
-else
-    echo "=> NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-fi
+#    popd > /dev/null
+#else
+#    echo "=> NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+#fi
 
 echo "=> Shared build and installation complete!"

@@ -157,3 +157,6 @@ fi
 echo
 echo "=> Build complete. Outputs generated in current directory."
 ls -lh python*.wasm python*.cwasm 2>/dev/null || true
+
+#Copying python.cwasm to lindfs
+cp python.cwasm ${LINDFS}/usr/local/bin/python.cwasm
