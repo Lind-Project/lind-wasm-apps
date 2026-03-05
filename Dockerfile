@@ -11,11 +11,6 @@ RUN make -j"$(nproc)" -Otarget preflight merge-base-sysroot libtirpc
 
 # Stage 2: build apps in sibling stages so BuildKit can schedule them in parallel.
 # Cap per-stage JOBS so concurrent stages do not all try to consume the full machine.
-FROM shared AS nginx-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" nginx
-
 FROM shared AS bash-build
 ARG ARTIFACT_MODE
 RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
@@ -26,30 +21,45 @@ ARG ARTIFACT_MODE
 RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
     make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" coreutils
 
-FROM shared AS git-build
+FROM shared AS cpython-build
 ARG ARTIFACT_MODE
 RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" git
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" cpython
 
-FROM shared AS curl-build
+FROM shared AS lmbench-build
 ARG ARTIFACT_MODE
 RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" curl
-
-FROM shared AS grep-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" grep
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" lmbench
 
 FROM shared AS sed-build
 ARG ARTIFACT_MODE
 RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
     make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" sed
 
-FROM shared AS lmbench-build
+FROM shared AS nginx-build
 ARG ARTIFACT_MODE
 RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" lmbench
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" nginx
+
+FROM shared AS grep-build
+ARG ARTIFACT_MODE
+RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" grep
+
+FROM shared AS curl-build
+ARG ARTIFACT_MODE
+RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" curl
+
+FROM shared AS git-build
+ARG ARTIFACT_MODE
+RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" git
+
+FROM shared AS postgres-build
+ARG ARTIFACT_MODE
+RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
+    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" postgres
 
 # Stage 3: final image
 FROM securesystemslab/lind-wasm-dev:latest
@@ -61,10 +71,6 @@ COPY --from=shared --chown=lind:lind \
   /home/lind/lind-wasm/lind-wasm-apps
 
 # 2) Overlay only the build outputs from each sibling stage.
-COPY --from=nginx-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/nginx \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/nginx
-
 COPY --from=bash-build --chown=lind:lind \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/bash \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/bash
@@ -73,25 +79,37 @@ COPY --from=coreutils-build --chown=lind:lind \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/coreutils \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/coreutils
 
-COPY --from=git-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/git \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/git
+COPY --from=cpython-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/cpython \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/cpython
 
-COPY --from=curl-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/curl \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/curl
-
-COPY --from=grep-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/grep \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/grep
+COPY --from=lmbench-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/lmbench \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/lmbench
 
 COPY --from=sed-build --chown=lind:lind \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/sed \
   /home/lind/lind-wasm/lind-wasm-apps/build/bin/sed
 
-COPY --from=lmbench-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/lmbench \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/lmbench
+COPY --from=nginx-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/nginx \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/nginx
+
+COPY --from=grep-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/grep \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/grep
+
+COPY --from=curl-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/curl \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/curl
+
+COPY --from=git-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/git \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/git
+
+COPY --from=postgres-build --chown=lind:lind \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/postgres \
+  /home/lind/lind-wasm/lind-wasm-apps/build/bin/postgres
 
 # 3) Ensure lindfs exists in the final image.
 WORKDIR /home/lind/lind-wasm
