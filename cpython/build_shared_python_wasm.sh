@@ -35,6 +35,9 @@ clang \
 mkdir -p "$LINDFS_ROOT/lib"
 $LIND_WASM_ROOT/scripts/append_tls_relocs_export.sh $BUILD_WASM/libpython3.14.wasm $LINDFS_ROOT/lib/libpython3.14.so
 
+#Produce the libpython3.14.cwasm binary
+"$LIND_BOOT" --precompile $LINDFS_ROOT/lib/libpython3.14.so
+
 #compile shared python
 clang \
     -pthread \
