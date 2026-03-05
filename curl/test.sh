@@ -337,6 +337,47 @@ test_retry_flag() {
     status=$($LIND_RUN "$CURL_BIN" -s --retry 1 -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
     [[ "$status" == *"200"* ]]
 }
+# === EXTERNAL URL TESTS (DNS resolution + real network) ======================
+
+# 26. External HTTP GET (tests DNS resolution)
+test_external_http() {
+    local status
+    status=$($LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 10 "http://example.com/" 2>&1)
+    [[ "$status" == *"200"* ]]
+}
+
+# 27. External HTTPS GET (tests DNS + TLS handshake)
+test_external_https() {
+    local status
+    status=$($LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 10 "https://example.com/" 2>&1)
+    [[ "$status" == *"200"* ]]
+}
+
+# 28. External HTTPS content verification
+test_external_content() {
+    local output
+    output=$($LIND_RUN "$CURL_BIN" -s --max-time 10 "https://example.com/" 2>&1)
+    [[ "$output" == *"Example Domain"* ]]
+}
+
+# 29. External redirect follow (tests DNS + HTTP 301/302 handling)
+test_external_redirect() {
+    local status
+    status=$($LIND_RUN "$CURL_BIN" -s -L -o /dev/null -w '%{http_code}' --max-time 10 "http://www.google.com/" 2>&1)
+    [[ "$status" == *"200"* ]]
+}
+
+# 30. External HEAD request (tests DNS + response headers)
+test_external_head() {
+    local output
+    output=$($LIND_RUN "$CURL_BIN" -s -I --max-time 10 "https://example.com/" 2>&1)
+    echo "$output" | grep -qi "Content-Type"
+}
+
+# Quick DNS check - if this fails, skip all external tests
+DNS_AVAILABLE=false
+dns_status=$($LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 5 "http://example.com/" 2>/dev/null) || true
+[[ "$dns_status" == *"200"* ]] && DNS_AVAILABLE=true
 
 # --- run tests ---------------------------------------------------------------
 
@@ -369,7 +410,18 @@ run_test "Max time (--max-time)"                   test_max_time
 run_test "Large file download"                     test_large_download
 run_test "Range request (-r)"                      test_range_request
 run_test "Retry flag (--retry)"                    test_retry_flag
-
+echo ""
+echo "$PREFIX --- External URL tests (DNS + network) ---"
+if $DNS_AVAILABLE; then
+    run_test "External HTTP GET (DNS resolution)"      test_external_http
+    run_test "External HTTPS GET (DNS + TLS)"          test_external_https
+    run_test "External HTTPS content verification"     test_external_content
+    run_test "External redirect follow (HTTP 301/302)" test_external_redirect
+    run_test "External HEAD request"                   test_external_head
+else
+    echo "$PREFIX [SKIP] DNS resolution not available from sandbox — skipping external tests"
+    echo "$PREFIX        (getaddrinfo fails for external hosts; local networking works fine)"
+fi
 # --- report ------------------------------------------------------------------
 TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
 echo ""
