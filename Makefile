@@ -350,6 +350,11 @@ cpython: merge-sysroot
 postgres: merge-sysroot
 	mkdir -p '$(APPS_BIN_DIR)/postgres/wasm32-wasi'
 
+# ---------------- tinycc (WASM build) --------------------------------------
+tinycc: merge-sysroot
+	. '$(TOOL_ENV)'
+	'$(APPS_ROOT)/tinycc/compile_tinycc.sh'
+
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
 
