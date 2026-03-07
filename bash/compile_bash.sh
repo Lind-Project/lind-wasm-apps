@@ -63,7 +63,7 @@ LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
 # Output location
-BASH_OUT_DIR="$APPS_ROOT/build/bin/bash/wasm32-wasi"
+BASH_OUT_DIR="$APPS_ROOT/build/bash/bin/bash"
 mkdir -p "$BASH_OUT_DIR"
 
 # wasm_compat header is committed in the repo
