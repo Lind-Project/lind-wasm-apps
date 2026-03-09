@@ -249,6 +249,8 @@ ac_cv_func_setproctitle_fast=${ac_cv_func_setproctitle_fast=no}
 ac_cv_func_getpeereid=${ac_cv_func_getpeereid=no}
 pgac_cv_rint_is_c99_compliant=${pgac_cv_rint_is_c99_compliant=yes}
 ac_cv_working_alloca=${ac_cv_working_alloca=yes}
+ac_cv_header_sys_signalfd_h=${ac_cv_header_sys_signalfd_h=no}
+ac_cv_func_signalfd=${ac_cv_func_signalfd=no}
 
 # Printf format checks — assume C99 compliant
 pgac_cv_snprintf_long_long_int_modifier=${pgac_cv_snprintf_long_long_int_modifier=ll}

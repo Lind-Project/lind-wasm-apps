@@ -327,6 +327,11 @@ find_other_exec(const char *argv0, const char *target,
 
 	if (validate_exec(retpath) != 0)
 		return -1;
+	
+	#ifdef __wasi__
+  	 (void) versionstr;
+  	 return 0;
+  	#endif
 
 	snprintf(cmd, sizeof(cmd), "\"%s\" -V", retpath);
 

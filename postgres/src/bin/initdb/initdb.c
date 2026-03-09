@@ -816,7 +816,7 @@ get_id(void)
 {
 	const char *username;
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__wasi__)
 	if (geteuid() == 0)			/* 0 is root's uid */
 	{
 		pg_log_error("cannot be run as root");
