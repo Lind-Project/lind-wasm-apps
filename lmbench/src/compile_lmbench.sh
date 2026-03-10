@@ -7,10 +7,11 @@ set -euo pipefail
 #   1) Load toolchain from build/.toolchain.env (set by top-level Makefile preflight).
 #   2) Build a combined libc.a = merged sysroot libc.a + libtirpc objects.
 #   3) Build lmbench with a WASI toolchain (REAL_CC).
-#   4) Stage binaries under build/bin/lmbench/wasm32-wasi.
+#   4) Stage binaries under build/lmbench/bin/wasm32-wasi (canonical location).
 #   5) Run wasm-opt compile on staged binaries:
 #        - <name>.opt.wasm
 #        - <name>.cwasm
+#   6) Mirror staged artifacts to build/bin/lmbench/wasm32-wasi (legacy path).
 
 
 # ----------------------------------------------------------------------
@@ -27,7 +28,8 @@ fi
 APPS_BUILD="$REPO_ROOT/build"
 APPS_OVERLAY="$APPS_BUILD/sysroot_overlay"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-APPS_BIN_ROOT="$APPS_BUILD/bin/lmbench"
+APPS_LMBENCH_CANON_ROOT="$APPS_BUILD/lmbench/bin"
+APPS_LMBENCH_LEGACY_ROOT="$APPS_BUILD/bin/lmbench"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 MAX_WASM_MEMORY="${MAX_WASM_MEMORY:-67108864}"
 ENABLE_WASI_THREADS="${ENABLE_WASI_THREADS:-1}"
@@ -165,10 +167,10 @@ echo "[lmbench] building suite with REAL_CC='$REAL_CC'"
 )
 
 # ----------------------------------------------------------------------
-# 4) Stage binaries under build/bin/lmbench/wasm32-wasi
+# 4) Stage binaries under build/lmbench/bin/wasm32-wasi
 # ----------------------------------------------------------------------
-mkdir -p "$APPS_BIN_ROOT"
-OUT_DIR="$APPS_BIN_ROOT/wasm32-wasi"
+mkdir -p "$APPS_LMBENCH_CANON_ROOT"
+OUT_DIR="$APPS_LMBENCH_CANON_ROOT/wasm32-wasi"
 LM_BENCH_BIN_DIR="$REPO_ROOT/lmbench/bin/wasm32-wasi"
 
 echo "[lmbench] staging binaries from $LM_BENCH_BIN_DIR → $OUT_DIR"
@@ -206,25 +208,22 @@ echo "[lmbench] staged binaries under $OUT_DIR"
 # ----------------------------------------------------------------------
 if [[ ! -x "$WASM_OPT" ]]; then
   echo "[lmbench] NOTE: neither wasm-opt found; skipping .opt.wasm/.cwasm generation."
-  exit 0
-fi
+else
+  echo "[lmbench] post-processing staged binaries under $OUT_DIR ..."
 
-echo "[lmbench] post-processing staged binaries under $OUT_DIR ..."
+  shopt -s nullglob
+  stage_bins=("$OUT_DIR"/*)
+  shopt -u nullglob
 
-shopt -s nullglob
-stage_bins=("$OUT_DIR"/*)
-shopt -u nullglob
+  for f in "${stage_bins[@]}"; do
+    case "$f" in
+      *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm) continue ;;
+    esac
 
-for f in "${stage_bins[@]}"; do
-  case "$f" in
-    *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm) continue ;;
-  esac
+    base="$(basename -- "$f")"
+    bin_for_compile="$f"
 
-  base="$(basename -- "$f")"
-  bin_for_compile="$f"
-
-  # wasm-opt pass -> <name>.opt.wasm
-  if [[ -x "$WASM_OPT" ]]; then
+    # wasm-opt pass -> <name>.opt.wasm
     OPT_OUT="$OUT_DIR/${base}.opt.wasm"
     echo "[lmbench]   wasm-opt: $base → $(basename -- "$OPT_OUT")"
     if "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
@@ -234,34 +233,42 @@ for f in "${stage_bins[@]}"; do
       echo "[lmbench]   WARNING: wasm-opt failed for '$base'; continuing with unoptimized binary."
       bin_for_compile="$f"
     fi
-  fi
 
-done
-
-# ----------------------------------------------------------------------
-# 6) cwasm generation via lind-boot --precompile
-# ----------------------------------------------------------------------
-if [[ -x "$LIND_BOOT" ]]; then
-  echo "[lmbench] generating cwasm via lind-boot --precompile..."
-  shopt -s nullglob
-  opt_files=("$OUT_DIR"/*.opt.wasm)
-  shopt -u nullglob
-  for w in "${opt_files[@]}"; do
-    echo "[lmbench]   precompile: $(basename "$w")"
-    if "$LIND_BOOT" --precompile "$w"; then
-      # Rename foo.opt.cwasm → foo.cwasm (drop .opt)
-      OPT_CWASM="${w%.wasm}.cwasm"
-      CLEAN_CWASM="${OPT_CWASM/.opt/}"
-      if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-        mv "$OPT_CWASM" "$CLEAN_CWASM"
-      fi
-    else
-      echo "[lmbench]   WARNING: lind-boot --precompile failed for '$(basename "$w")'; skipping."
-    fi
   done
-else
-  echo "[lmbench] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+
+  # --------------------------------------------------------------------
+  # 6) cwasm generation via lind-boot --precompile
+  # --------------------------------------------------------------------
+  if [[ -x "$LIND_BOOT" ]]; then
+    echo "[lmbench] generating cwasm via lind-boot --precompile..."
+    shopt -s nullglob
+    opt_files=("$OUT_DIR"/*.opt.wasm)
+    shopt -u nullglob
+    for w in "${opt_files[@]}"; do
+      echo "[lmbench]   precompile: $(basename "$w")"
+      if "$LIND_BOOT" --precompile "$w"; then
+        # Rename foo.opt.cwasm → foo.cwasm (drop .opt)
+        OPT_CWASM="${w%.wasm}.cwasm"
+        CLEAN_CWASM="${OPT_CWASM/.opt/}"
+        if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
+          mv "$OPT_CWASM" "$CLEAN_CWASM"
+        fi
+      else
+        echo "[lmbench]   WARNING: lind-boot --precompile failed for '$(basename "$w")'; skipping."
+      fi
+    done
+  else
+    echo "[lmbench] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  fi
 fi
 
-echo "[lmbench] post-processing complete."
+echo "[lmbench] post-processing complete for canonical output."
 
+# ----------------------------------------------------------------------
+# 7) Mirror canonical output to legacy build/bin/lmbench/wasm32-wasi path
+# ----------------------------------------------------------------------
+LEGACY_OUT_DIR="$APPS_LMBENCH_LEGACY_ROOT/wasm32-wasi"
+rm -rf "$LEGACY_OUT_DIR"
+mkdir -p "$LEGACY_OUT_DIR"
+cp -a "$OUT_DIR/." "$LEGACY_OUT_DIR/"
+echo "[lmbench] mirrored artifacts to legacy path: $LEGACY_OUT_DIR"

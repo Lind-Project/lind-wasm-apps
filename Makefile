@@ -220,8 +220,8 @@ install: install-bash install-nginx install-git install-curl install-grep instal
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
 	-rm -rf '$(APPS_BIN_DIR)/lmbench'
+	-rm -rf '$(APPS_BUILD)/lmbench'
 	-rm -rf '$(APPS_BIN_DIR)/nginx'
 	-$(MAKE) -C '$(APPS_ROOT)/nginx' clean || true
 	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
 	$(MAKE) -C '$(APPS_ROOT)/libtirpc' distclean || true
-
