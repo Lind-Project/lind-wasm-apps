@@ -35,7 +35,7 @@ print-config:
 	@echo "APPS_BIN_DIR=$(APPS_BIN_DIR)"
 	@echo "APPS_LIB_DIR=$(APPS_LIB_DIR)"
 	@if [[ -r '$(TOOL_ENV)' ]]; then . '$(TOOL_ENV)'; \
-	  echo "CLANG=$$CLANG"; echo "AR=$$AR"; echo "RANLIB=$$RANLIB"; fi
+	  echo "CLANG=$$CLANG"; echo "AR=$$AR"; echo "RANLIB=$$RANLIB"; echo "NM=$$NM"; fi
 
 dirs:
 	mkdir -p \
@@ -74,17 +74,24 @@ preflight: dirs
 	    "$$(command -v llvm-ranlib || true)" \
 	    "$$(command -v ranlib || true)" \
 	  )
+	  NM_CAND=( \
+	    "$(LIND_WASM_ROOT)/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/llvm-nm" \
+	    "$$(command -v llvm-nm || true)" \
+	  )
 	  pick() { for x in "$$@"; do [[ -x "$$x" ]] && { echo "$$x"; return; }; done; echo ""; }
 	  CLANG="$$(pick "$${CLANG_CAND[@]}")"
 	  AR="$$(pick   "$${AR_CAND[@]}")"
 	  RANLIB="$$(pick "$${RANLIB_CAND[@]}")"
+	  NM="$$(pick "$${NM_CAND[@]}")"
 	  [[ -x "$$CLANG"  ]] || { echo "ERROR: clang not found (tried: $${CLANG_CAND[*]})"; exit 1; }
 	  [[ -x "$$AR"     ]] || { echo "ERROR: llvm-ar/ar not found (tried: $${AR_CAND[*]})"; exit 1; }
 	  [[ -x "$$RANLIB" ]] || { echo "ERROR: llvm-ranlib/ranlib not found (tried: $${RANLIB_CAND[*]})"; exit 1; }
+	  [[ -x "$$NM"     ]] || { echo "ERROR: llvm-nm not found (tried: $${NM_CAND[*]})"; exit 1; }
 	  {
 	    echo "export CLANG='$$CLANG'"
 	    echo "export AR='$$AR'"
 	    echo "export RANLIB='$$RANLIB'"
+	    echo "export NM='$$NM'"
 	  } > '$(TOOL_ENV)'
 	  echo "[*] preflight OK"
 	  "$$CLANG" --version | head -n1
