@@ -1,6 +1,9 @@
 options:
   logging: CLOUD_LOGGING_ONLY
-  machineType: E2_HIGHCPU_8
+  machineType: E2_HIGHCPU_32
+
+substitutions:
+  _ARTIFACT_MODE: "full"
 
 steps:
   - name: 'gcr.io/cloud-builders/git'
@@ -24,30 +27,76 @@ steps:
       - 'DOCKER_PASSWORD'
 
   - name: 'gcr.io/cloud-builders/docker'
-    id: Build Image
+    id: Build & Capture Logs (buildx)
     entrypoint: 'bash'
     args:
       - '-c'
       - |
+        set -euo pipefail
         source /workspace/commit.env
-        docker build \
+        mkdir -p /workspace/artifacts
+
+        # Create or reuse buildx builder
+        docker buildx create --use --name cbuilder || docker buildx use cbuilder
+
+        BUILD_LOG=/workspace/artifacts/buildx.log
+        BUILD_RC=0
+
+        set +e
+        docker buildx build \
+          --platform=linux/amd64 \
+          --progress=plain \
+          --pull \
+          --build-arg ARTIFACT_MODE=${_ARTIFACT_MODE} \
+          --cache-from=type=registry,ref=docker.io/$$DOCKER_USERNAME/lind-wasm-apps:buildcache \
+          --cache-to=type=registry,ref=docker.io/$$DOCKER_USERNAME/lind-wasm-apps:buildcache,mode=max \
           -t docker.io/$$DOCKER_USERNAME/lind-wasm-apps:latest \
           -t docker.io/$$DOCKER_USERNAME/lind-wasm-apps:sha-$SHORT_SHA \
-          .
+          --push \
+          . 2>&1 | tee "$$BUILD_LOG"
+        BUILD_RC=$${PIPESTATUS[0]}
+        set -e
+
+        printf '%s\n' "$$BUILD_RC" > /workspace/artifacts/buildx.exitcode
+        gzip -f "$$BUILD_LOG"
+        echo "BUILD_RC=$$BUILD_RC"
     secretEnv:
       - 'DOCKER_USERNAME'
 
-  - name: 'gcr.io/cloud-builders/docker'
-    id: Push Image
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: Upload Build Log Artifact
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        source /workspace/commit.env
-        docker push docker.io/$$DOCKER_USERNAME/lind-wasm-apps:latest
-        docker push docker.io/$$DOCKER_USERNAME/lind-wasm-apps:sha-$SHORT_SHA
-    secretEnv:
-      - 'DOCKER_USERNAME'
+        set -euo pipefail
+        LOG_BUCKET="gs://${PROJECT_ID}-cloudbuild-artifacts"
+        LOG_PREFIX="$${LOG_BUCKET}/lind-wasm-apps/${BUILD_ID}"
+
+        if ! gsutil ls -b "$$LOG_BUCKET" >/dev/null 2>&1; then
+          gsutil mb -p "$PROJECT_ID" -l us-central1 "$$LOG_BUCKET" >/dev/null 2>&1 || true
+        fi
+
+        gsutil -m cp \
+          /workspace/artifacts/buildx.log.gz \
+          /workspace/artifacts/buildx.exitcode \
+          "$${LOG_PREFIX}/" || true
+
+        echo "Build log artifact path: $${LOG_PREFIX}/"
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: Finalize Build Result
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        BUILD_RC="$$(cat /workspace/artifacts/buildx.exitcode)"
+        if [[ "$$BUILD_RC" != "0" ]]; then
+          echo "Build failed. Captured log: /workspace/artifacts/buildx.log.gz"
+          echo "If upload succeeded, the Cloud Storage path was printed in the previous step."
+          exit "$$BUILD_RC"
+        fi
 
 availableSecrets:
   secretManager:
