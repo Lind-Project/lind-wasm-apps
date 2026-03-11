@@ -7,7 +7,7 @@ set -euo pipefail
 #   1) Load toolchain from build/.toolchain.env (set by top-level Makefile preflight).
 #   2) Build a combined libc.a = merged sysroot libc.a + libtirpc objects.
 #   3) Build lmbench with a WASI toolchain (REAL_CC).
-#   4) Stage binaries under build/lmbench/bin/wasm32-wasi (canonical location).
+#   4) Stage binaries under build/lmbench/bin (canonical location).
 #   5) Run wasm-opt compile on staged binaries:
 #        - <name>.opt.wasm
 #        - <name>.cwasm
@@ -167,10 +167,10 @@ echo "[lmbench] building suite with REAL_CC='$REAL_CC'"
 )
 
 # ----------------------------------------------------------------------
-# 4) Stage binaries under build/lmbench/bin/wasm32-wasi
+# 4) Stage binaries under build/lmbench/bin
 # ----------------------------------------------------------------------
 mkdir -p "$APPS_LMBENCH_CANON_ROOT"
-OUT_DIR="$APPS_LMBENCH_CANON_ROOT/wasm32-wasi"
+OUT_DIR="$APPS_LMBENCH_CANON_ROOT"
 LM_BENCH_BIN_DIR="$REPO_ROOT/lmbench/bin/wasm32-wasi"
 
 echo "[lmbench] staging binaries from $LM_BENCH_BIN_DIR → $OUT_DIR"

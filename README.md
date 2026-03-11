@@ -25,7 +25,7 @@ Artifacts land under`build/`:
 - `build/sysroot_overlay/` – staged headers/libs (e.g., libtirpc)
 - `build/sysroot_merged/` – base sysroot + overlay
 - `build/lib/` – helper archives (e.g., `liblmb_stubs.a`, combined `libc.a`)
-- `build/lmbench/bin/wasm32-wasi/` – lmbench binaries (canonical)
+- `build/lmbench/bin/` – lmbench binaries (canonical)
 - `build/bin/lmbench/wasm32-wasi/` – lmbench binaries (legacy mirror)
 - `build/bin/bash/wasm32-wasi/` – bash outputs
 
@@ -43,7 +43,7 @@ Artifacts land under`build/`:
 - `make stubs`  
 	Creates small compatibility stubs needed for lmbench (temporary workaround; see TODOs in Makefile).
 - `make lmbench`  
-	Builds lmbench via `lmbench/src/compile_lmbench.sh`, stages into `build/lmbench/bin/wasm32-wasi/`, and mirrors to `build/bin/lmbench/wasm32-wasi/`.
+	Builds lmbench via `lmbench/src/compile_lmbench.sh`, stages into `build/lmbench/bin/`, and mirrors to `build/bin/lmbench/wasm32-wasi/`.
 - `make bash`  
 	Builds bash via `bash/compile_bash.sh` and stages into `build/bin/bash/wasm32-wasi/`.
 - `make clean
