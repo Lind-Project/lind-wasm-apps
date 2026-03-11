@@ -1,25 +1,60 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
+if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
+  LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
+fi
+SYSROOT="${LIND_WASM_ROOT}/build/sysroot"
+LINDFS="${LIND_WASM_ROOT}/lindfs"
+LIND_BOOT="${LIND_WASM_ROOT}/src/lind-boot/target/debug/lind-boot"
+
+CLANG_BIN="${LIND_WASM_ROOT}/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang"
+
+CFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$SYSROOT -pthread -matomics -mbulk-memory -fno-pie -fvisibility=default -fno-builtin"
+
+LDFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$SYSROOT -static -Wl,--import-memory,--export-memory,--shared-memory,--max-memory=67108864,--export="__stack_pointer",--export=__stack_low,--export=__tls_base"
+
+cd $SCRIPT_DIR
+
 ./configure \
   --cpu=i386 \
-  --cc="/home/lind/lind-wasm/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang" \
-  --extra-cflags="--target=wasm32-wasi -g -O0 --sysroot=/home/lind/lind-wasm/build/sysroot -pthread -matomics -mbulk-memory -fno-pie -fvisibility=default -fno-builtin" \
-  --extra-ldflags="--target=wasm32-wasi -g -O0 --sysroot=/home/lind/lind-wasm/build/sysroot -static -Wl,--import-memory,--export-memory,--shared-memory,--max-memory=67108864,--export="__stack_pointer",--export=__stack_low,--export=__tls_base" \
+  --cc=$CLANG_BIN \
+  --extra-cflags="$CFLAGS_WASM" \
+  --extra-ldflags="$LDFLAGS_WASM" \
   --enable-static --enable-cross --extra-libs=""
 
 echo "CONFIG_ldl=no" >> config.mak
 
-make
+make tcc
+
+if [ -f "tcc" ]; then
+    mv tcc tcc.wasm
+else
+    echo "Error: tcc binary was not generated!"
+    exit 1
+fi
 
 # use gcc to compile libtcc1.c to object file, then archive it into a static library
+# `libtcc1` is used by tinycc wasm binary for compiling C programs. Hence `libtcc1` is compiled as an x86  ELF binary in align with the target architecture of tinycc
 gcc -m32 -O2 -DTCC_TARGET_I386 -c lib/libtcc1.c -o libtcc1.o
 ar rcs libtcc1.a libtcc1.o
 
 # opt and precompile
-lind_compile --opt-only tcc.wasm -o tcc.cwasm
-lind_compile --precompile-only tcc.wasm -o tcc.cwasm
+echo "Precompiling"
+lind_compile --opt-only tcc.wasm -o tcc.opt.wasm
+if [ -s "tcc.opt.wasm" ]; then
+	echo "Generating cwasm from opt.wasm"
+	lind_compile --precompile-only tcc.opt.wasm -o tcc.cwasm
+else
+	echo "Generating cwasm from wasm"
+	lind_compile --precompile-only tcc.wasm -o tcc.cwasm
+fi
 
-# copy
-mkdir -p /home/lind/lind-wasm/lindfs/usr/local/lib/tcc/
-cp tcc.cwasm ../lindfs/
-cp libtcc1.a /home/lind/lind-wasm/lindfs/usr/local/lib/tcc/
+# copy to app build folder preserving the directory structure
+mkdir -p $APPS_ROOT/build/tinycc/bin
+mkdir -p $APPS_ROOT/build/usr/local/bin/tcc/
+cp tcc.cwasm $APPS_ROOT/build/tinycc/bin
+cp libtcc1.a $APPS_ROOT/build/usr/local/bin/tcc/
