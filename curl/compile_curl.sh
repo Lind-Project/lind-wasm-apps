@@ -125,7 +125,7 @@ echo "[curl] configuring…"
   --disable-rtsp --disable-dict --disable-telnet --disable-tftp \
   --disable-pop3 --disable-imap --disable-smb --disable-smtp \
   --disable-gopher --disable-mqtt --disable-ipfs \
-  --enable-http --enable-proxy --enable-ipv6 \
+  --enable-http --enable-proxy --disable-ipv6 \
   --disable-manual --disable-docs --disable-threaded-resolver \
   --disable-websockets --disable-openssl-auto-load-config \
   --without-ca-bundle --without-ca-path --with-ca-fallback \
