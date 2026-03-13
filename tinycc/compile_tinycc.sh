@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# This build script produces wasm tinycc compiler that  can compile C programs to 32-bit ELF binaries (i386 target). 
+
+# libtcc.a is a shared library that is required to run tinycc. Since the target is i386, libtcc.a is also compiled as i386. 
+
+# The required header files, shared libraries and other files (libc.so, ld.so, libc_nonshared.a, crt1.o) which are required to run tinycc is also copied to the build/ folder. 
+
+# To run dynamically linked executables produced by tinycc, dynamic linker is used. Since the executable is run natively, we provide a symbolic link to the 32-bit dynamic linker within /lib of the root filesystem so that the kernel can locate the dynamic linker.
+
+
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
