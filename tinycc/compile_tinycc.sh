@@ -55,6 +55,37 @@ fi
 
 # copy to app build folder preserving the directory structure
 mkdir -p $APPS_ROOT/build/tinycc/bin
-mkdir -p $APPS_ROOT/build/usr/local/bin/tcc/
-cp tcc.cwasm $APPS_ROOT/build/tinycc/bin
-cp libtcc1.a $APPS_ROOT/build/usr/local/bin/tcc/
+mkdir -p $APPS_ROOT/build/tinycc/usr/local/bin/tcc/
+if [ -s "tcc.cwasm" ]; then
+	cp tcc.cwasm $APPS_ROOT/build/tinycc/bin/tcc
+elif [ -s "tcc.wasm" ]; then
+	cp tcc.wasm $APPS_ROOT/build/tinycc/bin/tcc
+else
+	echo "No wasm binary created"
+	exit 1
+fi
+
+#libtcc1.a is required to run tinycc
+cp libtcc1.a $APPS_ROOT/build/tinycc/usr/local/bin/tcc/
+
+#These headers are required to compile C programs using tinycc
+tar -xvzf tcc_headers.tar.gz
+rsync -a "${SCRIPT_DIR}/tcc_headers/" "$APPS_ROOT/build/tinycc/"
+
+#While running tinycc to compile C programs as 32-bit binaries, it
+#requires 32-bit versions of libc.so, ld.so, libc_nonshared.a and crt object files
+#in the search path. Since tinycc is run within lindfs/ it will search in paths
+#relative to lindfs. We first create these paths with respect to the build folder
+#Later at 'make install' stage, all the files within the build folder copied to lindfs folder
+
+mkdir -p "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
+cp /usr/i686-linux-gnu/lib/crt*.o "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
+cp /usr/i686-linux-gnu/lib/libc.so* "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
+cp /usr/i686-linux-gnu/lib/ld-linux.so.2 "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
+cp /usr/i686-linux-gnu/lib/libc_nonshared.a "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
+
+#While running tinycc, it checks for libc.so which is a stub that looks for ld.so, libc_nonshared.a and libc.so.6. We change the absolute paths of these which were with respect to the root filesystem, so tinycc can locate these files with respect to lindfs 
+sed -i 's|[^ ]*/libc\.so\.6|libc.so.6|g; s|[^ ]*/libc_nonshared\.a|libc_nonshared.a|g; s|[^ ]*/ld-linux\.so\.2|ld-linux.so.2|g' "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/libc.so"
+
+#To run dynamically linked executable using tinycc, it expects its linker at /lib/ld-linux.so.2, hence we map the 32-bit linker to that file
+sudo ln -s /usr/i686-linux-gnu/lib/ld-linux.so.2 /lib/ld-linux.so.2
