@@ -19,7 +19,7 @@ CURL_ROOT="$APPS_ROOT/curl"
 
 APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-STAGE_DIR="$APPS_BUILD/bin/curl/wasm32-wasi"
+STAGE_DIR="$APPS_BUILD/curl/bin/curl"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -196,6 +196,9 @@ if [[ -x "$LIND_BOOT" ]]; then
       CLEAN_CWASM="${OPT_CWASM/.opt/}"
       if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
         mv "$OPT_CWASM" "$CLEAN_CWASM"
+        # Strip .cwasm extension for final staged binary (required by issue #130)
+        cp "$CLEAN_CWASM" "$STAGE_DIR/curl"
+        echo "[curl] staged final binary: $STAGE_DIR/curl"
       fi
     else
       echo "[curl] WARNING: lind-boot --precompile failed; skipping cwasm generation."

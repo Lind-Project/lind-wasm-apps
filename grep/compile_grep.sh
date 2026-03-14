@@ -14,7 +14,7 @@ GREP_ROOT="$APPS_ROOT/grep"
 
 APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-STAGE_DIR="$APPS_BUILD/bin/grep/wasm32-wasi"
+STAGE_DIR="$APPS_BUILD/grep/bin/grep"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -212,6 +212,9 @@ if [[ -x "$LIND_BOOT" ]]; then
       CLEAN_CWASM="$STAGE_DIR/grep.cwasm"
       if [[ -f "$OPT_CWASM" ]]; then
         mv "$OPT_CWASM" "$CLEAN_CWASM"
+        # Strip .cwasm extension for final staged binary (required by issue #130)
+        cp "$CLEAN_CWASM" "$STAGE_DIR/grep"
+        echo "[grep] staged final binary: $STAGE_DIR/grep"
       fi
     else
       echo "[grep] WARNING: lind-boot --precompile failed; skipping."

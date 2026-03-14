@@ -219,23 +219,31 @@ coreutils: $(MERGE_BASE_STAMP)
 # ---------------- git (WASM build) --------------------------------------------
 # Uses git/compile_git.sh to build git as a wasm32-wasi binary using the
 # merged sysroot and toolchain detected by preflight (zlib + OpenSSL), and
-# stages artifacts under build/bin/git/wasm32-wasi/.
+# stages artifacts under build/git/bin/git/.
 git: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/git/compile_git.sh'
 
 # ---------------- curl (WASM build) -------------------------------------------
-# Uses curl/compile_curl.sh and requires the merged sysroot (OpenSSL + zlib).
+# Uses curl/compile_curl.sh to build curl as a wasm32-wasi binary using the
+# merged sysroot and toolchain detected by preflight (zlib + OpenSSL), and
+# stages artifacts under build/curl/bin/curl/.
 curl: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/curl/compile_curl.sh'
 
 # ---------------- grep (WASM build) -------------------------------------------
+# Uses grep/compile_grep.sh to build grep as a wasm32-wasi binary using the
+# merged sysroot and toolchain detected by preflight, and
+# stages artifacts under build/grep/bin/grep/.
 grep: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/grep/compile_grep.sh'
 
 # ---------------- sed (WASM build) --------------------------------------------
+# Uses sed/compile_sed.sh to build sed as a wasm32-wasi binary using the
+# merged sysroot and toolchain detected by preflight, and
+# stages artifacts under build/sed/bin/sed/.
 sed: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/sed/compile_sed.sh'
