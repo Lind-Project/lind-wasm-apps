@@ -20,7 +20,7 @@ APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
 BUILD_ROOT="$APPS_BUILD/coreutils_wasi"
 BUILD_DIR="$BUILD_ROOT/build"
-STAGE_DIR="$APPS_BUILD/bin/coreutils/wasm32-wasi"
+STAGE_DIR="$APPS_BUILD/coreutils/bin/coreutils"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
@@ -574,6 +574,10 @@ if [[ -x "$LIND_BOOT" ]]; then
       CLEAN_CWASM="${OPT_CWASM/.opt/}"
       if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
         mv "$OPT_CWASM" "$CLEAN_CWASM"
+        # Strip .cwasm extension for final staged binary (required by issue #126)
+        BINARY_NAME="$(basename "${CLEAN_CWASM%.cwasm}")"
+        cp "$CLEAN_CWASM" "$(dirname "$CLEAN_CWASM")/$BINARY_NAME"
+        echo "[coreutils] staged final binary: $(dirname "$CLEAN_CWASM")/$BINARY_NAME"
       fi
     done
   else

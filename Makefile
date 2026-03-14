@@ -211,7 +211,8 @@ nginx: $(MERGE_BASE_STAMP)
 	JOBS='$(JOBS)' '$(APPS_ROOT)/nginx/compile_nginx.sh'
 
 # ---------------- coreutils (WASM build) --------------------------------------
-# Uses coreutils/compile_coreutils.sh and requires the merged sysroot.
+# Uses coreutils/compile_coreutils.sh and requires the merged sysroot,
+# stages artifacts under build/coreutils/bin/coreutils/.
 coreutils: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/coreutils/compile_coreutils.sh'
