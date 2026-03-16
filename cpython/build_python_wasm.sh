@@ -159,4 +159,12 @@ echo "=> Build complete. Outputs generated in current directory."
 ls -lh python*.wasm python*.cwasm 2>/dev/null || true
 
 #Copying python.cwasm to lindfs
-cp python.cwasm ${LINDFS}/usr/local/bin/python.cwasm
+PYTHON_CWASM="${SCRIPT_DIR}/build-wasm/python.cwasm"
+if [[ -x "$PYTHON_CWASM" ]]; then
+	mkdir -p ${APPS_ROOT}/build/cpython
+	cp "$PYTHON_CWASM" ${APPS_ROOT}/build/cpython/usr/local/bin/python
+	echo "=>Build complete. Python binary copied to build folder."
+	ls -lh ${APPS_ROOT}/build/cpython/usr/local/bin/python 2>/dev/null || true
+else
+	echo "python.cwasm not generated. Build failed!"
+fi
