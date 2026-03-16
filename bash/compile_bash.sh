@@ -86,7 +86,7 @@ fi
 
 CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
 
-CFLAGS_WASM="-O2 -g -std=gnu89 -pthread \
+CFLAGS_WASM="-O2 -g -std=gnu89 -pthread -fPIC\
   -DHAVE_STRSIGNAL=1 -DHAVE_MKTIME=1 \
   -include $WASM_COMPAT_H \
   -I$MERGED_SYSROOT/include \
