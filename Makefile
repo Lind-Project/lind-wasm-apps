@@ -258,28 +258,28 @@ postgres: merge-sysroot
 	mkdir -p '$(APPS_BIN_DIR)/postgres/wasm32-wasi'
 
 install-bash:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' bash
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
 
 install-nginx:
-	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)'
+	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' nginx
 
 install-git:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' git
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' git
 
 install-curl:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' curl
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' curl
 
 install-grep:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' grep
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' grep
 
 install-sed:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' sed
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' sed
 
 install-lmbench:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' lmbench
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' lmbench
 
 install-coreutils:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' coreutils
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' coreutils
 
 install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils
 
