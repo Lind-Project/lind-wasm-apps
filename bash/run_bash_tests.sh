@@ -90,7 +90,7 @@ assert "alternative :+ when set"      "alt"         'x=set; echo "${x:+alt}"'
 assert "alternative :+ when unset"    ""            'echo "${X:+alt}"'
 assert "variable length"              "5"           'x=hello; echo "${#x}"'
 assert "readonly variable"            "42"          'readonly x=42; echo "$x"'
-#assert "export to subshell"           "visible"     'export V=visible; bash -c "echo $V"'
+assert "export to subshell"           "visible"     'export V=visible; bash -c "echo $V"'
 assert "local var in function"        "local
 global" \
     'V=global; f(){ local V=local; echo "$V"; }; f; echo "$V"'
@@ -313,11 +313,16 @@ section "12. Glob & Pattern Matching"
 assert "case * glob"          "matched" 'x=hello; case $x in h*) echo matched;; esac'
 assert "case ? glob"          "matched" 'x=hi; case $x in h?) echo matched;; esac'
 assert "case [abc] class"     "matched" 'x=b; case $x in [abc]) echo matched;; esac'
-assert "extglob +(a)"         "matched" 'shopt -s extglob; x=aaa; case $x in +(a)) echo matched;; esac'
-assert "extglob *(a) empty"   "matched" 'shopt -s extglob; x=""; case $x in *(a)) echo matched;; esac'
-assert "extglob ?(a)"         "matched" 'shopt -s extglob; x=a; case $x in ?(a)) echo matched;; esac'
-assert "extglob @(cat|dog)"   "matched" 'shopt -s extglob; x=cat; case $x in @(cat|dog)) echo matched;; esac'
-assert "extglob !(cat)"       "matched" 'shopt -s extglob; x=dog; case $x in !(cat)) echo matched;; esac'
+assert "extglob +(a)"         "matched" 'shopt -s extglob; 
+x=aaa; case $x in +(a)) echo matched;; esac'
+assert "extglob *(a) empty"   "matched" 'shopt -s extglob; 
+x=""; case $x in *(a)) echo matched;; esac'
+assert "extglob ?(a)"         "matched" 'shopt -s extglob; 
+x=a; case $x in ?(a)) echo matched;; esac'
+assert "extglob @(cat|dog)"   "matched" 'shopt -s extglob; 
+x=cat; case $x in @(cat|dog)) echo matched;; esac'
+assert "extglob !(cat)"       "matched" 'shopt -s extglob; 
+x=dog; case $x in !(cat)) echo matched;; esac'
 
 # ─────────────────────────────────────────────────────────────
 section "13. Special Variables"
