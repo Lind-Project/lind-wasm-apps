@@ -55,7 +55,7 @@ FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
 
 # Output location
-BASH_OUT_DIR="$APPS_ROOT/build/bash/bin/bash"
+BASH_OUT_DIR="$APPS_ROOT/build/bash/bin"
 BASH_STATE_DIR="$APPS_ROOT/build/.bash_state"
 HOST_SIG_FILE="$BASH_STATE_DIR/host-config.sig"
 CACHE_REVISION="2"
