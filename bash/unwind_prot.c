@@ -120,7 +120,7 @@ without_interrupts (function, arg1, arg2)
   old_interrupt_immediately = interrupt_immediately;
   interrupt_immediately = 0;
 
-  (*function)(arg1, arg2);
+  ((void (*)(char *, char *))function)(arg1, arg2);
 
   interrupt_immediately = old_interrupt_immediately;
 }
@@ -330,7 +330,10 @@ unwind_frame_run_internal (tag, ignore)
 	  if (elt->head.cleanup == (Function *) restore_variable)
 	    restore_variable (&elt->sv.v);
 	  else
-	    (*(elt->head.cleanup)) (elt->arg.v);
+        if (elt->arg.v)
+          ((void (*)(char *))(elt->head.cleanup))(elt->arg.v);
+        else
+          ((void (*)(void))(elt->head.cleanup))();
 	}
 
       uwpfree (elt);
