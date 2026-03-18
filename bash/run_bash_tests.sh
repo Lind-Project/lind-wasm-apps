@@ -14,6 +14,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
+
 mkdir -p "$LINDFS_ROOT/tests/bash/"
 
 PASS=0
@@ -42,8 +43,7 @@ assert() {
     
     # Evaluate the command
     local actual
-    
-    actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/bash "$testfile" 2>/dev/null)
+    actual=$(timeout ${TIMEOUT_SECS}s lind_run --env PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:.  bin/bash  "$testfile" 2>/dev/null)
     echo "--------- Test run Completed -------"
 
     exit_code=$?
@@ -361,4 +361,31 @@ else
     echo -e "${GREEN}ALL PASSED${NC} — $PASS/$TOTAL tests passed"
     exit 0
 fi
+
+COREUTIL_BINARIES=(
+    "cat"
+    "tr"
+    "wc"
+    "grep"
+    "mktemp"
+    "source"
+    "rm"
+    "touch"
+)
+
+for file in "${COREUTIL_BINARIES[@]}"; do
+    # Construct the full path
+    FULL_PATH="$LINDFS_ROOT/bin/$file"
+    if [[ ! -f "$FULL_PATH" ]]; then
+        echo -e "[ ${RED}MISSING${NC} ] $FULL_PATH"
+        echo -r "Coreutils have to be built and copied to lindfs to run bash tests"
+        echo "Tests 79,80,81, 84, 85, 89, 133 requires cat"
+        echo "Tests 87 and 88 require tr"
+	echo "Test 88 requires wc"
+	echo "Test 99 requires grep"
+	echo "Test 106 requires mktemp, source and rm"
+	echo "Test 117 requires touch and rm"
+	exit 1
+    fi
+done
 
