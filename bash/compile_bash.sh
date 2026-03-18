@@ -46,9 +46,11 @@ LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ##################
 # These knobs are the script-level control surface for the speedups below.
-# `FORCE_CLEAN` and `FORCE_CONFIGURE` preserve a simple way to fall back to a from-scratch
+# ``ARTIFACT_MODE=fast` gives a quick development path,while FORCE_CLEAN` 
+# and `FORCE_CONFIGURE` preserve a simple way to fall back to a from-scratch
 # rebuild when debugging or validating the cache logic.
 ##################
+ARTIFACT_MODE="${ARTIFACT_MODE:-full}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
 
@@ -101,6 +103,7 @@ echo "[bash] using AR          = $AR"
 echo "[bash] LIND_WASM_ROOT    = $LIND_WASM_ROOT"
 echo "[bash] merged sysroot    = $MERGED_SYSROOT"
 echo "[bash] output dir        = $BASH_OUT_DIR"
+echo "[bash] artifact mode     = $ARTIFACT_MODE"
 echo
 
 ##################
@@ -476,16 +479,28 @@ fi
 # `wasm-opt` is not just an optional beautification pass here; it is part of
 # producing a runnable default artifact. We therefore keep the raw compiler
 # output for debugging as `bash.raw.wasm`, but write the runnable module to the
-# traditional `bash.wasm` path. 
+# traditional `bash.wasm` path. Full mode still adds the extra alias and cwasm. 
 ##################
 if [[ ! -x "$WASM_OPT" ]]; then
   echo "[bash] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact."
   exit 1
 fi
 
+### Added `--fpcast-emu` flag to fix bash errors liked indirect function mismatch and others
 echo "[bash] running wasm-opt to produce runnable bash.wasm..."
 "$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
   "$BASH_RAW_WASM" -o "$BASH_WASM"
+
+### If choosing the fast path, .cwasm is not generated
+### Only .cwasm is copied to the build folder
+### The build exits after this
+
+if [[ "$ARTIFACT_MODE" == "fast" ]]; then
+	echo "[bash] artifact mode is fast; keeping bash.wasm runnable and skipping only cwasm generation."
+	echo "Only .cwasm binary is copied to build/bash folder and hence no binaries are copied"
+	echo "Exiting..."
+	exit 1
+fi
 
 if [[ -x "$LIND_BOOT" ]]; then
    echo "[bash] generating cwasm via lind-boot --precompile..."
