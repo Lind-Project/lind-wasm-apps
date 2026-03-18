@@ -8,7 +8,7 @@ set -euo pipefail
 #   1. Clean any previous build
 #   2. Build git with wasm32-wasi toolchain, disabling unavailable features
 #      (curl, iconv, expat, gettext, perl, python, tcl/tk, unix sockets)
-#   3. Stage the main git binary to build/git/bin/git/
+#   3. Stage the main git binary to build/bin/git/wasm32-wasi/
 #   4. Optimize with wasm-opt (asyncify)
 #   5. Precompile with lind-boot
 #
@@ -53,7 +53,7 @@ LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
 # Output location
-GIT_OUT_DIR="$APPS_ROOT/build/git/bin/git"
+GIT_OUT_DIR="$APPS_ROOT/build/git/usr/local/bin"
 mkdir -p "$GIT_OUT_DIR"
 
 # --- sanity checks -----------------------------------------------------------
@@ -198,21 +198,21 @@ if [[ ! -f git ]]; then
   exit 1
 fi
 
-cp git "$GIT_OUT_DIR/git.wasm"
-echo "[git] staged: $GIT_OUT_DIR/git.wasm"
+GIT_WASM="$SCRIPT_DIR/git.wasm"
+GIT_OPT_WASM="$SCRIPT_DIR/git.opt.wasm"
+
+cp git "$GIT_WASM"
 
 ###############################################################################
 # 4. wasm-opt (best-effort)
 ###############################################################################
 
-GIT_WASM="$GIT_OUT_DIR/git.wasm"
 
 if [[ -x "$WASM_OPT" ]]; then
   echo "[git] running wasm-opt (asyncify + optimization)..."
-  OPT_WASM="$GIT_OUT_DIR/git.opt.wasm"
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
-    "$GIT_WASM" -o "$OPT_WASM"
-  GIT_WASM="$OPT_WASM"
+    "$GIT_WASM" -o "$GIT_OPT_WASM"
+  GIT_WASM="$GIT_OPT_WASM"
 else
   echo "[git] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
 fi
@@ -224,20 +224,29 @@ fi
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[git] generating cwasm via lind-boot --precompile..."
   if "$LIND_BOOT" --precompile "$GIT_WASM"; then
-    # Rename git.opt.cwasm -> git.cwasm (drop .opt)
-    OPT_CWASM="${GIT_WASM%.wasm}.cwasm"
-    CLEAN_CWASM="${OPT_CWASM/.opt/}"
-    if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-      mv "$OPT_CWASM" "$CLEAN_CWASM"
-      # Strip .cwasm extension for final staged binary (required by issue #130)
-      cp "$CLEAN_CWASM" "$GIT_OUT_DIR/git"
-      echo "[git] staged final binary: $GIT_OUT_DIR/git"
+    
+    #If wasm-opt is successful, it produces git.opt.wasm.
+    #In that case --precompile is run on git.opt.wasm and this produces git.opt.cwasm
+    GIT_OPT_CWASM="$SCRIPT_DIR/git.opt.cwasm"
+
+    #If wasm-opt is not successful, then the --precompile is run on git.wasm and this produces git.cwasm
+    GIT_CWASM="$SCRIPT_DIR/git.cwasm"
+    if [[ -f "$GIT_OPT_CWASM" ]]; then
+      cp "$GIT_OPT_CWASM" "$GIT_OUT_DIR/git"
+      echo "[git] git staged as $GIT_OUT_DIR/git "
+    elif [[ -f "$GIT_CWASM" ]]; then
+      cp "$GIT_CWASM" "$GIT_OUT_DIR/git"
+      echo "[git] git staged as $GIT_OUT_DIR/git "
     fi
   else
     echo "[git] WARNING: lind-boot --precompile failed; skipping cwasm generation."
+    echo "No binaries copied to the build folder. Exiting.."
+    exit 1
   fi
 else
   echo "[git] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "No binaries copied to the build folder. Exiting.."
+  exit 1
 fi
 
 popd >/dev/null
