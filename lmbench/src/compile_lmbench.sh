@@ -9,7 +9,6 @@ set -euo pipefail
 #   3) Stage final artifacts under build/lmbench/bin.
 #   4) Require cwasm generation for the staged executables and copy the
 #      resulting .cwasm files back onto the final extensionless program names.
-#   5) Mirror canonical outputs to build/bin/lmbench/wasm32-wasi (legacy path).
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -22,7 +21,6 @@ APPS_BUILD="$REPO_ROOT/build"
 APPS_OVERLAY="$APPS_BUILD/sysroot_overlay"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
 APPS_LMBENCH_CANON_ROOT="$APPS_BUILD/lmbench"
-APPS_LMBENCH_LEGACY_ROOT="$APPS_BUILD/bin/lmbench"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 MAX_WASM_MEMORY="${MAX_WASM_MEMORY:-67108864}"
 ENABLE_WASI_THREADS="${ENABLE_WASI_THREADS:-1}"
@@ -126,14 +124,6 @@ run_wasm_opt_replace() {
     rm -f "$tmp"
     return 1
   fi
-}
-
-mirror_legacy_outputs() {
-  local legacy_out="$APPS_LMBENCH_LEGACY_ROOT/wasm32-wasi"
-  rm -rf "$legacy_out"
-  mkdir -p "$legacy_out"
-  cp -a "$OUT_DIR/." "$legacy_out/"
-  echo "[lmbench] mirrored artifacts to legacy path: $legacy_out"
 }
 
 BASE_LIBC="$MERGED_SYSROOT/lib/wasm32-wasi/libc.a"
@@ -425,5 +415,4 @@ if [[ "$ARTIFACT_MODE" != "full" ]]; then
   find "$LM_BENCH_BIN_DIR" -maxdepth 1 -type f -name '*.opt.wasm' -delete
 fi
 
-mirror_legacy_outputs
 echo "[lmbench] post-processing complete."
