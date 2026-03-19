@@ -6,9 +6,10 @@ set -euo pipefail
 # High level:
 #   1) Reuse the merged `libc.a` augmentation unless its inputs changed.
 #   2) Rebuild lmbench only when the toolchain or build inputs changed.
-#   3) Stage outputs under build/lmbench/bin (canonical location).
-#   4) Treat optimization and precompilation as optional, heavier follow-up
-#      work instead of always doing them on the default path.
+#   3) Stage final artifacts under build/lmbench/, preserving lmbench's
+#      original bin/wasm32-wasi structure.
+#   4) Require cwasm generation for the staged executables and copy the
+#      resulting .cwasm files back onto the final extensionless program names.
 #   5) Mirror canonical outputs to build/bin/lmbench/wasm32-wasi (legacy path).
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,7 +22,7 @@ fi
 APPS_BUILD="$REPO_ROOT/build"
 APPS_OVERLAY="$APPS_BUILD/sysroot_overlay"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-APPS_LMBENCH_CANON_ROOT="$APPS_BUILD/lmbench/bin"
+APPS_LMBENCH_CANON_ROOT="$APPS_BUILD/lmbench"
 APPS_LMBENCH_LEGACY_ROOT="$APPS_BUILD/bin/lmbench"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 MAX_WASM_MEMORY="${MAX_WASM_MEMORY:-67108864}"
@@ -30,10 +31,9 @@ WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ##################
-# These flags expose the speed/cleanliness tradeoff directly at the script
-# layer. The default is a faster developer-oriented path, but the caller can
-# still request a scratch rebuild or the full artifact set without changing
-# lmbench's own makefiles.
+# These flags expose the scratch-rebuild tradeoff directly at the script layer.
+# lmbench's staged executables now always require the full cwasm-backed output
+# set mandated by issue #127, regardless of artifact mode.
 ##################
 ARTIFACT_MODE="${ARTIFACT_MODE:-fast}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
@@ -310,8 +310,8 @@ echo "[lmbench] building suite with REAL_CC='$REAL_CC'"
 )
 printf '%s\n' "$current_build_sig" >"$BUILD_SIG_FILE"
 
-mkdir -p "$APPS_LMBENCH_CANON_ROOT"
-OUT_DIR="$APPS_LMBENCH_CANON_ROOT"
+OUT_DIR="$APPS_LMBENCH_CANON_ROOT/bin/wasm32-wasi"
+mkdir -p "$OUT_DIR"
 
 echo "[lmbench] staging binaries from $LM_BENCH_BIN_DIR -> $OUT_DIR"
 
@@ -325,7 +325,6 @@ fi
 # Here we only clear staged files inside it, which is enough to keep the
 # outputs accurate without paying for more directory churn than necessary.
 ##################
-mkdir -p "$OUT_DIR"
 find "$OUT_DIR" -maxdepth 1 -type f \( -name '*.wasm' -o -name '*.raw.wasm' -o -name '*.opt.wasm' -o -name '*.cwasm' -o -name '*.opt.wasm.cwasm' -o -name '*' \) -delete
 
 shopt -s nullglob
@@ -349,11 +348,13 @@ fi
 echo "[lmbench] staged binaries under $OUT_DIR"
 
 ##################
-# Lind expects the runtime module to include the epoch-injection transform, so
-# the staged raw lmbench binaries are best understood as intermediate files,
-# not the final runnable artifacts. We therefore preserve the raw link output
-# under a debug-friendly `.raw.wasm` name and rewrite the traditional lmbench
-# program name to be the runnable optimized module.
+# Lind expects the runtime module to include the epoch-injection transform, and
+# issue #127 further requires the final staged executable name to be backed by
+# the generated `.cwasm` artifact. We therefore keep both `.raw.wasm` and
+# `.opt.wasm` files for debugging while rewriting each staged executable's
+# extensionless program name to be a copy of the final `.cwasm`. Any
+# non-executable artifacts already copied into the staging tree are preserved
+# unchanged so config files and logs keep their original names and layout.
 ##################
 if [[ ! -x "$WASM_OPT" ]]; then
   echo "[lmbench] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifacts."
@@ -370,59 +371,66 @@ for f in "${stage_bins[@]}"; do
   case "$f" in
     *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm|*.raw.wasm) continue ;;
   esac
+  if [[ ! -x "$f" ]]; then
+    continue
+  fi
   base="$(basename -- "$f")"
   RAW_OUT="$OUT_DIR/${base}.raw.wasm"
-  run_limited "$JOBS" run_wasm_opt_replace "$f" "$RAW_OUT" "$f"
+  OPT_OUT="$OUT_DIR/${base}.opt.wasm"
+  run_limited "$JOBS" run_wasm_opt_replace "$f" "$RAW_OUT" "$OPT_OUT"
 done
 
-wait_for_background_jobs
-
-##################
-# Full mode still preserves the historical `.opt.wasm` names expected by some
-# tooling, but those are now aliases of the runnable default outputs rather
-# than the only runnable versions. Fast mode stops after creating the optimized
-# default program names.
-##################
-if [[ "$ARTIFACT_MODE" != "full" ]]; then
-  echo "[lmbench] artifact mode is fast; keeping default lmbench program names runnable and skipping cwasm generation."
-  mirror_legacy_outputs
-  exit 0
+if ! wait_for_background_jobs; then
+  echo "[lmbench] ERROR: wasm-opt post-processing failed." >&2
+  exit 1
 fi
 
+##################
+# Issue #127 requires the final staged executable names to come from `.cwasm`
+# outputs. We therefore require `lind-boot --precompile`, fail the build if it
+# does not produce the expected artifacts, and then copy each `.cwasm` back to
+# its extensionless executable name in the staging directory.
+##################
+if [[ ! -x "$LIND_BOOT" ]]; then
+  echo "[lmbench] ERROR: lind-boot not found at '$LIND_BOOT'; cannot produce required cwasm artifacts." >&2
+  exit 1
+fi
+
+echo "[lmbench] generating cwasm via lind-boot --precompile..."
 shopt -s nullglob
-optimized_bins=("$OUT_DIR"/*)
+opt_files=("$OUT_DIR"/*.opt.wasm)
 shopt -u nullglob
-for f in "${optimized_bins[@]}"; do
-  case "$f" in
-    *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm|*.raw.wasm) continue ;;
-  esac
-  cp "$f" "$OUT_DIR/$(basename -- "$f").opt.wasm"
+
+if (( ${#opt_files[@]} == 0 )); then
+  echo "[lmbench] ERROR: no optimized .opt.wasm files were produced under $OUT_DIR" >&2
+  exit 1
+fi
+
+for w in "${opt_files[@]}"; do
+  run_limited "$JOBS" "$LIND_BOOT" --precompile "$w"
 done
 
-##################
-# In full mode we still keep the richer artifact set, but we do not need to
-# run the post-processing strictly one file at a time. The bounded worker loop
-# lets us use `JOBS` without oversubscribing wildly.
-##################
-if [[ -x "$LIND_BOOT" ]]; then
-  echo "[lmbench] generating cwasm via lind-boot --precompile..."
-  shopt -s nullglob
-  opt_files=("$OUT_DIR"/*.opt.wasm)
-  shopt -u nullglob
-  for w in "${opt_files[@]}"; do
-    run_limited "$JOBS" "$LIND_BOOT" --precompile "$w"
-  done
-  wait_for_background_jobs
+if ! wait_for_background_jobs; then
+  echo "[lmbench] ERROR: lind-boot --precompile failed." >&2
+  exit 1
+fi
 
-  for w in "${opt_files[@]}"; do
-    OPT_CWASM="${w%.wasm}.cwasm"
-    CLEAN_CWASM="${OPT_CWASM/.opt/}"
-    if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-      mv "$OPT_CWASM" "$CLEAN_CWASM"
-    fi
-  done
-else
-  echo "[lmbench] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+for w in "${opt_files[@]}"; do
+  FINAL_BIN="${w%.opt.wasm}"
+  OPT_CWASM="${w%.wasm}.cwasm"
+  CLEAN_CWASM="${OPT_CWASM/.opt/}"
+  if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
+    mv "$OPT_CWASM" "$CLEAN_CWASM"
+  fi
+  if [[ ! -f "$CLEAN_CWASM" ]]; then
+    echo "[lmbench] ERROR: expected cwasm artifact '$CLEAN_CWASM' was not produced." >&2
+    exit 1
+  fi
+  cp "$CLEAN_CWASM" "$FINAL_BIN"
+done
+
+if [[ "$ARTIFACT_MODE" != "full" ]]; then
+  find "$OUT_DIR" -maxdepth 1 -type f -name '*.opt.wasm' -delete
 fi
 
 mirror_legacy_outputs
