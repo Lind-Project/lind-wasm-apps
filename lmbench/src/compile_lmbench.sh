@@ -6,8 +6,7 @@ set -euo pipefail
 # High level:
 #   1) Reuse the merged `libc.a` augmentation unless its inputs changed.
 #   2) Rebuild lmbench only when the toolchain or build inputs changed.
-#   3) Stage final artifacts under build/lmbench/, preserving lmbench's
-#      original bin/wasm32-wasi structure.
+#   3) Stage final artifacts under build/lmbench/bin.
 #   4) Require cwasm generation for the staged executables and copy the
 #      resulting .cwasm files back onto the final extensionless program names.
 #   5) Mirror canonical outputs to build/bin/lmbench/wasm32-wasi (legacy path).
@@ -136,7 +135,6 @@ mirror_legacy_outputs() {
   cp -a "$OUT_DIR/." "$legacy_out/"
   echo "[lmbench] mirrored artifacts to legacy path: $legacy_out"
 }
-
 
 BASE_LIBC="$MERGED_SYSROOT/lib/wasm32-wasi/libc.a"
 TIRPC_MERGE_DIR="$APPS_OVERLAY/usr/lib/wasm32-wasi/merge_tmp"
@@ -310,7 +308,7 @@ echo "[lmbench] building suite with REAL_CC='$REAL_CC'"
 )
 printf '%s\n' "$current_build_sig" >"$BUILD_SIG_FILE"
 
-OUT_DIR="$APPS_LMBENCH_CANON_ROOT/bin/wasm32-wasi"
+OUT_DIR="$APPS_LMBENCH_CANON_ROOT/bin"
 mkdir -p "$OUT_DIR"
 
 echo "[lmbench] staging binaries from $LM_BENCH_BIN_DIR -> $OUT_DIR"
@@ -325,7 +323,8 @@ fi
 # Here we only clear staged files inside it, which is enough to keep the
 # outputs accurate without paying for more directory churn than necessary.
 ##################
-find "$OUT_DIR" -maxdepth 1 -type f \( -name '*.wasm' -o -name '*.raw.wasm' -o -name '*.opt.wasm' -o -name '*.cwasm' -o -name '*.opt.wasm.cwasm' -o -name '*' \) -delete
+find "$OUT_DIR" -maxdepth 1 -type f -delete
+find "$LM_BENCH_BIN_DIR" -maxdepth 1 -type f \( -name '*.raw.wasm' -o -name '*.opt.wasm' -o -name '*.cwasm' -o -name '*.opt.wasm.cwasm' \) -delete
 
 shopt -s nullglob
 bin_files=("$LM_BENCH_BIN_DIR"/*)
@@ -334,9 +333,8 @@ shopt -u nullglob
 have_files=0
 for f in "${bin_files[@]}"; do
   case "$f" in
-    *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm) continue ;;
+    *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm|*/lmbench) continue ;;
   esac
-  cp "$f" "$OUT_DIR/"
   have_files=1
 done
 
@@ -345,16 +343,10 @@ if (( have_files == 0 )); then
   exit 1
 fi
 
-echo "[lmbench] staged binaries under $OUT_DIR"
-
 ##################
 # Lind expects the runtime module to include the epoch-injection transform, and
 # issue #127 further requires the final staged executable name to be backed by
-# the generated `.cwasm` artifact. We therefore keep both `.raw.wasm` and
-# `.opt.wasm` files for debugging while rewriting each staged executable's
-# extensionless program name to be a copy of the final `.cwasm`. Any
-# non-executable artifacts already copied into the staging tree are preserved
-# unchanged so config files and logs keep their original names and layout.
+# the generated `.cwasm` artifact.
 ##################
 if [[ ! -x "$WASM_OPT" ]]; then
   echo "[lmbench] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifacts."
@@ -364,19 +356,19 @@ fi
 echo "[lmbench] post-processing staged binaries under $OUT_DIR ..."
 
 shopt -s nullglob
-stage_bins=("$OUT_DIR"/*)
+stage_bins=("$LM_BENCH_BIN_DIR"/*)
 shopt -u nullglob
 
 for f in "${stage_bins[@]}"; do
   case "$f" in
-    *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm|*.raw.wasm) continue ;;
+    *.o|*.a|*.cwasm|*.opt.wasm|*.opt.wasm.cwasm|*.raw.wasm|*/lmbench) continue ;;
   esac
   if [[ ! -x "$f" ]]; then
     continue
   fi
   base="$(basename -- "$f")"
-  RAW_OUT="$OUT_DIR/${base}.raw.wasm"
-  OPT_OUT="$OUT_DIR/${base}.opt.wasm"
+  RAW_OUT="$LM_BENCH_BIN_DIR/${base}.raw.wasm"
+  OPT_OUT="$LM_BENCH_BIN_DIR/${base}.opt.wasm"
   run_limited "$JOBS" run_wasm_opt_replace "$f" "$RAW_OUT" "$OPT_OUT"
 done
 
@@ -398,11 +390,11 @@ fi
 
 echo "[lmbench] generating cwasm via lind-boot --precompile..."
 shopt -s nullglob
-opt_files=("$OUT_DIR"/*.opt.wasm)
+opt_files=("$LM_BENCH_BIN_DIR"/*.opt.wasm)
 shopt -u nullglob
 
 if (( ${#opt_files[@]} == 0 )); then
-  echo "[lmbench] ERROR: no optimized .opt.wasm files were produced under $OUT_DIR" >&2
+  echo "[lmbench] ERROR: no optimized .opt.wasm files were produced under $LM_BENCH_BIN_DIR" >&2
   exit 1
 fi
 
@@ -416,7 +408,7 @@ if ! wait_for_background_jobs; then
 fi
 
 for w in "${opt_files[@]}"; do
-  FINAL_BIN="${w%.opt.wasm}"
+  FINAL_BIN="$OUT_DIR/$(basename -- "${w%.opt.wasm}")"
   OPT_CWASM="${w%.wasm}.cwasm"
   CLEAN_CWASM="${OPT_CWASM/.opt/}"
   if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
@@ -430,7 +422,7 @@ for w in "${opt_files[@]}"; do
 done
 
 if [[ "$ARTIFACT_MODE" != "full" ]]; then
-  find "$OUT_DIR" -maxdepth 1 -type f -name '*.opt.wasm' -delete
+  find "$LM_BENCH_BIN_DIR" -maxdepth 1 -type f -name '*.opt.wasm' -delete
 fi
 
 mirror_legacy_outputs
