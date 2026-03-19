@@ -9,4 +9,4 @@ while IFS= read -r f; do
   [ -f "$dir/$f" ] || { echo "missing: $dir/$f"; exit 1; }
 done < expected-binaries.txt
 
-echo "All expected binaries are present."
+echo "SUCCESS: All expected binaries present"
