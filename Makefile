@@ -8,6 +8,7 @@ SHELL := /bin/bash
 # -------- Paths ---------------------------------------------------------------
 LIND_WASM_ROOT ?= $(HOME)/lind-wasm
 BASE_SYSROOT   ?= $(LIND_WASM_ROOT)/src/glibc/sysroot
+LLVM_BIN_DIR   ?= $(LIND_WASM_ROOT)/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin
 
 APPS_ROOT      := $(CURDIR)
 APPS_BUILD     := $(APPS_ROOT)/build
@@ -45,7 +46,7 @@ print-config:
 	@echo "APPS_BIN_DIR=$(APPS_BIN_DIR)"
 	@echo "APPS_LIB_DIR=$(APPS_LIB_DIR)"
 	@if [[ -r '$(TOOL_ENV)' ]]; then . '$(TOOL_ENV)'; \
-	  echo "CLANG=$$CLANG"; echo "AR=$$AR"; echo "RANLIB=$$RANLIB"; fi
+	  echo "CLANG=$$CLANG"; echo "AR=$$AR"; echo "RANLIB=$$RANLIB"; echo "NM=$$NM"; fi
 
 dirs:
 	mkdir -p \
@@ -69,32 +70,19 @@ $(TOOL_ENV): | dirs
 	[ -r '$(BASE_SYSROOT)/include/wasm32-wasi/stdio.h' ] || { echo "ERROR: sysroot headers missing at $(BASE_SYSROOT)"; exit 1; }
 	{
 	  set -euo pipefail
-	  CLANG_CAND=( \
-	    "$(LIND_WASM_ROOT)/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang" \
-	    "$$(command -v clang-18 || true)" \
-	    "$$(command -v clang || true)" \
-	  )
-	  AR_CAND=( \
-	    "$(LIND_WASM_ROOT)/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/llvm-ar" \
-	    "$$(command -v llvm-ar || true)" \
-	    "$$(command -v ar || true)" \
-	  )
-	  RANLIB_CAND=( \
-	    "$(LIND_WASM_ROOT)/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/llvm-ranlib" \
-	    "$$(command -v llvm-ranlib || true)" \
-	    "$$(command -v ranlib || true)" \
-	  )
-	  pick() { for x in "$$@"; do [[ -x "$$x" ]] && { echo "$$x"; return; }; done; echo ""; }
-	  CLANG="$$(pick "$${CLANG_CAND[@]}")"
-	  AR="$$(pick   "$${AR_CAND[@]}")"
-	  RANLIB="$$(pick "$${RANLIB_CAND[@]}")"
-	  [[ -x "$$CLANG"  ]] || { echo "ERROR: clang not found (tried: $${CLANG_CAND[*]})"; exit 1; }
-	  [[ -x "$$AR"     ]] || { echo "ERROR: llvm-ar/ar not found (tried: $${AR_CAND[*]})"; exit 1; }
-	  [[ -x "$$RANLIB" ]] || { echo "ERROR: llvm-ranlib/ranlib not found (tried: $${RANLIB_CAND[*]})"; exit 1; }
+	  CLANG='$(LLVM_BIN_DIR)/clang'
+	  AR='$(LLVM_BIN_DIR)/llvm-ar'
+	  RANLIB='$(LLVM_BIN_DIR)/llvm-ranlib'
+	  NM='$(LLVM_BIN_DIR)/llvm-nm'
+	  [[ -x "$$CLANG"  ]] || { echo "ERROR: expected clang at $$CLANG"; exit 1; }
+	  [[ -x "$$AR"     ]] || { echo "ERROR: expected llvm-ar at $$AR"; exit 1; }
+	  [[ -x "$$RANLIB" ]] || { echo "ERROR: expected llvm-ranlib at $$RANLIB"; exit 1; }
+	  [[ -x "$$NM"     ]] || { echo "ERROR: expected llvm-nm at $$NM"; exit 1; }
 	  {
 	    echo "export CLANG='$$CLANG'"
 	    echo "export AR='$$AR'"
 	    echo "export RANLIB='$$RANLIB'"
+	    echo "export NM='$$NM'"
 	  } > '$(TOOL_ENV)'
 	  echo "[*] preflight OK"
 	  "$$CLANG" --version | head -n1
