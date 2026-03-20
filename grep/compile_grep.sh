@@ -197,9 +197,14 @@ if [[ -x "$WASM_OPT" ]]; then
   echo "[grep] running wasm-opt…"
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
     "$GREP_WASM" -o "$GREP_OPT_WASM" || true
-  GREP_WASM="$GREP_OPT_WASM"
 else
-  echo "[grep] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+  echo "[grep] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
+fi
+
+if [[ ! -f "$GREP_OPT_WASM" ]]; then
+  echo "[grep] ERROR: Failed to generate "$GREP_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 # ----------------------------------------------------------------------
@@ -207,21 +212,13 @@ fi
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[grep] generating cwasm via lind-boot --precompile..."
-  if "$LIND_BOOT" --precompile "$GREP_WASM"; then
+  if "$LIND_BOOT" --precompile "$GREP_OPT_WASM"; then
     
-    #If wasm-opt is successful, it produces grep.opt.wasm.
-    #In that case --precompile is run on grep.opt.wasm and this produces grep.opt.cwasm
     GREP_OPT_CWASM="$SCRIPT_DIR/grep.opt.cwasm"
 
-    #If wasm-opt is not successful, then the --precompile is run on grep.wasm and this produces grep.cwasm
-    GREP_CWASM="$SCRIPT_DIR/grep.cwasm"
 
-    #Staging the final .cwasm binary to the build folder
     if [[ -f "$GREP_OPT_CWASM" ]]; then
       cp "$GREP_OPT_CWASM" "$STAGE_DIR/grep"
-      echo "[grep] grep staged as $STAGE_DIR/grep"
-    elif [[ -f "$GREP_CWASM" ]]; then
-      cp "$GREP_CWASM" "$STAGE_DIR/grep"
       echo "[grep] grep staged as $STAGE_DIR/grep"
     else
       echo "[grep] ERROR: No .cwasm binaries generated and no binaries copied to the build folder. Exiting.."

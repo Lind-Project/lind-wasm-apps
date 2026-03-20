@@ -232,9 +232,14 @@ if [[ -x "$WASM_OPT" ]]; then
   echo "[sed] running wasm-opt…"
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
     "$SED_WASM" -o "$SED_OPT_WASM" || true
-    SED_WASM="$SED_OPT_WASM"
 else
-  echo "[sed] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+  echo "[sed] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
+fi
+
+if [[ ! -f "$SED_OPT_WASM" ]]; then
+  echo "[sed] ERROR: Failed to generate "$SED_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 # ----------------------------------------------------------------------
@@ -242,23 +247,14 @@ fi
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[git] generating cwasm via lind-boot --precompile..."
-  if "$LIND_BOOT" --precompile "$SED_WASM"; then
+  if "$LIND_BOOT" --precompile "$SED_OPT_WASM"; then
     
-    #If wasm-opt is successful, it produces sed.opt.wasm.
-    #In that case --precompile is run on sed.opt.wasm and this produces sed.opt.cwasm
     SED_OPT_CWASM="$SCRIPT_DIR/sed.opt.cwasm"
 
-    #If wasm-opt is not successful, then the --precompile is run on sed.wasm and this produces sed.cwasm
-    SED_CWASM="$SCRIPT_DIR/sed.cwasm"
-
-    #Staging the final .cwasm binary to the build folder
     if [[ -f "$SED_OPT_CWASM" ]]; then
       cp "$SED_OPT_CWASM" "$STAGE_DIR/sed"
       echo "[sed] sed staged as $STAGE_DIR/sed"
-    elif [[ -f "$SED_CWASM" ]]; then
-      cp "$SED_CWASM" "$STAGE_DIR/sed"
-      echo "[sed] sed staged as $STAGE_DIR/sed"
-    else
+    else   
       echo "[sed] ERROR : No cwasm binaries generated and none copied to the build folder. Exiting .."
       exit 1
     fi

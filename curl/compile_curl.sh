@@ -180,9 +180,14 @@ if [[ -x "$WASM_OPT" ]]; then
     -O2 \
     "$CURL_WASM" \
     -o "$CURL_OPT_WASM" || true
-  CURL_WASM="$CURL_OPT_WASM"
 else
-  echo "[curl] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+  echo "[curl] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
+fi
+
+if [[ ! -f "$CURL_OPT_WASM" ]]; then
+  echo "[curl] ERROR: Failed to generate "$CURL_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 # ----------------------------------------------------------------------
@@ -190,21 +195,13 @@ fi
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[git] generating cwasm via lind-boot --precompile..."
-  if "$LIND_BOOT" --precompile "$CURL_WASM"; then
-    
-    #If wasm-opt is successful, it produces curl.opt.wasm.
-    #In that case --precompile is run on curl.opt.wasm and this produces curl.opt.cwasm
+  if "$LIND_BOOT" --precompile "$CURL_OPT_WASM"; then
+  
     CURL_OPT_CWASM="$SCRIPT_DIR/curl.opt.cwasm"
-
-    #If wasm-opt is not successful, then the --precompile is run on curl.wasm and this produces curl.cwasm
-    CURL_CWASM="$SCRIPT_DIR/curl.cwasm"
 
     #Staging the final .cwasm binary to the build folder
     if [[ -f "$CURL_OPT_CWASM" ]]; then
       cp "$CURL_OPT_CWASM" "$STAGE_DIR/curl"
-      echo "[curl] curl staged as $STAGE_DIR/curl"
-    elif [[ -f "$CURL_CWASM" ]]; then
-      cp "$CURL_CWASM" "$STAGE_DIR/curl"
       echo "[curl] curl staged as $STAGE_DIR/curl"
     else
       echo "[curl] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. "

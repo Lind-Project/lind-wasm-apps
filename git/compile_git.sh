@@ -212,9 +212,14 @@ if [[ -x "$WASM_OPT" ]]; then
   echo "[git] running wasm-opt (asyncify + optimization)..."
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
     "$GIT_WASM" -o "$GIT_OPT_WASM"
-  GIT_WASM="$GIT_OPT_WASM"
 else
-  echo "[git] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+  echo "[git] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
+fi
+
+if [[ ! -f "$GIT_OPT_WASM" ]]; then
+  echo "[git] ERROR: Failed to generate "$GIT_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 ###############################################################################
@@ -223,19 +228,12 @@ fi
 
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[git] generating cwasm via lind-boot --precompile..."
-  if "$LIND_BOOT" --precompile "$GIT_WASM"; then
+  if "$LIND_BOOT" --precompile "$GIT_OPT_WASM"; then
     
-    #If wasm-opt is successful, it produces git.opt.wasm.
-    #In that case --precompile is run on git.opt.wasm and this produces git.opt.cwasm
     GIT_OPT_CWASM="$SCRIPT_DIR/git.opt.cwasm"
 
-    #If wasm-opt is not successful, then the --precompile is run on git.wasm and this produces git.cwasm
-    GIT_CWASM="$SCRIPT_DIR/git.cwasm"
     if [[ -f "$GIT_OPT_CWASM" ]]; then
       cp "$GIT_OPT_CWASM" "$GIT_OUT_DIR/git"
-      echo "[git] git staged as $GIT_OUT_DIR/git "
-    elif [[ -f "$GIT_CWASM" ]]; then
-      cp "$GIT_CWASM" "$GIT_OUT_DIR/git"
       echo "[git] git staged as $GIT_OUT_DIR/git "
     else
       echo "[git] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting .."
