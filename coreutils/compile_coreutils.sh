@@ -8,8 +8,9 @@ set -euo pipefail
 #   1. Prepare a cross-compiling configure environment for WASI.
 #   2. Apply a small set of source/configure patches needed for this target.
 #   3. Reuse configure state when those inputs are unchanged.
-#   4. Build and stage the raw wasm outputs.
-#   5. Treat optimization and precompilation as an optional full-artifact mode.
+#   4. Build and generate wasm outputs
+#   5. Apply optimization and precompilation to generate .cwasm binaries and fail the build if .cwasm is not generated.
+#   6. Stage .cwasm binaries
 ###############################################################################
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +21,7 @@ APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
 BUILD_ROOT="$APPS_BUILD/coreutils_wasi"
 BUILD_DIR="$BUILD_ROOT/build"
-STAGE_DIR="$APPS_BUILD/coreutils/bin/coreutils"
+STAGE_DIR="$APPS_BUILD/coreutils/bin"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
@@ -32,11 +33,12 @@ LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ##################
-# These flags define the new runtime policy for the script. The default is a
-# faster path that stops after raw `.wasm` outputs, but we keep explicit
-# switches for from-scratch rebuilds and for the old richer artifact set.
+# These flags define the new runtime policy for the script. ARTIFACT_MODE=fast is a
+# faster path that stops after raw `.wasm` outputs, while the default mode 'full' 
+# enables explicit switches for from-scratch rebuilds and for the old richer artifact set
+# and generates .cwasm binary
 ##################
-ARTIFACT_MODE="${ARTIFACT_MODE:-fast}"
+ARTIFACT_MODE="${ARTIFACT_MODE:-full}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
 CACHE_REVISION="2"
@@ -468,15 +470,31 @@ if [[ ! -d "$SRC_BIN_DIR" ]]; then
   exit 1
 fi
 
-TMP_STAGE_DIR="$(mktemp -d "$BUILD_ROOT/stage.XXXXXX")"
-trap 'rm -rf "$TMP_STAGE_DIR"' EXIT
 
-##################
-# The public stage directory should only change once we know we actually have a
-# coherent set of outputs to publish. Staging into a temporary directory first
-# avoids the failure mode where we delete the old outputs and then discover
-# that this build produced nothing usable.
-##################
+# Keep intermediates in a dedicated folder instead of a temp directory
+TMP_STAGE_DIR="$BUILD_ROOT/intermediates"
+mkdir -p "$TMP_STAGE_DIR"
+
+
+###############################################################################
+# INTERMEDIATE STAGING & WASM VALIDATION
+#
+# This section safely extracts the compiled WebAssembly binaries from the raw 
+# build directory and moves them to a persistent 'intermediates' folder.
+#
+# We use an embedded Python script here because validating binary files in pure 
+# Bash is slow and error-prone. The Python script performs the following:
+#
+#   1. Scans the compiler output directory ($SRC_BIN_DIR).
+#   2. Ignores standard C/C++ build artifacts (like .o, .a, .la files).
+#   3. Performs a "Magic Number" validation: It reads the first 4 bytes of 
+#      each file to ensure it perfectly matches the WebAssembly header (\0asm).
+#   4. Copies only the verified binaries to the intermediates directory 
+#      ($TMP_STAGE_DIR) and appends a '.wasm' extension to the filename.
+#   5. Returns the total count of staged files to bash ($staged_count) so we 
+#      can abort if the build produced nothing usable.
+###############################################################################
+
 staged_count="$(
 python3 - <<'PY' "$SRC_BIN_DIR" "$TMP_STAGE_DIR"
 import os, sys
@@ -517,84 +535,73 @@ if (( ${#wasm_files[@]} == 0 )); then
   exit 1
 fi
 
-##################
-# Lind expects the runtime module to include the epoch-injection transform, so
-# the staged raw `.wasm` files are intermediate compiler outputs rather than
-# the final default artifacts. We therefore preserve those raw binaries as
-# `.raw.wasm` files and rewrite the traditional `.wasm` names to be the
-# runnable optimized modules.
-##################
 if [[ ! -x "$WASM_OPT" ]]; then
   echo "[coreutils] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifacts."
   exit 1
 fi
 
-##################
+# Convert .wasm directly to .opt.wasm
 # We can safely parallelize the expensive per-binary post-process steps because
 # each output file is independent. The worker limiter keeps that concurrency
 # tied to `JOBS` instead of spawning one process per staged binary.
 ##################
-echo "[coreutils] running wasm-opt to produce runnable staged .wasm files..."
+echo "[coreutils] Step 1: Converting .wasm to .opt.wasm..."
 for w in "${wasm_files[@]}"; do
-  raw="${w%.wasm}.raw.wasm"
-  run_limited "$JOBS" run_wasm_opt_replace "$w" "$raw" "$w"
+  opt_file="${w%.wasm}.opt.wasm"
+  run_limited "$JOBS" "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$w" -o "$opt_file"
 done
 wait_for_background_jobs
 
-##################
-# Full mode still preserves the historical `.opt.wasm` names expected by some
-# tooling, but the default `.wasm` names are now already runnable. Fast mode
-# therefore skips only the cwasm layer.
-##################
-if [[ "$ARTIFACT_MODE" != "full" ]]; then
-  echo "[coreutils] artifact mode is fast; keeping staged .wasm files runnable and skipping cwasm generation."
-  publish_stage_dir "$TMP_STAGE_DIR"
-  exit 0
+# Verify .opt.wasm generation
+shopt -s nullglob
+opt_files=("$TMP_STAGE_DIR"/*.opt.wasm)
+shopt -u nullglob
+
+if (( ${#opt_files[@]} == 0 || ${#opt_files[@]} != ${#wasm_files[@]} )); then
+  echo "[coreutils] ERROR: Failed to generate all .opt.wasm files." >&2
+  exit 1
 fi
 
+if [[ "$ARTIFACT_MODE" != "full" ]]; then
+  echo "[coreutils] artifact mode is fast; Skipping cwasm generation."
+  echo "[coreutils] ERROR: No binaries copied to build/coreutils folder"
+  exit 1
+fi
+
+if [[ ! -x "$LIND_BOOT" ]]; then
+  echo "[coreutils] ERROR: lind-boot not found at '$LIND_BOOT'." >&2
+  exit 1
+fi
+
+# Convert .opt.wasm to .cwasm
+echo "[coreutils] Step 2: Converting .opt.wasm to .cwasm..."
+for opt in "${opt_files[@]}"; do
+  run_limited "$JOBS" "$LIND_BOOT" --precompile "$opt"
+done
+wait_for_background_jobs
+
+# Verify .cwasm generation (lind-boot appends .cwasm to the input file)
 shopt -s nullglob
-wasm_files=("$TMP_STAGE_DIR"/*.wasm)
+cwasm_files=("$TMP_STAGE_DIR"/*.opt.cwasm)
 shopt -u nullglob
-for w in "${wasm_files[@]}"; do
-  cp "$w" "${w%.wasm}.opt.wasm"
+
+if (( ${#cwasm_files[@]} == 0 || ${#cwasm_files[@]} != ${#opt_files[@]} )); then
+  echo "[coreutils] ERROR: Failed to generate all .cwasm files." >&2
+  exit 1
+fi
+
+# 5. Stage only the final binaries
+echo "[coreutils] Staging final binaries to $STAGE_DIR..."
+for cw in "${cwasm_files[@]}"; do
+  # Strip out the folder path and the .opt.cwasm extensions (e.g., "ls.opt.cwasm" -> "ls")
+  binary_name="$(basename "${cw%.opt.cwasm}")"
+
+  # Copy ONLY the final, extensionless binary to your final bin/ folder
+  cp "$cw" "$STAGE_DIR/$binary_name"
 done
 
-if [[ -x "$LIND_BOOT" ]]; then
-  echo "[coreutils] generating cwasm via lind-boot --precompile..."
-  shopt -s nullglob
-  opt_files=("$TMP_STAGE_DIR"/*.opt.wasm)
-  shopt -u nullglob
-  if (( ${#opt_files[@]} > 0 )); then
-    for w in "${opt_files[@]}"; do
-      run_limited "$JOBS" "$LIND_BOOT" --precompile "$w"
-    done
-    wait_for_background_jobs
-    for w in "${opt_files[@]}"; do
-      OPT_CWASM="${w%.wasm}.cwasm"
-      CLEAN_CWASM="${OPT_CWASM/.opt/}"
-      if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-        mv "$OPT_CWASM" "$CLEAN_CWASM"
-        # Strip .cwasm extension for final staged binary (required by issue #126)
-        BINARY_NAME="$(basename "${CLEAN_CWASM%.cwasm}")"
-        cp "$CLEAN_CWASM" "$(dirname "$CLEAN_CWASM")/$BINARY_NAME"
-        echo "[coreutils] staged final binary: $(dirname "$CLEAN_CWASM")/$BINARY_NAME"
-      fi
-    done
-  else
-    for w in "${wasm_files[@]}"; do
-      run_limited "$JOBS" "$LIND_BOOT" --precompile "$w"
-    done
-    wait_for_background_jobs
-  fi
-else
-  echo "[coreutils] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-fi
-
-publish_stage_dir "$TMP_STAGE_DIR"
-trap - EXIT
-rm -rf "$TMP_STAGE_DIR"
-
 echo
-echo "[coreutils] build complete. Outputs under:"
+echo "[coreutils] Build successfully completed! Outputs under:"
 echo "  $STAGE_DIR"
+
 ls -lh "$STAGE_DIR" || true
