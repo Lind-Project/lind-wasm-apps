@@ -258,15 +258,18 @@ if [[ -x "$LIND_BOOT" ]]; then
     elif [[ -f "$SED_CWASM" ]]; then
       cp "$SED_CWASM" "$STAGE_DIR/sed"
       echo "[sed] sed staged as $STAGE_DIR/sed"
+    else
+      echo "[sed] ERROR : No cwasm binaries generated and none copied to the build folder. Exiting .."
+      exit 1
     fi
   else
-    echo "[sed] WARNING: lind-boot --precompile failed; skipping cwasm generation."
-    echo "No binaries copied to the build folder. Exiting.."
+    echo "[sed] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[sed] ERROR: No binaries copied to the build folder. Exiting.."
     exit 1
   fi
 else
-  echo "[sed] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-  echo "No binaries copied to the build folder. Exiting.."
+  echo "[sed] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[sed] ERROR: No binaries copied to the build folder. Exiting.."
   exit 1
 fi
 

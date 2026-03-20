@@ -206,15 +206,18 @@ if [[ -x "$LIND_BOOT" ]]; then
     elif [[ -f "$CURL_CWASM" ]]; then
       cp "$CURL_CWASM" "$STAGE_DIR/curl"
       echo "[curl] curl staged as $STAGE_DIR/curl"
+    else
+      echo "[curl] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. "
+      exit 1
     fi
   else
-    echo "[curl] WARNING: lind-boot --precompile failed; skipping cwasm generation."
-    echo "No binaries copied to the build folder. Exiting.."
+    echo "[curl] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[curl] ERROR: No binaries copied to the build folder. Exiting.."
     exit 1
   fi
 else
-  echo "[curl] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-  echo "No binaries copied to the build folder. Exiting.."
+  echo "[curl] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[curl] ERROR: No binaries copied to the build folder. Exiting.."
   exit 1
 fi
 

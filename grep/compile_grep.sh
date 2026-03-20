@@ -223,15 +223,18 @@ if [[ -x "$LIND_BOOT" ]]; then
     elif [[ -f "$GREP_CWASM" ]]; then
       cp "$GREP_CWASM" "$STAGE_DIR/grep"
       echo "[grep] grep staged as $STAGE_DIR/grep"
+    else
+      echo "[grep] ERROR: No .cwasm binaries generated and no binaries copied to the build folder. Exiting.."
+      exit 1
     fi
   else
-    echo "[grep] WARNING: lind-boot --precompile failed; skipping cwasm generation."
-    echo "No binaries copied to the build folder. Exiting.."
+    echo "[grep] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[grep] ERROR: No binaries copied to the build folder. Exiting.."
     exit 1
   fi
 else
-  echo "[grep] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-  echo "No binaries copied to the build folder. Exiting.."
+  echo "[grep] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[grep] ERROR: No binaries copied to the build folder. Exiting.."
   exit 1
 fi
 

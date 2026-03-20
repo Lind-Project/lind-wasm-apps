@@ -237,15 +237,18 @@ if [[ -x "$LIND_BOOT" ]]; then
     elif [[ -f "$GIT_CWASM" ]]; then
       cp "$GIT_CWASM" "$GIT_OUT_DIR/git"
       echo "[git] git staged as $GIT_OUT_DIR/git "
+    else
+      echo "[git] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting .."
+      exit 1
     fi
   else
-    echo "[git] WARNING: lind-boot --precompile failed; skipping cwasm generation."
-    echo "No binaries copied to the build folder. Exiting.."
+    echo "[git] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[git] ERROR: No binaries copied to the build folder. Exiting.."
     exit 1
   fi
 else
-  echo "[git] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-  echo "No binaries copied to the build folder. Exiting.."
+  echo "[git] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[git] ERROR: No binaries copied to the build folder. Exiting.."
   exit 1
 fi
 
