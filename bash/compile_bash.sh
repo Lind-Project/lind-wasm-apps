@@ -509,6 +509,10 @@ if [[ -x "$LIND_BOOT" ]]; then
         # Strip .cwasm extension for final staged binary (required by issue #125)
         cp "$BASH_CWASM" "$BASH_OUT_DIR/bash"
         echo "[bash] staged final binary: $BASH_OUT_DIR/bash"
+      else
+        echo "[bash] ERROR: No .cwasm binary generated and hence no binaries copied to build/bash folder." 
+	echo "[bash] ERROR: Exiting.."
+	exit 1
       fi
    else
       echo "[bash] ERROR: lind-boot --precompile failed; skipping cwasm generation."
