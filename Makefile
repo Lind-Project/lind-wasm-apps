@@ -37,12 +37,12 @@ TESTABLE_APPS  := lmbench
 TEST_APPS      ?= $(if $(APP),$(APP),$(TESTABLE_APPS))
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config test libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
 
-test:
+check-build:
 	@if [[ -z "$(strip $(TEST_APPS))" ]]; then \
 	  echo "ERROR: no apps selected; set TEST_APPS to one or more of: $(TESTABLE_APPS)"; \
 	  exit 1; \
@@ -52,7 +52,7 @@ test:
 	    *" $$app "*) ;; \
 	    *) echo "ERROR: unsupported test app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
 	  esac; \
-	  '$(APPS_ROOT)/scripts/test.sh' "$$app"; \
+	  '$(APPS_ROOT)/scripts/check-build.sh' "$$app"; \
 	done
 
 
