@@ -32,10 +32,28 @@ JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 
 LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
+# Keep this list in sync as app-specific expected-binaries manifests come online.
+TESTABLE_APPS  := lmbench
+TEST_APPS      ?= $(if $(APP),$(APP),$(TESTABLE_APPS))
+
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
+
+
+check-build:
+	@if [[ -z "$(strip $(TEST_APPS))" ]]; then \
+	  echo "ERROR: no apps selected; set TEST_APPS to one or more of: $(TESTABLE_APPS)"; \
+	  exit 1; \
+	fi
+	@for app in $(TEST_APPS); do \
+	  case " $(TESTABLE_APPS) " in \
+	    *" $$app "*) ;; \
+	    *) echo "ERROR: unsupported test app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
+	  esac; \
+	  '$(APPS_ROOT)/scripts/check-build.sh' "$$app"; \
+	done
 
 
 print-config:
