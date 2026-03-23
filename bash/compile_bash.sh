@@ -46,15 +46,16 @@ LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ##################
 # These knobs are the script-level control surface for the speedups below.
-# `ARTIFACT_MODE=fast` gives a quick development path, while `FORCE_CLEAN`
+# ``ARTIFACT_MODE=fast` gives a quick development path,while FORCE_CLEAN` 
 # and `FORCE_CONFIGURE` preserve a simple way to fall back to a from-scratch
 # rebuild when debugging or validating the cache logic.
 ##################
-ARTIFACT_MODE="${ARTIFACT_MODE:-fast}"
+ARTIFACT_MODE="${ARTIFACT_MODE:-full}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
 
-BASH_OUT_DIR="$APPS_ROOT/build/bin/bash/wasm32-wasi"
+# Output location
+BASH_OUT_DIR="$APPS_ROOT/build/bash/bin"
 BASH_STATE_DIR="$APPS_ROOT/build/.bash_state"
 HOST_SIG_FILE="$BASH_STATE_DIR/host-config.sig"
 CACHE_REVISION="2"
@@ -63,7 +64,7 @@ CACHE_REVISION="2"
 # phase is still valid. That phase is slow, and in practice it only needs to
 # rerun when bash's configure inputs change or the user explicitly asks for it.
 ##################
-mkdir -p "$BASH_OUT_DIR" "$BASH_STATE_DIR"
+mkdir -p "$BASH_OUT_DIR" "$BASH_STATE_DIR" 
 
 WASM_COMPAT_H="$BASH_ROOT/wasm_compat.h"
 
@@ -442,9 +443,10 @@ EOF
 echo "[bash] [wasm] compiling getgroups stub..."
 $CC_WASM $CFLAGS_WASM -c "$GROUPS_STUB_C" -o "$GROUPS_STUB_O"
 
-BASH_RAW_WASM="$BASH_OUT_DIR/bash.raw.wasm"
-BASH_WASM="$BASH_OUT_DIR/bash.wasm"
-rm -f "$BASH_RAW_WASM" "$BASH_WASM" "$BASH_OUT_DIR/bash.opt.wasm" "$BASH_OUT_DIR/bash.cwasm"
+BASH_RAW_WASM="$SCRIPT_DIR/bash.raw.wasm"
+BASH_WASM="$SCRIPT_DIR/bash.wasm"
+BASH_CWASM="$SCRIPT_DIR/bash.cwasm"
+rm -f "$BASH_RAW_WASM" "$BASH_WASM" "$BASH_CWASM" "$BASH_OUT_DIR/bash"
 
 echo "[bash] [wasm] linking bash -> $BASH_RAW_WASM ..."
 $CC_WASM \
@@ -477,35 +479,48 @@ fi
 # `wasm-opt` is not just an optional beautification pass here; it is part of
 # producing a runnable default artifact. We therefore keep the raw compiler
 # output for debugging as `bash.raw.wasm`, but write the runnable module to the
-# traditional `bash.wasm` path. Full mode still adds the extra alias and cwasm.
+# traditional `bash.wasm` path. Full mode still adds the extra alias and cwasm. 
 ##################
 if [[ ! -x "$WASM_OPT" ]]; then
   echo "[bash] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact."
   exit 1
 fi
 
+### Added `--fpcast-emu` flag to fix bash errors liked indirect function mismatch and others
 echo "[bash] running wasm-opt to produce runnable bash.wasm..."
-"$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
+"$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
   "$BASH_RAW_WASM" -o "$BASH_WASM"
 
-if [[ "$ARTIFACT_MODE" == "full" ]]; then
-  cp "$BASH_WASM" "$BASH_OUT_DIR/bash.opt.wasm"
-  if [[ -x "$LIND_BOOT" ]]; then
-    echo "[bash] generating cwasm via lind-boot --precompile..."
-    if "$LIND_BOOT" --precompile "$BASH_OUT_DIR/bash.opt.wasm"; then
-      OPT_CWASM="$BASH_OUT_DIR/bash.opt.cwasm"
-      CLEAN_CWASM="$BASH_OUT_DIR/bash.cwasm"
-      if [[ -f "$OPT_CWASM" ]]; then
-        mv "$OPT_CWASM" "$CLEAN_CWASM"
+### If choosing the fast path, .cwasm is not generated
+### Only .cwasm is copied to the build folder
+### The build exits after this
+
+if [[ "$ARTIFACT_MODE" == "fast" ]]; then
+	echo "[bash] artifact mode is fast; keeping bash.wasm runnable and skipping only cwasm generation."
+	echo "Only .cwasm binary is copied to build/bash folder and hence no binaries are copied"
+	echo "Exiting..."
+	exit 1
+fi
+
+if [[ -x "$LIND_BOOT" ]]; then
+   echo "[bash] generating cwasm via lind-boot --precompile..."
+   if "$LIND_BOOT" --precompile "$BASH_WASM"; then
+      if [[ -f "$BASH_CWASM" ]]; then
+        # Strip .cwasm extension for final staged binary (required by issue #125)
+        cp "$BASH_CWASM" "$BASH_OUT_DIR/bash"
+        echo "[bash] staged final binary: $BASH_OUT_DIR/bash"
+      else
+        echo "[bash] ERROR: No .cwasm binary generated and hence no binaries copied to build/bash folder." 
+	echo "[bash] ERROR: Exiting.."
+	exit 1
       fi
-    else
-      echo "[bash] WARNING: lind-boot --precompile failed; skipping cwasm generation."
-    fi
-  else
-    echo "[bash] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-  fi
+   else
+      echo "[bash] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+      exit 1
+   fi
 else
-  echo "[bash] artifact mode is fast; keeping bash.wasm runnable and skipping only cwasm generation."
+   echo "[bash] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+   exit 1
 fi
 
 popd >/dev/null

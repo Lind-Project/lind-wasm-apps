@@ -185,7 +185,7 @@ lmbench: $(MERGE_TIRPC_STAMP)
 # ---------------- bash (WASM build) -------------------------------------------
 # Uses bash/compile_bash.sh to build bash as a wasm32-wasi binary using the
 # merged sysroot and toolchain detected by preflight, and stages artifacts
-# under build/bin/bash/wasm32-wasi/.
+# under build/bash/bin.
 bash: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/bash/compile_bash.sh'
