@@ -118,7 +118,7 @@ run_wasm_opt_replace() {
   local out="$3"
   local tmp="${out}.tmp"
   cp "$src" "$raw"
-  if "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
+  if "$WASM_OPT" --fpcast-emu --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
     mv "$tmp" "$out"
   else
     rm -f "$tmp"
