@@ -34,7 +34,7 @@ LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
 # Keep this list in sync as app-specific expected-binaries manifests come online.
 TESTABLE_APPS  := lmbench
-TEST_APPS      ?= $(TESTABLE_APPS)
+TEST_APPS      ?= $(if $(APP),$(APP),$(TESTABLE_APPS))
 
 # -------- Phonies -------------------------------------------------------------
 .PHONY: all preflight dirs print-config test libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
