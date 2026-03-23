@@ -14,7 +14,7 @@ GREP_ROOT="$APPS_ROOT/grep"
 
 APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-STAGE_DIR="$APPS_BUILD/bin/grep/wasm32-wasi"
+STAGE_DIR="$APPS_BUILD/grep/usr/local/bin"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -186,8 +186,9 @@ if [[ ! -f "$GREP_BIN" ]]; then
   exit 1
 fi
 
-cp "$GREP_BIN" "$STAGE_DIR/grep.wasm"
-echo "[grep] staged grep.wasm → $STAGE_DIR/grep.wasm"
+GREP_WASM="$SCRIPT_DIR/grep.wasm"
+GREP_OPT_WASM="$SCRIPT_DIR/grep.opt.wasm"
+cp "$GREP_BIN" "$GREP_WASM"
 
 # ----------------------------------------------------------------------
 # 9) wasm-opt (best-effort)
@@ -195,34 +196,45 @@ echo "[grep] staged grep.wasm → $STAGE_DIR/grep.wasm"
 if [[ -x "$WASM_OPT" ]]; then
   echo "[grep] running wasm-opt…"
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
-    "$STAGE_DIR/grep.wasm" -o "$STAGE_DIR/grep.opt.wasm" || true
+    "$GREP_WASM" -o "$GREP_OPT_WASM" || true
 else
-  echo "[grep] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+  echo "[grep] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
+fi
+
+if [[ ! -f "$GREP_OPT_WASM" ]]; then
+  echo "[grep] ERROR: Failed to generate "$GREP_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 # ----------------------------------------------------------------------
 # 10) cwasm generation (best-effort) via lind-boot --precompile
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
-  echo "[grep] generating cwasm via lind-boot --precompile…"
-  OPT_WASM="$STAGE_DIR/grep.opt.wasm"
-  if [[ -f "$OPT_WASM" ]]; then
-    if "$LIND_BOOT" --precompile "$OPT_WASM"; then
-      OPT_CWASM="${OPT_WASM%.wasm}.cwasm"
-      CLEAN_CWASM="$STAGE_DIR/grep.cwasm"
-      if [[ -f "$OPT_CWASM" ]]; then
-        mv "$OPT_CWASM" "$CLEAN_CWASM"
-      fi
+  echo "[grep] generating cwasm via lind-boot --precompile..."
+  if "$LIND_BOOT" --precompile "$GREP_OPT_WASM"; then
+    
+    GREP_OPT_CWASM="$SCRIPT_DIR/grep.opt.cwasm"
+
+
+    if [[ -f "$GREP_OPT_CWASM" ]]; then
+      cp "$GREP_OPT_CWASM" "$STAGE_DIR/grep"
+      echo "[grep] grep staged as $STAGE_DIR/grep"
     else
-      echo "[grep] WARNING: lind-boot --precompile failed; skipping."
+      echo "[grep] ERROR: No .cwasm binaries generated and no binaries copied to the build folder. Exiting.."
+      exit 1
     fi
   else
-    "$LIND_BOOT" --precompile "$STAGE_DIR/grep.wasm" || \
-      echo "[grep] WARNING: lind-boot --precompile failed; skipping."
+    echo "[grep] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[grep] ERROR: No binaries copied to the build folder. Exiting.."
+    exit 1
   fi
 else
-  echo "[grep] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[grep] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[grep] ERROR: No binaries copied to the build folder. Exiting.."
+  exit 1
 fi
+
 
 echo
 echo "[grep] build complete. Outputs under:"
