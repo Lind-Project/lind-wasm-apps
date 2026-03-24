@@ -22,9 +22,9 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
-NGINX_BIN="bin/nginx"
+NGINX_BIN="usr/sbin/nginx"
 NGINX_CONF_DIR="$LINDFS_ROOT/etc/nginx"
-NGINX_HTML_DIR="$LINDFS_ROOT/html"
+NGINX_HTML_DIR="$LINDFS_ROOT/var/www/html"
 
 # --- configurable settings ---------------------------------------------------
 TEST_PORT="${TEST_PORT:-8080}"
@@ -80,12 +80,12 @@ http {
         listen $TEST_PORT;
         server_name localhost;
         location / {
-            root   /html;
+            root   /var/www/html;
             index  index.html index.htm;
         }
         error_page 500 502 503 504 /50x.html;
         location = /50x.html {
-            root /html;
+            root /var/www/html;
         }
     }
 }
