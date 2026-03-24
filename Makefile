@@ -33,6 +33,11 @@ JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
 # Keep this list in sync as app-specific expected-binaries manifests come online.
+# Usage:
+#   make check-build                # runs the full TESTABLE_APPS list
+#   make check-build APP=nginx      # runs a single app on demand
+#   make check-build APP="nginx grep sed"  # also works for multiple apps
+#   make check-build TEST_APPS="nginx grep sed"  # runs multiple apps on demand
 TESTABLE_APPS  := bash coreutils cpython curl git grep lmbench sed tinycc
 TEST_APPS      ?= $(if $(APP),$(APP),$(TESTABLE_APPS))
 
