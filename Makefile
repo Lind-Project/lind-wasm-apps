@@ -33,7 +33,7 @@ JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
 # Keep this list in sync as app-specific expected-binaries manifests come online.
-TESTABLE_APPS  := lmbench
+TESTABLE_APPS  := bash coreutils cpython curl git grep lmbench sed tinycc
 TEST_APPS      ?= $(if $(APP),$(APP),$(TESTABLE_APPS))
 
 # -------- Phonies -------------------------------------------------------------
