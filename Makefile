@@ -276,7 +276,7 @@ install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
 
 install-nginx:
-	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' nginx
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' nginx
 
 install-git:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' git
