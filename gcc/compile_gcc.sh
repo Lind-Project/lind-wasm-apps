@@ -91,19 +91,23 @@ mkdir -p "$STAGE_DIR"
 # ----------------------------------------------------------------------
 LIBCXX_INCLUDE="$MERGED_SYSROOT/include/wasm32-wasi/c++/v1"
 
-# -matomics and -mbulk-memory are wasm32-only flags — they MUST live in CC/CXX
-# (not CFLAGS/CXXFLAGS) because GCC's build system also passes CFLAGS/CXXFLAGS
-# to CC_FOR_BUILD (native g++), which doesn't understand them.
-CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread -matomics -mbulk-memory"
+# GCC's build system passes CFLAGS/CXXFLAGS to BOTH the cross-compiler (CC)
+# and the native build compiler (CC_FOR_BUILD).  ALL wasm-specific flags —
+# target, sysroot, include paths, -matomics, -mbulk-memory, libc++ — MUST
+# live in CC/CXX so that native g++ never sees them.
+CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT \
+  -pthread -matomics -mbulk-memory \
+  -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi"
 
-CXX_WASM="$CLANGXX --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread -matomics -mbulk-memory \
-  -stdlib=libc++ -isystem $LIBCXX_INCLUDE -fno-exceptions"
+CXX_WASM="$CLANGXX --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT \
+  -pthread -matomics -mbulk-memory \
+  -stdlib=libc++ -isystem $LIBCXX_INCLUDE -fno-exceptions \
+  -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi"
 
-CFLAGS_WASM="-O2 -g \
-  -I$MERGED_SYSROOT/include \
-  -I$MERGED_SYSROOT/include/wasm32-wasi"
-
-CXXFLAGS_WASM="$CFLAGS_WASM -isystem $LIBCXX_INCLUDE"
+# CFLAGS/CXXFLAGS must contain ONLY portable flags that native g++ also
+# understands — no paths, no wasm flags.
+CFLAGS_WASM="-O2 -g"
+CXXFLAGS_WASM="-O2 -g"
 
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
   -Wl,--export=__stack_pointer,--export=__stack_low \
@@ -186,6 +190,9 @@ pushd "$GCC_BUILD" >/dev/null
   CC_FOR_BUILD=gcc \
   CXX_FOR_BUILD=g++ \
   AR_FOR_BUILD=ar \
+  CFLAGS_FOR_BUILD="-O2 -g" \
+  CXXFLAGS_FOR_BUILD="-O2 -g" \
+  LDFLAGS_FOR_BUILD="" \
   CC="$CC_WASM" \
   CXX="$CXX_WASM" \
   AR="$AR" \
