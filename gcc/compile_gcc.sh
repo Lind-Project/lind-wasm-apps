@@ -149,18 +149,17 @@ for dir in gmp mpfr mpc; do
   fi
 done
 
-# Patch MPFR's configure script to skip float128 detection.
+# Patch MPFR's configure script to disable float128.
 # MPFR detects __float128 support (clang accepts it), then adds
 # -D_Float128=__float128 which conflicts with the WASI sysroot's
 # "typedef __float128 _Float128;" in bits/floatn.h.
 # MPFR's configure runs during 'make all-gcc', so we must patch the
-# source-level configure script, not any generated files.
+# source-level configure script.  Injecting enable_float128=no has
+# the same effect as passing --disable-float128 on the command line.
 MPFR_CONFIGURE="$GCC_SRC/mpfr/configure"
 if [[ -f "$MPFR_CONFIGURE" ]] && ! grep -q 'PATCHED_FOR_WASI' "$MPFR_CONFIGURE"; then
-  echo "[gcc] [patch] disabling float128 detection in MPFR configure…"
-  sed -i '/mpfr_cv_want_float128/!b; /mpfr_cv_want_float128=no/b; s/mpfr_cv_want_float128=.*/mpfr_cv_want_float128=no # PATCHED_FOR_WASI/' "$MPFR_CONFIGURE"
-  # Also force-set it at the top of configure as a fallback
-  sed -i '2i\mpfr_cv_want_float128=no # PATCHED_FOR_WASI' "$MPFR_CONFIGURE"
+  echo "[gcc] [patch] disabling float128 in MPFR configure…"
+  sed -i '2i\enable_float128=no  # PATCHED_FOR_WASI' "$MPFR_CONFIGURE"
   echo "[gcc] [patch] done"
 fi
 
