@@ -149,6 +149,21 @@ for dir in gmp mpfr mpc; do
   fi
 done
 
+# Patch MPFR's configure script to skip float128 detection.
+# MPFR detects __float128 support (clang accepts it), then adds
+# -D_Float128=__float128 which conflicts with the WASI sysroot's
+# "typedef __float128 _Float128;" in bits/floatn.h.
+# MPFR's configure runs during 'make all-gcc', so we must patch the
+# source-level configure script, not any generated files.
+MPFR_CONFIGURE="$GCC_SRC/mpfr/configure"
+if [[ -f "$MPFR_CONFIGURE" ]] && ! grep -q 'PATCHED_FOR_WASI' "$MPFR_CONFIGURE"; then
+  echo "[gcc] [patch] disabling float128 detection in MPFR configure…"
+  sed -i '/mpfr_cv_want_float128/!b; /mpfr_cv_want_float128=no/b; s/mpfr_cv_want_float128=.*/mpfr_cv_want_float128=no # PATCHED_FOR_WASI/' "$MPFR_CONFIGURE"
+  # Also force-set it at the top of configure as a fallback
+  sed -i '2i\mpfr_cv_want_float128=no # PATCHED_FOR_WASI' "$MPFR_CONFIGURE"
+  echo "[gcc] [patch] done"
+fi
+
 popd >/dev/null
 
 # ----------------------------------------------------------------------
@@ -233,31 +248,6 @@ if [[ ! -f Makefile ]]; then
   echo "[gcc] ERROR: configure failed to produce Makefile." >&2
   exit 1
 fi
-
-# ----------------------------------------------------------------------
-# 5b) Patch MPFR config to disable float128
-# ----------------------------------------------------------------------
-# MPFR's configure detects __float128 (clang accepts it), but the WASI
-# sysroot's bits/floatn.h already typedefs _Float128, so MPFR's
-# -D_Float128=__float128 macro creates "typedef __float128 __float128;"
-# which is invalid.  Strip float128 support from MPFR's generated config.
-MPFR_CONFIG_H="$GCC_BUILD/mpfr/src/mpfr.h"
-MPFR_CONFIG_H2="$GCC_BUILD/mpfr/config.h"
-for f in "$MPFR_CONFIG_H" "$MPFR_CONFIG_H2"; do
-  if [[ -f "$f" ]]; then
-    if grep -q 'MPFR_WANT_FLOAT128' "$f"; then
-      sed -i 's/#define MPFR_WANT_FLOAT128.*/#undef MPFR_WANT_FLOAT128/' "$f"
-      echo "[gcc] [patch] disabled MPFR_WANT_FLOAT128 in $f"
-    fi
-  fi
-done
-# Also strip from the libtool compile flags cached in MPFR's Makefile
-for mf in "$GCC_BUILD/mpfr/Makefile" "$GCC_BUILD/mpfr/src/Makefile"; do
-  if [[ -f "$mf" ]]; then
-    sed -i 's/-DMPFR_WANT_FLOAT128=[0-9]*//g; s/-D_Float128=__float128//g' "$mf"
-    echo "[gcc] [patch] stripped float128 defines from $mf"
-  fi
-done
 
 # ----------------------------------------------------------------------
 # 6) Build (compiler only — no target libraries)
