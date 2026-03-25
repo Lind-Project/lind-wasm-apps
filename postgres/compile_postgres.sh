@@ -357,6 +357,12 @@ if [[ -f "$PG_CONFIG_H" ]]; then
   if ! grep -q '#define HAVE_SPINLOCKS' "$PG_CONFIG_H"; then
     echo '#define HAVE_SPINLOCKS 1' >> "$PG_CONFIG_H"
   fi
+
+  # Force signalfd off — not implemented in lind-wasm
+  if grep -q '#define HAVE_SYS_SIGNALFD_H' "$PG_CONFIG_H"; then
+    echo "[postgres] [wasm] disabling signalfd in pg_config.h..."
+    sed -i 's/#define HAVE_SYS_SIGNALFD_H.*$/\/* #undef HAVE_SYS_SIGNALFD_H -- disabled for WASI *\//' "$PG_CONFIG_H"
+  fi
 fi
 
 # Patch out the root-user check — inside the Lind sandbox geteuid() returns 0
@@ -365,6 +371,13 @@ MAIN_C="$PG_ROOT/src/backend/main/main.c"
 if grep -q 'if (geteuid() == 0)' "$MAIN_C" 2>/dev/null; then
   echo "[postgres] [wasm] patching out root-user check in main.c..."
   sed -i 's/if (geteuid() == 0)/if (0 \/* geteuid() == 0 -- disabled for WASI *\/)/' "$MAIN_C"
+fi
+
+# Patch out the root-user check in initdb too
+INITDB_C="$PG_ROOT/src/bin/initdb/initdb.c"
+if grep -q '#ifndef WIN32' "$INITDB_C" 2>/dev/null; then
+  echo "[postgres] [wasm] patching out root-user check in initdb.c..."
+  sed -i 's/#ifndef WIN32/#if !defined(WIN32) \&\& !defined(__wasi__)/' "$INITDB_C"
 fi
 
 # --- Compile WASI stubs -----------------------------------------------------
