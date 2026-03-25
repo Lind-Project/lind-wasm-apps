@@ -97,6 +97,8 @@ setsid $LIND_RUN "$NGINX_BIN" -p / -c "$TEST_CONF" \
     >"$NGINX_LOG" 2>&1 &
 NGINX_PID=$!
 
+# FIX 1: Readiness check now also verifies the Server header identifies nginx,
+# so we don't accidentally proceed against some other process on the port.
 READY=false
 for (( i=0; i<STARTUP_TIMEOUT; i++ )); do
     if ! kill -0 "$NGINX_PID" 2>/dev/null; then
@@ -106,8 +108,12 @@ for (( i=0; i<STARTUP_TIMEOUT; i++ )); do
         exit 1
     fi
     if curl -s -o /dev/null "http://localhost:$TEST_PORT/" 2>/dev/null; then
-        READY=true
-        break
+        server_header="$(curl -sI "http://localhost:$TEST_PORT/" 2>/dev/null \
+            | grep -i '^Server:' | tr -d '\r' || true)"
+        if echo "$server_header" | grep -qi "nginx"; then
+            READY=true
+            break
+        fi
     fi
     sleep 1
 done
@@ -121,17 +127,20 @@ fi
 echo "$PREFIX nginx ready (PID $NGINX_PID)"
 
 # --- test helpers ------------------------------------------------------------
+# FIX 4: All output from run_test (PASS/FAIL lines + any failure details) is
+# now piped through tee so the log file captures the full test results, not
+# just the header/footer summary.
 run_test() {
     local name="$1"
     shift
     local test_output
     if test_output=$("$@" 2>&1); then
-        echo "$PREFIX [PASS] $name"
+        echo "$PREFIX [PASS] $name" | tee -a "$LOG_FILE"
         (( PASS_COUNT++ )) || true
     else
-        echo "$PREFIX [FAIL] $name"
+        echo "$PREFIX [FAIL] $name" | tee -a "$LOG_FILE"
         if [[ -n "${test_output:-}" ]]; then
-            echo "$PREFIX        output: $(echo "$test_output" | head -3)"
+            echo "$PREFIX        output: $(echo "$test_output" | head -3)" | tee -a "$LOG_FILE"
         fi
         (( FAIL_COUNT++ )) || true
         FAILURES+=("$name")
@@ -181,10 +190,12 @@ test_content_length() {
     [[ "$body_len" -eq "$cl" ]] || { echo "$PREFIX        Content-Length=$cl but body is $body_len bytes" >&2; return 1; }
 }
 
+# FIX 2: POST to a static-file-only nginx should consistently return 405.
+# Accepting 200 as well made the contract ambiguous -- we now enforce 405.
 test_post_method() {
     local status
     status="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/")"
-    [[ "$status" == "405" || "$status" == "200" ]] || { echo "$PREFIX        expected 405 or 200, got $status" >&2; return 1; }
+    [[ "$status" == "405" ]] || { echo "$PREFIX        expected 405, got $status" >&2; return 1; }
 }
 
 test_sequential_requests() {
@@ -195,15 +206,19 @@ test_sequential_requests() {
     done
 }
 
+# FIX 3: Two 200s don't prove connection reuse -- curl could have opened two
+# separate connections and both succeeded.  We now parse curl's verbose output
+# for the explicit "Re-using existing connection" / "reuse" message, which only
+# appears when the TCP connection was actually kept alive and reused.
 test_keepalive() {
     local output
     output="$(curl -v -s -o /dev/null "$BASE_URL/" "$BASE_URL/" 2>&1)"
-    if echo "$output" | grep -qi "re-using existing connection\|reusing existing connection\|Re-using"; then
+    if echo "$output" | grep -qiE \
+        "re-using existing connection|reusing existing connection|Re-using|reuse conn"; then
         return 0
     fi
-    local count
-    count="$(echo "$output" | grep -c '< HTTP/1.1 200' || true)"
-    [[ "$count" -ge 2 ]] || { echo "$PREFIX        keepalive connection reuse not detected" >&2; return 1; }
+    echo "$PREFIX        keepalive connection reuse message not found in curl output" >&2
+    return 1
 }
 
 test_concurrent_requests() {
@@ -227,9 +242,11 @@ test_concurrent_requests() {
 }
 
 # --- run tests ---------------------------------------------------------------
-echo "" | tee "$LOG_FILE"
-echo "$PREFIX === Running nginx tests ===" | tee -a "$LOG_FILE"
-echo "" | tee -a "$LOG_FILE"
+# FIX 4 (cont.): Initialize the log file here and tee the section header into
+# it so the file always starts clean and captures everything from this run.
+: > "$LOG_FILE"
+{ echo ""; echo "$PREFIX === Running nginx tests ==="; echo ""; } | tee -a "$LOG_FILE"
+
 run_test "GET index page"               test_get_index
 run_test "HEAD request"                  test_head_request
 run_test "404 error page"               test_404_error
@@ -242,15 +259,18 @@ run_test "Concurrent requests"           test_concurrent_requests
 
 # --- report ------------------------------------------------------------------
 TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
-echo ""
-echo "$PREFIX $PASS_COUNT/$TOTAL tests passed, $FAIL_COUNT failed"
-if [[ ${#FAILURES[@]} -gt 0 ]]; then
-    echo "$PREFIX failed tests:"
-    for f in "${FAILURES[@]}"; do
-        echo "$PREFIX   - $f"
-    done
-fi
-echo "$PREFIX Log saved to: $LOG_FILE"
+{
+    echo ""
+    echo "$PREFIX $PASS_COUNT/$TOTAL tests passed, $FAIL_COUNT failed"
+    if [[ ${#FAILURES[@]} -gt 0 ]]; then
+        echo "$PREFIX failed tests:"
+        for f in "${FAILURES[@]}"; do
+            echo "$PREFIX   - $f"
+        done
+    fi
+    echo "$PREFIX Log saved to: $LOG_FILE"
+} | tee -a "$LOG_FILE"
+
 cleanup
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
     exit 1
