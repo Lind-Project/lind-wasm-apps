@@ -14,7 +14,7 @@ SED_ROOT="$APPS_ROOT/sed"
 
 APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-STAGE_DIR="$APPS_BUILD/bin/sed/wasm32-wasi"
+STAGE_DIR="$APPS_BUILD/sed/usr/local/bin"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -66,7 +66,7 @@ CFLAGS_WASM=(
 )
 
 LDFLAGS_WASM=(
-  "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low"
+  "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
   -L"$MERGED_SYSROOT/lib/wasm32-wasi"
   -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
 )
@@ -218,8 +218,12 @@ if [[ ! -f "$SED_BIN" ]]; then
   exit 1
 fi
 
-cp "$SED_BIN" "$STAGE_DIR/sed.wasm"
-echo "[sed] staged sed.wasm → $STAGE_DIR/sed.wasm"
+
+
+SED_WASM="$SCRIPT_DIR/sed.wasm"
+SED_OPT_WASM="$SCRIPT_DIR/sed.opt.wasm"
+cp "$SED_BIN" "$SED_WASM"
+
 
 # ----------------------------------------------------------------------
 # 9) wasm-opt (best-effort)
@@ -227,33 +231,42 @@ echo "[sed] staged sed.wasm → $STAGE_DIR/sed.wasm"
 if [[ -x "$WASM_OPT" ]]; then
   echo "[sed] running wasm-opt…"
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
-    "$STAGE_DIR/sed.wasm" -o "$STAGE_DIR/sed.opt.wasm" || true
+    "$SED_WASM" -o "$SED_OPT_WASM" || true
 else
-  echo "[sed] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+  echo "[sed] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
+fi
+
+if [[ ! -f "$SED_OPT_WASM" ]]; then
+  echo "[sed] ERROR: Failed to generate "$SED_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 # ----------------------------------------------------------------------
 # 10) cwasm generation (best-effort) via lind-boot --precompile
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
-  echo "[sed] generating cwasm via lind-boot --precompile…"
-  OPT_WASM="$STAGE_DIR/sed.opt.wasm"
-  if [[ -f "$OPT_WASM" ]]; then
-    if "$LIND_BOOT" --precompile "$OPT_WASM"; then
-      OPT_CWASM="${OPT_WASM%.wasm}.cwasm"
-      CLEAN_CWASM="$STAGE_DIR/sed.cwasm"
-      if [[ -f "$OPT_CWASM" ]]; then
-        mv "$OPT_CWASM" "$CLEAN_CWASM"
-      fi
-    else
-      echo "[sed] WARNING: lind-boot --precompile failed; skipping."
+  echo "[git] generating cwasm via lind-boot --precompile..."
+  if "$LIND_BOOT" --precompile "$SED_OPT_WASM"; then
+    
+    SED_OPT_CWASM="$SCRIPT_DIR/sed.opt.cwasm"
+
+    if [[ -f "$SED_OPT_CWASM" ]]; then
+      cp "$SED_OPT_CWASM" "$STAGE_DIR/sed"
+      echo "[sed] sed staged as $STAGE_DIR/sed"
+    else   
+      echo "[sed] ERROR : No cwasm binaries generated and none copied to the build folder. Exiting .."
+      exit 1
     fi
   else
-    "$LIND_BOOT" --precompile "$STAGE_DIR/sed.wasm" || \
-      echo "[sed] WARNING: lind-boot --precompile failed; skipping."
+    echo "[sed] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[sed] ERROR: No binaries copied to the build folder. Exiting.."
+    exit 1
   fi
 else
-  echo "[sed] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[sed] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[sed] ERROR: No binaries copied to the build folder. Exiting.."
+  exit 1
 fi
 
 echo

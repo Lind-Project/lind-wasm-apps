@@ -53,7 +53,7 @@ LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
 # Output location
-GIT_OUT_DIR="$APPS_ROOT/build/bin/git/wasm32-wasi"
+GIT_OUT_DIR="$APPS_ROOT/build/git/usr/local/bin"
 mkdir -p "$GIT_OUT_DIR"
 
 # --- sanity checks -----------------------------------------------------------
@@ -79,7 +79,7 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
   -I$MERGED_SYSROOT/include/wasm32-wasi"
 
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
-  -Wl,--export=__stack_pointer,--export=__stack_low,--shared-memory \
+  -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base,--shared-memory \
   -L$MERGED_SYSROOT/lib/wasm32-wasi \
   -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
 
@@ -198,23 +198,28 @@ if [[ ! -f git ]]; then
   exit 1
 fi
 
-cp git "$GIT_OUT_DIR/git.wasm"
-echo "[git] staged: $GIT_OUT_DIR/git.wasm"
+GIT_WASM="$SCRIPT_DIR/git.wasm"
+GIT_OPT_WASM="$SCRIPT_DIR/git.opt.wasm"
+
+cp git "$GIT_WASM"
 
 ###############################################################################
 # 4. wasm-opt (best-effort)
 ###############################################################################
 
-GIT_WASM="$GIT_OUT_DIR/git.wasm"
 
 if [[ -x "$WASM_OPT" ]]; then
   echo "[git] running wasm-opt (asyncify + optimization)..."
-  OPT_WASM="$GIT_OUT_DIR/git.opt.wasm"
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
-    "$GIT_WASM" -o "$OPT_WASM"
-  GIT_WASM="$OPT_WASM"
+    "$GIT_WASM" -o "$GIT_OPT_WASM"
 else
-  echo "[git] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+  echo "[git] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
+fi
+
+if [[ ! -f "$GIT_OPT_WASM" ]]; then
+  echo "[git] ERROR: Failed to generate "$GIT_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 ###############################################################################
@@ -223,18 +228,26 @@ fi
 
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[git] generating cwasm via lind-boot --precompile..."
-  if "$LIND_BOOT" --precompile "$GIT_WASM"; then
-    # Rename git.opt.cwasm -> git.cwasm (drop .opt)
-    OPT_CWASM="${GIT_WASM%.wasm}.cwasm"
-    CLEAN_CWASM="${OPT_CWASM/.opt/}"
-    if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-      mv "$OPT_CWASM" "$CLEAN_CWASM"
+  if "$LIND_BOOT" --precompile "$GIT_OPT_WASM"; then
+    
+    GIT_OPT_CWASM="$SCRIPT_DIR/git.opt.cwasm"
+
+    if [[ -f "$GIT_OPT_CWASM" ]]; then
+      cp "$GIT_OPT_CWASM" "$GIT_OUT_DIR/git"
+      echo "[git] git staged as $GIT_OUT_DIR/git "
+    else
+      echo "[git] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting .."
+      exit 1
     fi
   else
-    echo "[git] WARNING: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[git] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[git] ERROR: No binaries copied to the build folder. Exiting.."
+    exit 1
   fi
 else
-  echo "[git] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[git] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[git] ERROR: No binaries copied to the build folder. Exiting.."
+  exit 1
 fi
 
 popd >/dev/null

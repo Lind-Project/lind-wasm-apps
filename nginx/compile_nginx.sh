@@ -51,10 +51,29 @@ WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
+##################
+# These script-level knobs are where the new performance policy lives.
+# `ARTIFACT_MODE=fast` means "build the actual nginx wasm binary quickly,"
+# while the force flags preserve an explicit path back to the old
+# always-refresh behavior when that is useful for debugging.
+##################
+ARTIFACT_MODE="${ARTIFACT_MODE:-fast}"
+FORCE_CLEAN="${FORCE_CLEAN:-0}"
+FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
+CACHE_REVISION="2"
 
 # Output location
 NGINX_OUT_DIR="$APPS_ROOT/build/bin/nginx/wasm32-wasi"
 mkdir -p "$NGINX_OUT_DIR"
+NGINX_STATE_DIR="$APPS_ROOT/build/.nginx_state"
+CONFIG_SIG_FILE="$NGINX_STATE_DIR/config.sig"
+##################
+# nginx's expensive step is not the final `make`; it is the patch-plus-
+# configure pipeline that prepares `objs/Makefile` and `objs/ngx_auto_config.h`.
+# Persisting a signature for that state lets repeated runs skip a lot of shell
+# and configure work when none of the inputs changed.
+##################
+mkdir -p "$NGINX_STATE_DIR"
 
 # WASM compatibility header
 WASM_COMPAT_H="$NGINX_ROOT/wasm_compat.h"
@@ -94,7 +113,7 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
 # LINK make override at build time (not via --with-ld-opt, which configure
 # would test and fail for WASM-specific flags).
 LDFLAGS_WASM="-Wl,--shared-memory,--import-memory,--export-memory,--max-memory=67108864 \
-    -Wl,--export=__stack_pointer,--export=__stack_low \
+    -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base \
     -L$MERGED_SYSROOT/lib/wasm32-wasi \
     -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
 
@@ -103,7 +122,100 @@ echo "[nginx] using AR           = $AR"
 echo "[nginx] LIND_WASM_ROOT     = $LIND_WASM_ROOT"
 echo "[nginx] merged sysroot     = $MERGED_SYSROOT"
 echo "[nginx] output dir         = $NGINX_OUT_DIR"
+echo "[nginx] artifact mode      = $ARTIFACT_MODE"
 echo
+
+##################
+# `hash_file` and `write_if_changed` are the basic building blocks for the
+# incremental behavior below. The first gives us a deterministic signature of
+# configure inputs; the second keeps generated patches stable so we do not
+# trigger rebuilds merely by touching files with identical content.
+##################
+hash_file() {
+    local path="$1"
+    if [[ -e "$path" ]]; then
+        sha256sum "$path" | awk '{print $1}'
+    else
+        echo "missing"
+    fi
+}
+
+write_if_changed() {
+    local dest="$1"
+    local tmp
+    tmp="$(mktemp)"
+    cat >"$tmp"
+    if [[ -f "$dest" ]] && cmp -s "$tmp" "$dest"; then
+        rm -f "$tmp"
+        return 0
+    fi
+    mkdir -p "$(dirname "$dest")"
+    mv "$tmp" "$dest"
+    return 0
+}
+
+##################
+# nginx's configure phase is heavily influenced by the patched `auto/*`
+# scripts and by the exact configure argument list we pass here. We hash that
+# whole picture so "reuse existing configure state" is a precise statement, not
+# a guess based only on whether `objs/Makefile` happens to exist.
+##################
+config_signature() {
+    local configure_args
+    configure_args=$(
+        cat <<EOF
+--crossbuild=Linux::wasm32
+--with-cc=$CLANG
+--with-cc-opt=--target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT $CFLAGS_WASM
+--prefix=/usr/local/nginx
+--conf-path=/etc/nginx/nginx.conf
+--error-log-path=/var/log/nginx/error.log
+--http-log-path=/var/log/nginx/access.log
+--pid-path=/var/run/nginx.pid
+--lock-path=/var/run/nginx.lock
+--with-poll_module
+--without-select_module
+--without-http_rewrite_module
+--without-http_gzip_module
+--without-http_ssi_module
+--without-http_userid_module
+--without-http_auth_basic_module
+--without-http_mirror_module
+--without-http_autoindex_module
+--without-http_geo_module
+--without-http_map_module
+--without-http_split_clients_module
+--without-http_referer_module
+--without-http_fastcgi_module
+--without-http_uwsgi_module
+--without-http_scgi_module
+--without-http_grpc_module
+--without-http_memcached_module
+--without-http_empty_gif_module
+--without-http_browser_module
+--without-http_upstream_hash_module
+--without-http_upstream_ip_hash_module
+--without-http_upstream_least_conn_module
+--without-http_upstream_random_module
+--without-http_upstream_keepalive_module
+--without-http_upstream_zone_module
+--without-pcre
+EOF
+    )
+    cat <<EOF | sha256sum | awk '{print $1}'
+rev=$CACHE_REVISION
+configure=$(hash_file "$NGINX_ROOT/configure")
+auto_unix=$(hash_file "$NGINX_ROOT/auto/unix")
+auto_sizeof=$(hash_file "$NGINX_ROOT/auto/types/sizeof")
+auto_typedef=$(hash_file "$NGINX_ROOT/auto/types/typedef")
+auto_feature=$(hash_file "$NGINX_ROOT/auto/feature")
+clang=$CLANG
+merged=$MERGED_SYSROOT
+cflags=$CFLAGS_WASM
+ldflags=$LDFLAGS_WASM
+args=$configure_args
+EOF
+}
 
 pushd "$NGINX_ROOT" >/dev/null
 
@@ -111,11 +223,36 @@ pushd "$NGINX_ROOT" >/dev/null
 # 1. Clean any previous build
 ###############################################################################
 
-echo "[nginx] cleaning any previous build..."
-if [[ -f Makefile ]]; then
-    make clean >/dev/null 2>&1 || true
+##################
+# The old script always cleaned and reconfigured nginx. That is reliable, but
+# it is also one of the biggest avoidable costs in repeated builds. Here we
+# recompute a signature and only refresh configure state when the signature
+# changed, the generated files are missing, or the caller explicitly forces it.
+##################
+current_config_sig="$(config_signature)"
+need_configure=0
+if [[ "$FORCE_CLEAN" == "1" || "$FORCE_CONFIGURE" == "1" ]]; then
+    need_configure=1
 fi
-rm -rf objs
+if [[ ! -f "$CONFIG_SIG_FILE" ]] || [[ "$(cat "$CONFIG_SIG_FILE" 2>/dev/null || true)" != "$current_config_sig" ]]; then
+    need_configure=1
+fi
+if [[ ! -f objs/Makefile ]]; then
+    need_configure=1
+fi
+if [[ ! -f objs/ngx_auto_config.h ]]; then
+    need_configure=1
+fi
+
+if (( need_configure )); then
+    echo "[nginx] refreshing configure state..."
+    if [[ -f Makefile ]]; then
+        make clean >/dev/null 2>&1 || true
+    fi
+    rm -rf objs
+else
+    echo "[nginx] reusing existing configure state..."
+fi
 
 ###############################################################################
 # 1.5. Patch auto/types/sizeof for cross-compilation
@@ -123,9 +260,16 @@ rm -rf objs
 
 # nginx's configure tries to compile and RUN a program to detect type sizes.
 # This fails for cross-compilation. We patch it to use compile-time sizeof check.
+##################
+# These `auto/*` rewrites are not new behavior; they are the compatibility
+# layer that makes nginx's configure scripts usable in a WASM cross-build.
+# The change here is that we only regenerate them when configure state really
+# needs to be refreshed, and we write them in a content-preserving way.
+##################
+if (( need_configure )); then
 echo "[nginx] patching auto/types/sizeof for cross-compilation..."
 
-cat > auto/types/sizeof << 'SIZEOF_PATCH'
+write_if_changed auto/types/sizeof << 'SIZEOF_PATCH'
 
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
@@ -247,7 +391,7 @@ SIZEOF_PATCH
 # It checks if the binary is executable, but WASM binaries aren't native executables
 echo "[nginx] patching auto/types/typedef for cross-compilation..."
 
-cat > auto/types/typedef << 'TYPEDEF_PATCH'
+write_if_changed auto/types/typedef << 'TYPEDEF_PATCH'
 
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
@@ -338,7 +482,7 @@ TYPEDEF_PATCH
 # Also patch auto/feature to check for file existence instead of executable
 echo "[nginx] patching auto/feature for cross-compilation..."
 
-cat > auto/feature << 'FEATURE_PATCH'
+write_if_changed auto/feature << 'FEATURE_PATCH'
 
 # Copyright (C) Igor Sysoev
 # Copyright (C) Nginx, Inc.
@@ -471,11 +615,19 @@ fi
 rm -rf $NGX_AUTOTEST*
 
 FEATURE_PATCH
+fi
 
 ###############################################################################
 # 2. Configure nginx for WASM cross-compilation
 ###############################################################################
 
+##################
+# Configure is gated behind the same signature decision because the generated
+# `objs/Makefile` and feature headers are a function of both the patched auto
+# scripts and the exact flag set. Reusing them is safe precisely when that
+# signature is unchanged.
+##################
+if (( need_configure )); then
 echo "[nginx] configuring for wasm32-wasi cross-compilation..."
 
 # Configure nginx with minimal modules for WASM compatibility
@@ -530,11 +682,19 @@ echo "[nginx] configuring for wasm32-wasi cross-compilation..."
     --without-http_upstream_keepalive_module \
     --without-http_upstream_zone_module \
     --without-pcre
+fi
 
 ###############################################################################
 # 3. Patch generated files for WASI compatibility
 ###############################################################################
 
+##################
+# `objs/ngx_auto_config.h` is patched after configure because some probes can
+# compile in a cross-build even when the resulting feature should not be
+# considered available for our WASI/Lind runtime. We keep that logic, but only
+# rerun it when configure state was actually rebuilt.
+##################
+if (( need_configure )); then
 echo "[nginx] patching generated configuration for WASI..."
 
 # Patch objs/ngx_auto_config.h to disable features that configure may have
@@ -591,6 +751,14 @@ if [[ -f objs/ngx_auto_config.h ]]; then
 
     echo "[nginx] patched objs/ngx_auto_config.h"
 fi
+##################
+# We recompute the signature after patching because the patched `auto/*` files
+# are themselves part of the configure input set. Saving the post-patch digest
+# is what makes the configure cache reusable on the next invocation.
+##################
+current_config_sig="$(config_signature)"
+printf '%s\n' "$current_config_sig" >"$CONFIG_SIG_FILE"
+fi
 
 ###############################################################################
 # 4. Build nginx
@@ -612,38 +780,53 @@ if [[ ! -f objs/nginx ]]; then
 fi
 
 # Copy the binary to output directory
-cp objs/nginx "$NGINX_OUT_DIR/nginx.wasm"
-echo "[nginx] built: $NGINX_OUT_DIR/nginx.wasm"
+NGINX_RAW_WASM="$NGINX_OUT_DIR/nginx.raw.wasm"
+NGINX_WASM="$NGINX_OUT_DIR/nginx.wasm"
+cp objs/nginx "$NGINX_RAW_WASM"
+echo "[nginx] built raw module: $NGINX_RAW_WASM"
 
 ###############################################################################
 # 5. Optimize with wasm-opt (asyncify for fork/exec support)
 ###############################################################################
 
-if [[ -x "$WASM_OPT" ]]; then
-    echo "[nginx] running wasm-opt (asyncify + optimization)..."
-    "$WASM_OPT" \
-        --epoch-injection \
-        --asyncify \
-        --debuginfo \
-        -O2 \
-        "$NGINX_OUT_DIR/nginx.wasm" \
-        -o "$NGINX_OUT_DIR/nginx.opt.wasm"
-    echo "[nginx] optimized: $NGINX_OUT_DIR/nginx.opt.wasm"
+rm -f "$NGINX_WASM" "$NGINX_OUT_DIR/nginx.opt.wasm" "$NGINX_OUT_DIR/nginx.cwasm"
+##################
+# Lind expects the runnable module to include the epoch-injection transform, so
+# `wasm-opt` is part of producing a correct default artifact here, not just an
+# optional extra. We therefore keep the raw link output as `nginx.raw.wasm`
+# for debugging and write the runnable module to the traditional `nginx.wasm`
+# path. Full mode still keeps the historical `.opt.wasm` and `.cwasm` aliases.
+##################
+if [[ ! -x "$WASM_OPT" ]]; then
+    echo "[nginx] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact."
+    exit 1
+fi
+
+echo "[nginx] running wasm-opt (asyncify + epoch injection) to produce runnable nginx.wasm..."
+"$WASM_OPT" \
+    --epoch-injection \
+    --asyncify \
+    --debuginfo \
+    -O2 \
+    "$NGINX_RAW_WASM" \
+    -o "$NGINX_WASM"
+echo "[nginx] optimized runnable module: $NGINX_WASM"
+
+if [[ "$ARTIFACT_MODE" == "full" ]]; then
+    cp "$NGINX_WASM" "$NGINX_OUT_DIR/nginx.opt.wasm"
 else
-    echo "[nginx] NOTE: wasm-opt not found at $WASM_OPT; skipping optimization."
-    cp "$NGINX_OUT_DIR/nginx.wasm" "$NGINX_OUT_DIR/nginx.opt.wasm"
+    echo "[nginx] artifact mode is fast; keeping nginx.wasm runnable and skipping only cwasm generation."
 fi
 
 ###############################################################################
 # 6. cwasm generation (best-effort)
 ###############################################################################
 
-NGINX_WASM="$NGINX_OUT_DIR/nginx.opt.wasm"
-if [[ -x "$LIND_BOOT" ]]; then
+if [[ "$ARTIFACT_MODE" == "full" && -x "$LIND_BOOT" ]]; then
     echo "[nginx] generating cwasm via lind-boot --precompile..."
-    if "$LIND_BOOT" --precompile "$NGINX_WASM"; then
+    if "$LIND_BOOT" --precompile "$NGINX_OUT_DIR/nginx.opt.wasm"; then
         # Rename nginx.opt.cwasm → nginx.cwasm (drop .opt)
-        OPT_CWASM="${NGINX_WASM%.wasm}.cwasm"
+        OPT_CWASM="$NGINX_OUT_DIR/nginx.opt.cwasm"
         CLEAN_CWASM="${OPT_CWASM/.opt/}"
         if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
             mv "$OPT_CWASM" "$CLEAN_CWASM"
@@ -651,8 +834,10 @@ if [[ -x "$LIND_BOOT" ]]; then
     else
         echo "[nginx] WARNING: lind-boot --precompile failed; skipping cwasm generation."
     fi
-else
+elif [[ "$ARTIFACT_MODE" == "full" ]]; then
     echo "[nginx] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+else
+    echo "[nginx] artifact mode is fast; skipping cwasm generation."
 fi
 
 ###############################################################################
@@ -665,7 +850,7 @@ cp -r "$NGINX_ROOT/conf/"* "$NGINX_OUT_DIR/conf/" 2>/dev/null || true
 cp -r "$NGINX_ROOT/html" "$NGINX_OUT_DIR/" 2>/dev/null || true
 
 # Create a minimal nginx.conf for WASM testing
-cat > "$NGINX_OUT_DIR/conf/nginx-wasm.conf" << 'EOF'
+write_if_changed "$NGINX_OUT_DIR/conf/nginx-wasm.conf" << 'EOF'
 # nginx configuration for WASM/Lind runtime
 # Run in foreground, single-process mode for initial testing
 
@@ -718,7 +903,7 @@ echo "[nginx] build complete. Outputs:"
 ls -lh "$NGINX_OUT_DIR"/*.wasm 2>/dev/null || true
 echo
 echo "To run nginx in Lind:"
-echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.opt.wasm -c /etc/nginx/nginx.conf"
+echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.wasm -c /etc/nginx/nginx.conf"
 echo
 echo "Or with the test config:"
-echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.opt.wasm -c conf/nginx-wasm.conf"
+echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.wasm -c conf/nginx-wasm.conf"

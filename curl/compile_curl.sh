@@ -19,7 +19,7 @@ CURL_ROOT="$APPS_ROOT/curl"
 
 APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-STAGE_DIR="$APPS_BUILD/bin/curl/wasm32-wasi"
+STAGE_DIR="$APPS_BUILD/curl/usr/local/bin"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -71,7 +71,7 @@ CFLAGS_WASM=(
 )
 
 LDFLAGS_WASM=(
-  "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low"
+  "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
   -L"$MERGED_SYSROOT/lib/wasm32-wasi"
   -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
 )
@@ -164,8 +164,9 @@ if [[ -z "$CURL_BIN" ]]; then
   exit 1
 fi
 
-cp "$CURL_BIN" "$STAGE_DIR/curl.wasm"
-echo "[curl] staged: $STAGE_DIR/curl.wasm"
+CURL_WASM="$SCRIPT_DIR/curl.wasm"
+CURL_OPT_WASM="$SCRIPT_DIR/curl.opt.wasm"
+cp "$CURL_BIN" "$CURL_WASM"
 
 # ----------------------------------------------------------------------
 # 8) wasm-opt (best-effort)
@@ -177,37 +178,46 @@ if [[ -x "$WASM_OPT" ]]; then
     --asyncify \
     --debuginfo \
     -O2 \
-    "$STAGE_DIR/curl.wasm" \
-    -o "$STAGE_DIR/curl.opt.wasm" || true
+    "$CURL_WASM" \
+    -o "$CURL_OPT_WASM" || true
 else
-  echo "[curl] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+  echo "[curl] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
+fi
+
+if [[ ! -f "$CURL_OPT_WASM" ]]; then
+  echo "[curl] ERROR: Failed to generate "$CURL_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 # ----------------------------------------------------------------------
 # 9) cwasm generation (best-effort) via lind-boot --precompile
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
-  echo "[curl] generating cwasm via lind-boot --precompile…"
-  OPT_WASM="$STAGE_DIR/curl.opt.wasm"
-  if [[ -f "$OPT_WASM" ]]; then
-    if "$LIND_BOOT" --precompile "$OPT_WASM"; then
-      # Rename curl.opt.cwasm → curl.cwasm (drop .opt)
-      OPT_CWASM="${OPT_WASM%.wasm}.cwasm"
-      CLEAN_CWASM="${OPT_CWASM/.opt/}"
-      if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-        mv "$OPT_CWASM" "$CLEAN_CWASM"
-      fi
+  echo "[git] generating cwasm via lind-boot --precompile..."
+  if "$LIND_BOOT" --precompile "$CURL_OPT_WASM"; then
+  
+    CURL_OPT_CWASM="$SCRIPT_DIR/curl.opt.cwasm"
+
+    #Staging the final .cwasm binary to the build folder
+    if [[ -f "$CURL_OPT_CWASM" ]]; then
+      cp "$CURL_OPT_CWASM" "$STAGE_DIR/curl"
+      echo "[curl] curl staged as $STAGE_DIR/curl"
     else
-      echo "[curl] WARNING: lind-boot --precompile failed; skipping cwasm generation."
+      echo "[curl] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. "
+      exit 1
     fi
   else
-    echo "[curl] NOTE: no optimized wasm found; trying raw binary…"
-    "$LIND_BOOT" --precompile "$STAGE_DIR/curl.wasm" || \
-      echo "[curl] WARNING: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[curl] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[curl] ERROR: No binaries copied to the build folder. Exiting.."
+    exit 1
   fi
 else
-  echo "[curl] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[curl] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[curl] ERROR: No binaries copied to the build folder. Exiting.."
+  exit 1
 fi
+
 
 echo
 echo "[curl] build complete. Outputs under:"
