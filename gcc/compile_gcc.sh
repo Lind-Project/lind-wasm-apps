@@ -149,18 +149,32 @@ for dir in gmp mpfr mpc; do
   fi
 done
 
-# Patch MPFR's configure script to disable float128.
-# MPFR detects __float128 support (clang accepts it), then adds
-# -D_Float128=__float128 which conflicts with the WASI sysroot's
-# "typedef __float128 _Float128;" in bits/floatn.h.
-# MPFR's configure runs during 'make all-gcc', so we must patch the
-# source-level configure script.  Injecting enable_float128=no has
-# the same effect as passing --disable-float128 on the command line.
+# Patch MPFR's configure to disable float128.
+# MPFR detects __float128 (clang accepts it), then adds -D_Float128=__float128
+# which conflicts with the WASI sysroot's "typedef __float128 _Float128;"
+# in bits/floatn.h.  MPFR's configure runs during 'make all-gcc', so we
+# patch the source-level configure script directly.
 MPFR_CONFIGURE="$GCC_SRC/mpfr/configure"
-if [[ -f "$MPFR_CONFIGURE" ]] && ! grep -q 'PATCHED_FOR_WASI' "$MPFR_CONFIGURE"; then
-  echo "[gcc] [patch] disabling float128 in MPFR configure…"
-  sed -i '2i\enable_float128=no  # PATCHED_FOR_WASI' "$MPFR_CONFIGURE"
-  echo "[gcc] [patch] done"
+if [[ -f "$MPFR_CONFIGURE" ]]; then
+  if ! grep -q 'PATCHED_FOR_WASI' "$MPFR_CONFIGURE"; then
+    echo "[gcc] [patch] disabling float128 in MPFR configure…"
+    # Insert enable_float128=no right after the shebang line
+    sed -i '1 a\enable_float128=no  # PATCHED_FOR_WASI' "$MPFR_CONFIGURE"
+    echo "[gcc] [patch] verify:"
+    head -3 "$MPFR_CONFIGURE"
+  else
+    echo "[gcc] MPFR configure already patched for WASI."
+  fi
+else
+  echo "[gcc] WARN: MPFR configure not found at $MPFR_CONFIGURE"
+fi
+
+# Also guard the sysroot's bits/floatn.h so the typedef doesn't conflict
+# when _Float128 is pre-defined as a macro (by MPFR or anything else).
+FLOATN_H="$MERGED_SYSROOT/include/wasm32-wasi/bits/floatn.h"
+if [[ -f "$FLOATN_H" ]] && ! grep -q 'PATCHED_FOR_WASI' "$FLOATN_H"; then
+  echo "[gcc] [patch] guarding _Float128 typedef in sysroot floatn.h…"
+  sed -i 's|^typedef __float128 _Float128;|/* PATCHED_FOR_WASI */\n#ifndef _Float128\ntypedef __float128 _Float128;\n#endif|' "$FLOATN_H"
 fi
 
 popd >/dev/null
