@@ -106,8 +106,10 @@ CXX_WASM="$CLANGXX --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT \
 
 # CFLAGS/CXXFLAGS must contain ONLY portable flags that native g++ also
 # understands — no paths, no wasm flags.
-CFLAGS_WASM="-O2 -g"
-CXXFLAGS_WASM="-O2 -g"
+# Use -Os to minimize binary size — cc1 at -O2 is ~183MB which causes
+# wasm-opt --asyncify to OOM in Docker (no swap available).
+CFLAGS_WASM="-Os"
+CXXFLAGS_WASM="-Os"
 
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
   -Wl,--export=__stack_pointer,--export=__stack_low \
@@ -289,18 +291,17 @@ echo "[gcc] cc1 binary size: $(du -h "$CC1_WASM" | cut -f1)"
 # 8) wasm-opt
 # ----------------------------------------------------------------------
 if [[ -x "$WASM_OPT" ]]; then
-  # cc1 is ~183MB — running all passes at once (asyncify + O2 + fpcast-emu)
-  # causes wasm-opt to exhaust memory.  Split into two passes:
-  #   Pass 1: epoch-injection + asyncify (memory-intensive, skip optimization)
-  #   Pass 2: optimize the result
-  CC1_ASYNC_WASM="$SCRIPT_DIR/cc1.async.wasm"
-  echo "[gcc] running wasm-opt pass 1 (epoch-injection + asyncify)…"
-  "$WASM_OPT" --epoch-injection --asyncify --debuginfo \
-    "$CC1_WASM" -o "$CC1_ASYNC_WASM"
-  echo "[gcc] running wasm-opt pass 2 (optimize)…"
-  "$WASM_OPT" --debuginfo -O2 \
-    "$CC1_ASYNC_WASM" -o "$CC1_OPT_WASM"
-  rm -f "$CC1_ASYNC_WASM"
+  # cc1 is very large — strip debug info first to reduce memory pressure
+  # during asyncify, then run asyncify + epoch-injection in a single pass.
+  CC1_STRIPPED="$SCRIPT_DIR/cc1.stripped.wasm"
+  echo "[gcc] stripping debug info to reduce wasm-opt memory usage…"
+  "$WASM_OPT" --strip-debug "$CC1_WASM" -o "$CC1_STRIPPED"
+  echo "[gcc] stripped size: $(du -h "$CC1_STRIPPED" | cut -f1)"
+
+  echo "[gcc] running wasm-opt (epoch-injection + asyncify)…"
+  "$WASM_OPT" --epoch-injection --asyncify \
+    "$CC1_STRIPPED" -o "$CC1_OPT_WASM"
+  rm -f "$CC1_STRIPPED"
 else
   echo "[gcc] ERROR: wasm-opt not found at '$WASM_OPT'; exiting." >&2
   exit 1
