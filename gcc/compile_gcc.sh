@@ -133,9 +133,21 @@ pushd "$GCC_SRC" >/dev/null
 if [[ ! -d gmp ]] || [[ ! -d mpfr ]] || [[ ! -d mpc ]]; then
   echo "[gcc] downloading prerequisites (GMP, MPFR, MPC)…"
   ./contrib/download_prerequisites --no-isl --no-verify
-else
-  echo "[gcc] prerequisites already present; skipping download."
 fi
+
+# GMP/MPFR/MPC ship their own config.sub which is too old to know about
+# wasm32-wasi.  Overwrite with GCC's version which does.
+echo "[gcc] patching config.sub in prerequisites…"
+for dir in gmp mpfr mpc; do
+  if [[ -f "$dir/config.sub" ]]; then
+    cp -f config.sub "$dir/config.sub"
+    echo "[gcc]   updated $dir/config.sub"
+  fi
+  if [[ -f "$dir/configfsf.sub" ]]; then
+    cp -f config.sub "$dir/configfsf.sub"
+    echo "[gcc]   updated $dir/configfsf.sub"
+  fi
+done
 
 popd >/dev/null
 
