@@ -240,6 +240,8 @@ pushd "$GCC_BUILD" >/dev/null
   --disable-libffi \
   --disable-decimal-float \
   --disable-lto \
+  --disable-gcov \
+  --enable-checking=release \
   --without-headers \
   --without-isl \
   --with-gnu-as \
@@ -298,8 +300,22 @@ if [[ -x "$WASM_OPT" ]]; then
   "$WASM_OPT" --strip-debug "$CC1_WASM" -o "$CC1_STRIPPED"
   echo "[gcc] stripped size: $(du -h "$CC1_STRIPPED" | cut -f1)"
 
+  # Build an asyncify ignore list for functions that are too large to
+  # instrument.  GCC's gimple_simplify_* are auto-generated pattern matchers
+  # with hundreds of locals — asyncify explodes them and cranelift overflows.
+  # They're pure computation (no I/O or yield points) so skipping is safe.
+  ASYNCIFY_IGNORE="$SCRIPT_DIR/asyncify_ignore.txt"
+  echo "[gcc] building asyncify ignore list for oversized functions…"
+  wasm-objdump -x "$CC1_WASM" \
+    | grep -oP '<\K[^>]+' \
+    | grep -E '^gimple_simplify_' \
+    > "$ASYNCIFY_IGNORE" || true
+  IGNORE_COUNT=$(wc -l < "$ASYNCIFY_IGNORE")
+  echo "[gcc] ignoring $IGNORE_COUNT gimple_simplify_* functions from asyncify"
+
   echo "[gcc] running wasm-opt (epoch-injection + asyncify)…"
   "$WASM_OPT" --epoch-injection --asyncify \
+    --pass-arg=asyncify-ignore-list@"$ASYNCIFY_IGNORE" \
     "$CC1_STRIPPED" -o "$CC1_OPT_WASM"
   rm -f "$CC1_STRIPPED"
 else
@@ -315,24 +331,30 @@ fi
 # ----------------------------------------------------------------------
 # 9) cwasm generation via lind-boot --precompile
 # ----------------------------------------------------------------------
+# NOTE: cc1 is extremely large and triggers a cranelift index overflow
+# (u32::MAX) during AOT compilation.  If precompile fails, fall back to
+# staging the .wasm directly (Lind will JIT-compile at runtime).
 if [[ -x "$LIND_BOOT" ]]; then
   echo "[gcc] generating cwasm via lind-boot --precompile…"
   if "$LIND_BOOT" --precompile "$CC1_OPT_WASM"; then
     CC1_OPT_CWASM="$SCRIPT_DIR/cc1.opt.cwasm"
     if [[ -f "$CC1_OPT_CWASM" ]]; then
       cp "$CC1_OPT_CWASM" "$STAGE_DIR/cc1"
-      echo "[gcc] cc1 staged as $STAGE_DIR/cc1"
+      echo "[gcc] cc1 staged as $STAGE_DIR/cc1 (precompiled)"
     else
-      echo "[gcc] ERROR: No .cwasm binary generated. Exiting." >&2
-      exit 1
+      echo "[gcc] WARN: precompile produced no .cwasm — staging .wasm instead"
+      cp "$CC1_OPT_WASM" "$STAGE_DIR/cc1"
+      echo "[gcc] cc1 staged as $STAGE_DIR/cc1 (wasm, will JIT at runtime)"
     fi
   else
-    echo "[gcc] ERROR: lind-boot --precompile failed. Exiting." >&2
-    exit 1
+    echo "[gcc] WARN: lind-boot --precompile failed (cranelift overflow on large module)"
+    echo "[gcc] staging .wasm instead — Lind will JIT-compile at runtime"
+    cp "$CC1_OPT_WASM" "$STAGE_DIR/cc1"
+    echo "[gcc] cc1 staged as $STAGE_DIR/cc1 (wasm)"
   fi
 else
-  echo "[gcc] ERROR: lind-boot not found at '$LIND_BOOT'. Exiting." >&2
-  exit 1
+  echo "[gcc] WARN: lind-boot not found at '$LIND_BOOT'; staging .wasm directly"
+  cp "$CC1_OPT_WASM" "$STAGE_DIR/cc1"
 fi
 
 popd >/dev/null 2>&1 || true
