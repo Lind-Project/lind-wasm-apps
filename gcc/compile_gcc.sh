@@ -91,16 +91,19 @@ mkdir -p "$STAGE_DIR"
 # ----------------------------------------------------------------------
 LIBCXX_INCLUDE="$MERGED_SYSROOT/include/wasm32-wasi/c++/v1"
 
-CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
+# -matomics and -mbulk-memory are wasm32-only flags — they MUST live in CC/CXX
+# (not CFLAGS/CXXFLAGS) because GCC's build system also passes CFLAGS/CXXFLAGS
+# to CC_FOR_BUILD (native g++), which doesn't understand them.
+CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread -matomics -mbulk-memory"
 
-CXX_WASM="$CLANGXX --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread \
+CXX_WASM="$CLANGXX --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread -matomics -mbulk-memory \
   -stdlib=libc++ -isystem $LIBCXX_INCLUDE -fno-exceptions"
 
-CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
+CFLAGS_WASM="-O2 -g \
   -I$MERGED_SYSROOT/include \
   -I$MERGED_SYSROOT/include/wasm32-wasi"
 
-CXXFLAGS_WASM="$CFLAGS_WASM -fno-exceptions -isystem $LIBCXX_INCLUDE"
+CXXFLAGS_WASM="$CFLAGS_WASM -isystem $LIBCXX_INCLUDE"
 
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
   -Wl,--export=__stack_pointer,--export=__stack_low \
