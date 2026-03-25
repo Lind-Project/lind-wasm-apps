@@ -160,6 +160,21 @@ mkdir -p "$GCC_BUILD"
 echo "[gcc] build dir = $GCC_BUILD"
 
 # ----------------------------------------------------------------------
+# 4b) Create config.site to override broken sub-configure detections
+# ----------------------------------------------------------------------
+# MPFR's configure detects __float128 support, then adds -D_Float128=__float128.
+# But the WASI sysroot already has "typedef __float128 _Float128;" in
+# bits/floatn.h, so the macro turns it into "typedef __float128 __float128;"
+# which is invalid.  Disable float128 in MPFR via configure cache.
+GCC_CONFIG_SITE="$GCC_BUILD/config.site"
+cat > "$GCC_CONFIG_SITE" << 'EOF'
+# Overrides for wasm32-wasi cross-compilation
+mpfr_cv_want_float128=no
+EOF
+export CONFIG_SITE="$GCC_CONFIG_SITE"
+echo "[gcc] created config.site: $GCC_CONFIG_SITE"
+
+# ----------------------------------------------------------------------
 # 5) Configure GCC
 # ----------------------------------------------------------------------
 BUILD_TRIPLET="$(gcc -dumpmachine 2>/dev/null || echo x86_64-linux-gnu)"
