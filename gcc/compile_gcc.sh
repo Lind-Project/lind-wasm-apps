@@ -289,9 +289,18 @@ echo "[gcc] cc1 binary size: $(du -h "$CC1_WASM" | cut -f1)"
 # 8) wasm-opt
 # ----------------------------------------------------------------------
 if [[ -x "$WASM_OPT" ]]; then
-  echo "[gcc] running wasm-opt…"
-  "$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
-    "$CC1_WASM" -o "$CC1_OPT_WASM"
+  # cc1 is ~183MB — running all passes at once (asyncify + O2 + fpcast-emu)
+  # causes wasm-opt to exhaust memory.  Split into two passes:
+  #   Pass 1: epoch-injection + asyncify (memory-intensive, skip optimization)
+  #   Pass 2: optimize the result
+  CC1_ASYNC_WASM="$SCRIPT_DIR/cc1.async.wasm"
+  echo "[gcc] running wasm-opt pass 1 (epoch-injection + asyncify)…"
+  "$WASM_OPT" --epoch-injection --asyncify --debuginfo \
+    "$CC1_WASM" -o "$CC1_ASYNC_WASM"
+  echo "[gcc] running wasm-opt pass 2 (optimize)…"
+  "$WASM_OPT" --debuginfo -O2 \
+    "$CC1_ASYNC_WASM" -o "$CC1_OPT_WASM"
+  rm -f "$CC1_ASYNC_WASM"
 else
   echo "[gcc] ERROR: wasm-opt not found at '$WASM_OPT'; exiting." >&2
   exit 1
