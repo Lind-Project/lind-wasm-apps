@@ -285,7 +285,7 @@ gcc: $(MERGE_LIBCXX_STAMP)
 # ---------------- binutils (WASM build) ----------------------------------------
 # Uses binutils/compile_binutils.sh to cross-compile ld and as as wasm32-wasi
 # binaries.  Pure C — no libc++ needed.  Stages to build/binutils/usr/local/bin.
-binutils: $(MERGE_BASE_STAMP)
+binutils: $(MERGE_ZLIB_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/binutils/compile_binutils.sh'
 
