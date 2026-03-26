@@ -322,15 +322,16 @@ if [[ -x "$WASM_OPT" ]]; then
   # signature that wasm-objdump appends for display (the wasm name section
   # stores only the bare symbol name, so the removelist needs exact bare
   # names without "(type, type, ...)" suffixes).
-  # Output is comma-separated (Binaryen's response file format).
+  # Output is newline-separated (Binaryen auto-detects: if newlines
+  # are present it splits on newlines, otherwise commas — newlines are
+  # safer because C++ template names can contain commas).
   wasm-objdump -x "$CC1_WASM" \
     | sed -n 's/.*<\(.*\)>/\1/p' \
     | sed 's/(.*//; /^$/d' \
     | sort -u \
     | grep -E '^(gimple_simplify_|generic_simplify_|gimple_bitwise_|gimple_bit_|gimple_power_|tree_power_|tree_bitwise_|tree_bit_|types_match|def_fn_type|wi::|fold_|recog|simplify_|combine_|ix86_|x86_|output_[0-9]|gen_|extract_|get_attr_|internal_dfa)' \
-    | tr '\n' ',' | sed 's/,$//' \
     > "$ASYNCIFY_IGNORE" || true
-  IGNORE_COUNT=$(tr ',' '\n' < "$ASYNCIFY_IGNORE" | wc -l)
+  IGNORE_COUNT=$(wc -l < "$ASYNCIFY_IGNORE")
   echo "[gcc] ignoring $IGNORE_COUNT auto-generated functions from asyncify"
 
   # IMPORTANT: asyncify must run on cc1.wasm (which has the name section
