@@ -330,16 +330,18 @@ if [[ -x "$WASM_OPT" ]]; then
     | grep -E '^(gimple_simplify_|generic_simplify_|gimple_bitwise_|gimple_bit_|gimple_power_|tree_power_|tree_bitwise_|tree_bit_|types_match|def_fn_type|wi::|fold_|recog|simplify_|combine_|ix86_|x86_|output_[0-9]|gen_|extract_|get_attr_|internal_dfa)' \
     | tr '\n' ',' | sed 's/,$//' \
     > "$ASYNCIFY_IGNORE" || true
-  IGNORE_COUNT=$(wc -l < "$ASYNCIFY_IGNORE")
+  IGNORE_COUNT=$(tr ',' '\n' < "$ASYNCIFY_IGNORE" | wc -l)
   echo "[gcc] ignoring $IGNORE_COUNT auto-generated functions from asyncify"
 
   # IMPORTANT: asyncify must run on cc1.wasm (which has the name section
-  # from wasm-ld) so that the ignore list can match function names.
+  # from wasm-ld) so that the removelist can match function names.
   # Stripping first (--strip-debug) removes the name section, making
-  # the ignore list useless and inflating ALL functions.
+  # the removelist useless and inflating ALL functions.
+  # Note: double @@ — first @ is pass-arg separator, second @ means
+  # "read from response file" (Binaryen convention).
   echo "[gcc] running wasm-opt (epoch-injection + asyncify + strip + Os)…"
   "$WASM_OPT" --epoch-injection --asyncify \
-    --pass-arg=asyncify-removelist@"$ASYNCIFY_IGNORE" \
+    --pass-arg=asyncify-removelist@@"$ASYNCIFY_IGNORE" \
     --strip-debug -Os \
     "$CC1_WASM" -o "$CC1_OPT_WASM"
 else
