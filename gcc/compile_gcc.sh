@@ -305,6 +305,14 @@ if [[ -x "$WASM_OPT" ]]; then
   #   types_match                  — match.pd helper
   #   def_fn_type                  — builtin type init (runs once)
   #   wi::*                        — wide-int template instantiations
+  #   fold_*                       — tree constant folding
+  #   recog*, extract_*            — insn-recog.c / insn-extract.c
+  #   output_NNN                   — insn-output.c emitters
+  #   gen_*                        — insn-emit.c generated code
+  #   simplify_*                   — RTL simplification
+  #   combine_*                    — instruction combiner
+  #   ix86_*, x86_*                — x86 backend (huge switch tables)
+  #   get_attr_*, internal_dfa*    — insn-attrtab.c scheduling tables
   ASYNCIFY_IGNORE="$SCRIPT_DIR/asyncify_ignore.txt"
   echo "[gcc] building asyncify ignore list for oversized functions…"
   # Note: sed extracts the full function name between the outermost < >,
@@ -312,7 +320,7 @@ if [[ -x "$WASM_OPT" ]]; then
   # truncate at the first > inside a template parameter list).
   wasm-objdump -x "$CC1_WASM" \
     | sed -n 's/.*<\(.*\)>/\1/p' \
-    | grep -E '^(gimple_simplify_|generic_simplify_|gimple_bitwise_|gimple_bit_|gimple_power_|tree_power_|tree_bitwise_|tree_bit_|types_match|def_fn_type|wi::)' \
+    | grep -E '^(gimple_simplify_|generic_simplify_|gimple_bitwise_|gimple_bit_|gimple_power_|tree_power_|tree_bitwise_|tree_bit_|types_match|def_fn_type|wi::|fold_|recog|simplify_|combine_|ix86_|x86_|output_[0-9]|gen_|extract_|get_attr_|internal_dfa)' \
     > "$ASYNCIFY_IGNORE" || true
   IGNORE_COUNT=$(wc -l < "$ASYNCIFY_IGNORE")
   echo "[gcc] ignoring $IGNORE_COUNT auto-generated functions from asyncify"
