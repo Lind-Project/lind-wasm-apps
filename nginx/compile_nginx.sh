@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -x
 set -euo pipefail
 
 ###############################################################################
@@ -812,7 +813,7 @@ fi
 
 echo "[nginx] running wasm-opt (asyncify + epoch injection) to produce runnable nginx.wasm..."
 "$WASM_OPT" \
-    --fpcast-emu \ 
+    --fpcast-emu \
     --epoch-injection \
     --asyncify \
     --debuginfo \
