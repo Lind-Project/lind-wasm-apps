@@ -313,31 +313,49 @@ if [[ -x "$WASM_OPT" ]]; then
   #   combine_*                    — instruction combiner
   #   ix86_*, x86_*                — x86 backend (huge switch tables)
   #   get_attr_*, internal_dfa*    — insn-attrtab.c scheduling tables
+  # Binaryen's asyncify-removelist supports * wildcards, so we use a
+  # small static pattern list instead of enumerating all 17K+ names.
   ASYNCIFY_IGNORE="$SCRIPT_DIR/asyncify_ignore.txt"
-  echo "[gcc] building asyncify ignore list for oversized functions…"
-  # Note: sed extracts the full function name between the outermost < >,
-  # handling nested <> in C++ template names (grep -oP '<\K[^>]+' would
-  # truncate at the first > inside a template parameter list).
-  # Pipeline: extract name between outermost <>, strip the parameter
-  # signature that wasm-objdump appends for display (the wasm name section
-  # stores only the bare symbol name, so the removelist needs exact bare
-  # names without "(type, type, ...)" suffixes).
-  # Output is newline-separated (Binaryen auto-detects: if newlines
-  # are present it splits on newlines, otherwise commas — newlines are
-  # safer because C++ template names can contain commas).
-  wasm-objdump -x "$CC1_WASM" \
-    | sed -n 's/.*<\(.*\)>/\1/p' \
-    | sed 's/(.*//; /^$/d' \
-    | sort -u \
-    | grep -E '^(gimple_simplify_|generic_simplify_|gimple_bitwise_|gimple_bit_|gimple_power_|tree_power_|tree_bitwise_|tree_bit_|types_match|def_fn_type|wi::|fold_|recog|simplify_|combine_|ix86_|x86_|output_[0-9]|gen_|extract_|get_attr_|internal_dfa)' \
-    > "$ASYNCIFY_IGNORE" || true
+  cat > "$ASYNCIFY_IGNORE" << 'PATTERNS'
+gimple_simplify_*
+generic_simplify_*
+gimple_bitwise_*
+gimple_bit_*
+gimple_power_*
+gimple_maybe_*
+gimple_unsigned_integer_sat_*
+gimple_signed_integer_sat_*
+gimple_nop_convert*
+gimple_with_*
+tree_power_*
+tree_bitwise_*
+tree_bit_*
+tree_maybe_*
+tree_nop_convert*
+tree_with_*
+tree_unsigned_integer_sat_*
+tree_signed_integer_sat_*
+types_match
+def_fn_type
+wi::*
+fold_*
+recog*
+simplify_*
+combine_*
+ix86_*
+x86_*
+output_*
+gen_*
+extract_*
+get_attr_*
+internal_dfa*
+peephole2_*
+PATTERNS
   IGNORE_COUNT=$(wc -l < "$ASYNCIFY_IGNORE")
-  echo "[gcc] ignoring $IGNORE_COUNT auto-generated functions from asyncify"
+  echo "[gcc] asyncify removelist: $IGNORE_COUNT wildcard patterns"
 
   # IMPORTANT: asyncify must run on cc1.wasm (which has the name section
   # from wasm-ld) so that the removelist can match function names.
-  # Stripping first (--strip-debug) removes the name section, making
-  # the removelist useless and inflating ALL functions.
   # Note: double @@ — first @ is pass-arg separator, second @ means
   # "read from response file" (Binaryen convention).
   echo "[gcc] running wasm-opt (epoch-injection + asyncify + strip + Os)…"
