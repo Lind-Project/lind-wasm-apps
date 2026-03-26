@@ -337,7 +337,7 @@ if [[ -x "$WASM_OPT" ]]; then
   # the ignore list useless and inflating ALL functions.
   echo "[gcc] running wasm-opt (epoch-injection + asyncify + strip + Os)…"
   "$WASM_OPT" --epoch-injection --asyncify \
-    --pass-arg=asyncify-ignore-list@"$ASYNCIFY_IGNORE" \
+    --pass-arg=asyncify-removelist@"$ASYNCIFY_IGNORE" \
     --strip-debug -Os \
     "$CC1_WASM" -o "$CC1_OPT_WASM"
 else
