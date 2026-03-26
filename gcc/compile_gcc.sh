@@ -320,13 +320,15 @@ if [[ -x "$WASM_OPT" ]]; then
   # truncate at the first > inside a template parameter list).
   # Pipeline: extract name between outermost <>, strip the parameter
   # signature that wasm-objdump appends for display (the wasm name section
-  # stores only the bare symbol name, so asyncify-ignore-list needs exact
-  # bare names without "(type, type, ...)" suffixes).
+  # stores only the bare symbol name, so the removelist needs exact bare
+  # names without "(type, type, ...)" suffixes).
+  # Output is comma-separated (Binaryen's response file format).
   wasm-objdump -x "$CC1_WASM" \
     | sed -n 's/.*<\(.*\)>/\1/p' \
     | sed 's/(.*//; /^$/d' \
     | sort -u \
     | grep -E '^(gimple_simplify_|generic_simplify_|gimple_bitwise_|gimple_bit_|gimple_power_|tree_power_|tree_bitwise_|tree_bit_|types_match|def_fn_type|wi::|fold_|recog|simplify_|combine_|ix86_|x86_|output_[0-9]|gen_|extract_|get_attr_|internal_dfa)' \
+    | tr '\n' ',' | sed 's/,$//' \
     > "$ASYNCIFY_IGNORE" || true
   IGNORE_COUNT=$(wc -l < "$ASYNCIFY_IGNORE")
   echo "[gcc] ignoring $IGNORE_COUNT auto-generated functions from asyncify"
