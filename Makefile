@@ -39,7 +39,7 @@ TESTABLE_APPS  := lmbench
 TEST_APPS      ?= $(if $(APP),$(APP),$(TESTABLE_APPS))
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -282,6 +282,13 @@ gcc: $(MERGE_LIBCXX_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/gcc/compile_gcc.sh'
 
+# ---------------- binutils (WASM build) ----------------------------------------
+# Uses binutils/compile_binutils.sh to cross-compile ld and as as wasm32-wasi
+# binaries.  Pure C — no libc++ needed.  Stages to build/binutils/usr/local/bin.
+binutils: $(MERGE_BASE_STAMP)
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/binutils/compile_binutils.sh'
+
 rebuild-libs:
 	rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)' \
 	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
@@ -326,7 +333,10 @@ install-coreutils:
 install-gcc:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' gcc
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc
+install-binutils:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' binutils
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils
 
 clean:
 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
@@ -335,7 +345,7 @@ clean:
 	-rm -rf '$(APPS_BIN_DIR)/nginx'
 	-$(MAKE) -C '$(APPS_ROOT)/nginx' clean || true
 	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
-	-rm -rf '$(APPS_BUILD)/libcxx-build' '$(APPS_BUILD)/libcxx-install' '$(APPS_BUILD)/gcc-build'
+	-rm -rf '$(APPS_BUILD)/libcxx-build' '$(APPS_BUILD)/libcxx-install' '$(APPS_BUILD)/gcc-build' '$(APPS_BUILD)/binutils-build'
 	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)'
 	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 	$(MAKE) -C '$(APPS_ROOT)/libtirpc' distclean || true
