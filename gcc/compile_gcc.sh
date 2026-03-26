@@ -293,31 +293,39 @@ echo "[gcc] cc1 binary size: $(du -h "$CC1_WASM" | cut -f1)"
 # 8) wasm-opt
 # ----------------------------------------------------------------------
 if [[ -x "$WASM_OPT" ]]; then
-  # cc1 is very large — strip debug info first to reduce memory pressure
-  # during asyncify, then run asyncify + epoch-injection in a single pass.
-  CC1_STRIPPED="$SCRIPT_DIR/cc1.stripped.wasm"
-  echo "[gcc] stripping debug info to reduce wasm-opt memory usage…"
-  "$WASM_OPT" --strip-debug "$CC1_WASM" -o "$CC1_STRIPPED"
-  echo "[gcc] stripped size: $(du -h "$CC1_STRIPPED" | cut -f1)"
-
   # Build an asyncify ignore list for functions that are too large to
-  # instrument.  GCC's gimple_simplify_* are auto-generated pattern matchers
-  # with hundreds of locals — asyncify explodes them and cranelift overflows.
-  # They're pure computation (no I/O or yield points) so skipping is safe.
+  # instrument.  Asyncify inflates auto-generated pattern matchers and
+  # template instantiations by 1000x+, causing cranelift's u32 DFG index
+  # to overflow during AOT precompilation.  These are all pure computation
+  # (no I/O or yield points) so skipping is safe:
+  #   gimple_simplify_*            — match.pd GIMPLE simplifiers
+  #   generic_simplify_*           — match.pd GENERIC simplifiers
+  #   gimple_bitwise_*, gimple_bit_*, gimple_power_* — match.pd exports
+  #   tree_power_*, tree_bitwise_* — match.pd GENERIC exports
+  #   types_match                  — match.pd helper
+  #   def_fn_type                  — builtin type init (runs once)
+  #   wi::*                        — wide-int template instantiations
   ASYNCIFY_IGNORE="$SCRIPT_DIR/asyncify_ignore.txt"
   echo "[gcc] building asyncify ignore list for oversized functions…"
+  # Note: sed extracts the full function name between the outermost < >,
+  # handling nested <> in C++ template names (grep -oP '<\K[^>]+' would
+  # truncate at the first > inside a template parameter list).
   wasm-objdump -x "$CC1_WASM" \
-    | grep -oP '<\K[^>]+' \
-    | grep -E '^gimple_simplify_' \
+    | sed -n 's/.*<\(.*\)>/\1/p' \
+    | grep -E '^(gimple_simplify_|generic_simplify_|gimple_bitwise_|gimple_bit_|gimple_power_|tree_power_|tree_bitwise_|tree_bit_|types_match|def_fn_type|wi::)' \
     > "$ASYNCIFY_IGNORE" || true
   IGNORE_COUNT=$(wc -l < "$ASYNCIFY_IGNORE")
-  echo "[gcc] ignoring $IGNORE_COUNT gimple_simplify_* functions from asyncify"
+  echo "[gcc] ignoring $IGNORE_COUNT auto-generated functions from asyncify"
 
-  echo "[gcc] running wasm-opt (epoch-injection + asyncify)…"
+  # IMPORTANT: asyncify must run on cc1.wasm (which has the name section
+  # from wasm-ld) so that the ignore list can match function names.
+  # Stripping first (--strip-debug) removes the name section, making
+  # the ignore list useless and inflating ALL functions.
+  echo "[gcc] running wasm-opt (epoch-injection + asyncify + strip + Os)…"
   "$WASM_OPT" --epoch-injection --asyncify \
     --pass-arg=asyncify-ignore-list@"$ASYNCIFY_IGNORE" \
-    "$CC1_STRIPPED" -o "$CC1_OPT_WASM"
-  rm -f "$CC1_STRIPPED"
+    --strip-debug -Os \
+    "$CC1_WASM" -o "$CC1_OPT_WASM"
 else
   echo "[gcc] ERROR: wasm-opt not found at '$WASM_OPT'; exiting." >&2
   exit 1
