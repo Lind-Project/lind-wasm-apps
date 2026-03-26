@@ -151,7 +151,7 @@ fi
 # 5) Build ld and as
 # ----------------------------------------------------------------------
 echo "[binutils] building (make all-ld all-gas)…"
-make all-ld all-gas -j"$JOBS" V=1
+make all-ld all-gas -j"$JOBS" V=1 MAKEINFO=true
 
 popd >/dev/null
 
