@@ -20,6 +20,7 @@ LIND_WASM_ROOT="${LIND_WASM_ROOT:-$(cd "$APPS_ROOT/.." && pwd)}"
 STAGE_DIR="$APPS_ROOT/build/grep/usr/local/bin"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
+GREP_BIN="/usr/local/bin/grep"
 TEST_DIR="/tests/grep"
 
 PASS=0
@@ -48,23 +49,23 @@ echo "  OK: staged binary found at $STAGE_DIR/grep"
 echo
 echo "[test] Checking lindfs installation..."
 
-if [[ ! -f "$LINDFS_ROOT/bin/grep" ]]; then
-  echo "  ERROR: grep is not installed in lindfs ($LINDFS_ROOT/bin/grep not found)"
+if [[ ! -f "$LINDFS_ROOT$GREP_BIN" ]]; then
+  echo "  ERROR: grep is not installed in lindfs ($LINDFS_ROOT$GREP_BIN not found)"
   echo "  Please build and install grep by running:"
   echo "    make grep"
   echo "    make install-grep"
   exit 1
 fi
 
-echo "  OK: grep installed at $LINDFS_ROOT/bin/grep"
+echo "  OK: grep installed at $LINDFS_ROOT$GREP_BIN"
 
 # ----------------------------------------------------------------------
 # 3) Create test fixtures
 # ----------------------------------------------------------------------
 echo
 echo "[test] Creating test fixtures..."
-mkdir -p "$LINDFS_ROOT$TEST_DIR"
-cat > "$LINDFS_ROOT$TEST_DIR/hello.txt" <<'EOF'
+mkdir -p "$LINDFS_ROOT/$TEST_DIR"
+cat > "$LINDFS_ROOT/$TEST_DIR/hello.txt" <<'EOF'
 hello world
 Hello World
 HELLO WORLD
@@ -79,7 +80,7 @@ echo
 echo "[test] Running sanity tests..."
 
 # Test: basic pattern match
-OUTPUT=$(sudo "$LIND_RUN" /bin/grep "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
 EXPECTED=$'hello world\nhello again'
 if [[ "$OUTPUT" == "$EXPECTED" ]]; then
   pass "basic pattern match"
@@ -88,7 +89,7 @@ else
 fi
 
 # Test: case-insensitive
-OUTPUT=$(sudo "$LIND_RUN" /bin/grep -i "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN -i "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
 LINE_COUNT=$(echo "$OUTPUT" | wc -l | tr -d ' ')
 if [[ "$LINE_COUNT" -eq 4 ]]; then
   pass "case-insensitive (-i)"
@@ -97,7 +98,7 @@ else
 fi
 
 # Test: count matches
-OUTPUT=$(sudo "$LIND_RUN" /bin/grep -c "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN -c "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
 if [[ "$OUTPUT" == "2" ]]; then
   pass "count matches (-c)"
 else
@@ -105,7 +106,7 @@ else
 fi
 
 # Test: stdin pipe
-OUTPUT=$(echo "test123" | sudo "$LIND_RUN" /bin/grep -oE "[0-9]+" 2>/dev/null || true)
+OUTPUT=$(echo "test123" | sudo "$LIND_RUN" $GREP_BIN -oE "[0-9]+" 2>/dev/null || true)
 if [[ "$OUTPUT" == "123" ]]; then
   pass "stdin pipe with regex (-oE)"
 else
@@ -113,7 +114,7 @@ else
 fi
 
 # Test: no match returns non-zero (grep exits 1 when no match)
-sudo "$LIND_RUN" /bin/grep "zzzznotfound" "$TEST_DIR/hello.txt" >/dev/null 2>&1 && RC=$? || RC=$?
+sudo "$LIND_RUN" $GREP_BIN "zzzznotfound" "$TEST_DIR/hello.txt" >/dev/null 2>&1 && RC=$? || RC=$?
 if [[ "$RC" -ne 0 ]]; then
   pass "no match returns non-zero exit"
 else
@@ -125,7 +126,7 @@ fi
 # ----------------------------------------------------------------------
 echo
 echo "[test] Cleaning up test fixtures..."
-rm -f "$LINDFS_ROOT$TEST_DIR/hello.txt"
+rm -f "$LINDFS_ROOT/$TEST_DIR/hello.txt"
 
 # ----------------------------------------------------------------------
 # Summary
