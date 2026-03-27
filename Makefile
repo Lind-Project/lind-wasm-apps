@@ -58,7 +58,7 @@ test:
 	  if [[ -x '$(APPS_ROOT)/'"$$app"'/test.sh' ]]; then \
 	    '$(APPS_ROOT)/'"$$app"'/test.sh' "$$app"; \
 	  else \
-	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/test.sh"; \
+	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/run_tests.sh"; \
 	  fi; \
 	done
 
