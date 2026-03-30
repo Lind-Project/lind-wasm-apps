@@ -9,6 +9,11 @@ set -euo pipefail
 #   3) Stage final artifacts under build/lmbench/bin.
 #   4) Require cwasm generation for the staged executables and copy the
 #      resulting .cwasm files back onto the final extensionless program names.
+#
+# Dynamic loading support:
+#   Set LIND_DYLINK=1 to build lmbench as position-independent executables
+#   for the dylink branch. This adds -fPIC to CFLAGS, uses PIE link flags,
+#   and applies the dylink-aware wasm-opt passes.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -32,6 +37,7 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 # lmbench's staged executables now always require the full cwasm-backed output
 # set mandated by issue #127, regardless of artifact mode.
 ##################
+LIND_DYLINK="${LIND_DYLINK:-0}"
 ARTIFACT_MODE="${ARTIFACT_MODE:-fast}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
@@ -118,11 +124,28 @@ run_wasm_opt_replace() {
   local out="$3"
   local tmp="${out}.tmp"
   cp "$src" "$raw"
-  if "$WASM_OPT" --fpcast-emu --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
-    mv "$tmp" "$out"
+  if [[ "$LIND_DYLINK" == "1" ]]; then
+    # dylink-aware wasm-opt: epoch-import and asyncify-import-globals
+    # are needed because epoch counter and asyncify globals live in the
+    # host (libc module), not in the main module.
+    if "$WASM_OPT" \
+        --enable-bulk-memory --enable-threads \
+        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+        --asyncify --pass-arg=asyncify-import-globals \
+        --debuginfo \
+        "$raw" -o "$tmp"; then
+      mv "$tmp" "$out"
+    else
+      rm -f "$tmp"
+      return 1
+    fi
   else
-    rm -f "$tmp"
-    return 1
+    if "$WASM_OPT" --fpcast-emu --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
+      mv "$tmp" "$out"
+    else
+      rm -f "$tmp"
+      return 1
+    fi
   fi
 }
 
@@ -171,11 +194,52 @@ mkdir -p "$LM_BENCH_BIN_DIR"
 
 REAL_CC="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
 CFLAGS="-DNO_PORTMAPPER -O2 -g -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -I$MERGED_SYSROOT/include/tirpc"
-LDFLAGS_WASM=(
-  "-Wl,--import-memory,--export-memory,--max-memory=${MAX_WASM_MEMORY},--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
-  "-L$MERGED_SYSROOT/lib/wasm32-wasi"
-  "-L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
-)
+
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[lmbench] Dynamic linking mode enabled (LIND_DYLINK=1)"
+  CFLAGS+=" -fPIC"
+  # add-export-tool is used after linking to export relocation and stack symbols
+  ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
+  if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+    echo "[lmbench] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'" >&2
+    exit 1
+  fi
+  # Extra objects required for dynamic PIE executables
+  DYLINK_CRT_OBJS=(
+    "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o"
+  )
+  for obj in "${DYLINK_CRT_OBJS[@]}"; do
+    if [[ ! -f "$obj" ]]; then
+      echo "[lmbench] ERROR: required dylink CRT object '$obj' not found." >&2
+      echo "[lmbench] Hint: rebuild sysroot on the dylink branch (make sysroot in lind-wasm)." >&2
+      exit 1
+    fi
+  done
+  LDFLAGS_WASM=(
+    "-nostartfiles"
+    "-Wl,-pie"
+    "-Wl,--import-table"
+    "-Wl,--import-memory"
+    "-Wl,--export-memory"
+    "-Wl,--max-memory=${MAX_WASM_MEMORY}"
+    "-Wl,--allow-undefined"
+    "-Wl,--unresolved-symbols=import-dynamic"
+    "-Wl,--export=__wasm_call_ctors"
+    "-Wl,--export-if-defined=__wasm_init_tls"
+    "-Wl,--export=__tls_base"
+    "-L$MERGED_SYSROOT/lib/wasm32-wasi"
+    "-L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+    "${DYLINK_CRT_OBJS[@]}"
+  )
+else
+  LDFLAGS_WASM=(
+    "-Wl,--import-memory,--export-memory,--max-memory=${MAX_WASM_MEMORY},--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
+    "-L$MERGED_SYSROOT/lib/wasm32-wasi"
+    "-L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+  )
+fi
 
 if [[ "$ENABLE_WASI_THREADS" == "1" ]]; then
   thread_flag="-mthread-model=posix"
@@ -212,6 +276,7 @@ build_signature() {
     echo "merged=$MERGED_SYSROOT"
     echo "memory=$MAX_WASM_MEMORY"
     echo "threads=$ENABLE_WASI_THREADS"
+    echo "dylink=$LIND_DYLINK"
     echo "cflags=$CFLAGS"
     echo "ldflags=$LDFLAGS"
     echo "ldlibs=$LDLIBS"
@@ -365,6 +430,24 @@ done
 if ! wait_for_background_jobs; then
   echo "[lmbench] ERROR: wasm-opt post-processing failed." >&2
   exit 1
+fi
+
+##################
+# For dynamic linking, each optimized binary needs extra exports added via
+# add-export-tool. These exports (__wasm_apply_tls_relocs, __wasm_apply_global_relocs,
+# __stack_pointer) are required by lind-boot to wire up the dynamically loaded
+# modules at runtime.
+##################
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[lmbench] adding dylink exports via add-export-tool..."
+  shopt -s nullglob
+  dylink_opts=("$LM_BENCH_BIN_DIR"/*.opt.wasm)
+  shopt -u nullglob
+  for w in "${dylink_opts[@]}"; do
+    "$ADD_EXPORT_TOOL" "$w" "$w" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+    "$ADD_EXPORT_TOOL" "$w" "$w" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+    "$ADD_EXPORT_TOOL" "$w" "$w" __stack_pointer global __stack_pointer
+  done
 fi
 
 ##################
