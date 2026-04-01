@@ -28,7 +28,7 @@ fi
 
 LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
-CURL_BIN="bin/curl"
+CURL_BIN="usr/local/bin/curl"
 
 # --- configurable settings ---------------------------------------------------
 HTTP_PORT="${HTTP_PORT:-8111}"
