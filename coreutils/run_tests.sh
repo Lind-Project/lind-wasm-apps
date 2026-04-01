@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 ################################################################################
-# manual_coreutils_tests.sh
 #
-# Manually tests a subset of coreutils binaries through lind-boot with
-# hardcoded absolute paths to work around the cwd/chroot issue (#742).
-#
-# Tests 3+ utilities from each category:
+# Tests 3+ utilities from each category of coreutils:
 #   File Management: ls, cp, mv, rm, mkdir, rmdir, ln, touch
 #   Text Processing: cat, head, tail, wc, sort, uniq, cut, paste
 #   Permissions/Info: chmod, df, du, pwd, dd
