@@ -28,7 +28,7 @@ fi
 
 LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
-GIT_BIN="bin/git"
+GIT_BIN="usr/local/bin/git"
 REPO_PATH="/tmp/git-test-repo"
 HOST_REPO_PATH="$LINDFS_ROOT$REPO_PATH"
 REMOTE_PATH="/tmp/git-test-remote.git"
