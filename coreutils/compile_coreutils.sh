@@ -286,6 +286,23 @@ ac_cv_func_symlinkat=no
 ac_cv_func_readlinkat=no
 ac_cv_func_inotify_init=no
 ac_cv_search_crypt=no
+
+# ---- Disable platform-specific features that can false-positive under
+#      dylink link flags (--allow-undefined, --unresolved-symbols=import-dynamic).
+#      These link tests succeed even for undefined symbols, causing autoconf
+#      to think HP-UX/Solaris/BSD/AIX functions are available on WASI. ----
+ac_cv_func_getppriv=no
+ac_cv_func_pstat_getdynamic=no
+ac_cv_func_pstat_getstatic=no
+ac_cv_func_sysmp=no
+ac_cv_func_getsysinfo=no
+ac_cv_func_sysctl=no
+ac_cv_func_table=no
+ac_cv_header_priv_h=no
+ac_cv_header_sys_pstat_h=no
+ac_cv_header_sys_sysmp_h=no
+ac_cv_header_sys_sysctl_h=no
+ac_cv_header_sys_systemcfg_h=no
 EOF
 export CONFIG_SITE="$CONFIG_SITE_FILE"
 
