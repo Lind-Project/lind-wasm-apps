@@ -9,7 +9,12 @@ set -euo pipefail
 #   2. Apply patches for WASI compatibility
 #   3. Build nginx with wasm32-wasi toolchain
 #   4. Optimize with wasm-opt (asyncify for multi-process support)
-#   5. Precompile with wasmtime compile
+#   5. Precompile with lind-boot --precompile
+#
+# Dynamic loading support:
+#   Set LIND_DYLINK=1 to build nginx as a position-independent executable
+#   for the dylink branch. This adds -fPIC to CFLAGS, uses PIE link flags,
+#   and applies the dylink-aware wasm-opt passes.
 #
 # Prerequisites:
 #   - Run 'make preflight' and 'make merge-sysroot' from lind-wasm-apps root
@@ -57,6 +62,7 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 # skipping .cwasm generation while the default `ARTIFACT_MODE=full` performs
 # optimization and .cwasm binary generation
 ##################
+LIND_DYLINK="${LIND_DYLINK:-0}"
 ARTIFACT_MODE="${ARTIFACT_MODE:-full}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
@@ -107,15 +113,63 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
     -I$MERGED_SYSROOT/include/wasm32-wasi \
     -D_GNU_SOURCE"
 
-# LDFLAGS for WASM linking
-# Note: nginx's generated Makefile does not use $(LDFLAGS). Instead, the link
-# rule uses $(LINK) as the full linker command. We pass these flags via the
-# LINK make override at build time (not via --with-ld-opt, which configure
-# would test and fail for WASM-specific flags).
-LDFLAGS_WASM="-Wl,--shared-memory,--import-memory,--export-memory,--max-memory=67108864 \
-    -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base \
-    -L$MERGED_SYSROOT/lib/wasm32-wasi \
-    -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+if [[ "$LIND_DYLINK" == "1" ]]; then
+    echo "[nginx] Dynamic linking mode enabled (LIND_DYLINK=1)"
+    CFLAGS_WASM+=" -fPIC"
+
+    # add-export-tool is used after wasm-opt to export relocation and stack symbols
+    ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
+    if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+        echo "[nginx] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'" >&2
+        exit 1
+    fi
+
+    # Extra CRT objects required for dynamic PIE executables
+    DYLINK_CRT_OBJS=(
+        "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
+        "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
+        "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o"
+    )
+    for obj in "${DYLINK_CRT_OBJS[@]}"; do
+        if [[ ! -f "$obj" ]]; then
+            echo "[nginx] ERROR: required dylink CRT object '$obj' not found." >&2
+            echo "[nginx] Hint: rebuild sysroot on the dylink branch (make sysroot in lind-wasm)." >&2
+            exit 1
+        fi
+    done
+
+    # LDFLAGS for WASM dynamic/PIE linking
+    # -nostartfiles: skip default CRT, use dylink-specific CRT objects instead
+    # -Wl,-pie: produce a Position Independent Executable
+    # -Wl,--import-table: import the indirect-function table (cross-module calls)
+    # -Wl,--allow-undefined + --unresolved-symbols=import-dynamic: resolve at load time
+    # -Wl,--export=__wasm_call_ctors: let lind-boot call constructors
+    LDFLAGS_WASM="-nostartfiles \
+        -Wl,-pie \
+        -Wl,--import-table \
+        -Wl,--import-memory \
+        -Wl,--export-memory \
+        -Wl,--shared-memory \
+        -Wl,--max-memory=67108864 \
+        -Wl,--allow-undefined \
+        -Wl,--unresolved-symbols=import-dynamic \
+        -Wl,--export=__wasm_call_ctors \
+        -Wl,--export-if-defined=__wasm_init_tls \
+        -Wl,--export=__tls_base \
+        -L$MERGED_SYSROOT/lib/wasm32-wasi \
+        -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
+        ${DYLINK_CRT_OBJS[*]}"
+else
+    # LDFLAGS for static WASM linking
+    # Note: nginx's generated Makefile does not use $(LDFLAGS). Instead, the link
+    # rule uses $(LINK) as the full linker command. We pass these flags via the
+    # LINK make override at build time (not via --with-ld-opt, which configure
+    # would test and fail for WASM-specific flags).
+    LDFLAGS_WASM="-Wl,--shared-memory,--import-memory,--export-memory,--max-memory=67108864 \
+        -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base \
+        -L$MERGED_SYSROOT/lib/wasm32-wasi \
+        -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+fi
 
 echo "[nginx] using CLANG        = $CLANG"
 echo "[nginx] using AR           = $AR"
@@ -123,6 +177,7 @@ echo "[nginx] LIND_WASM_ROOT     = $LIND_WASM_ROOT"
 echo "[nginx] merged sysroot     = $MERGED_SYSROOT"
 echo "[nginx] output dir         = $NGINX_OUT_DIR"
 echo "[nginx] artifact mode      = $ARTIFACT_MODE"
+echo "[nginx] dylink mode        = $LIND_DYLINK"
 echo
 
 ##################
@@ -213,6 +268,7 @@ clang=$CLANG
 merged=$MERGED_SYSROOT
 cflags=$CFLAGS_WASM
 ldflags=$LDFLAGS_WASM
+dylink=$LIND_DYLINK
 args=$configure_args
 EOF
 }
@@ -810,15 +866,26 @@ if [[ ! -x "$WASM_OPT" ]]; then
     exit 1
 fi
 
-echo "[nginx] running wasm-opt (asyncify + epoch injection) to produce runnable nginx.wasm..."
-"$WASM_OPT" \
-    --fpcast-emu \
-    --epoch-injection \
-    --asyncify \
-    --debuginfo \
-    -O2 \
-    "$NGINX_RAW_WASM" \
-    -o "$NGINX_WASM"
+if [[ "$LIND_DYLINK" == "1" ]]; then
+    echo "[nginx] running wasm-opt (dylink-aware: epoch-import + asyncify-import-globals)..."
+    "$WASM_OPT" \
+        --enable-bulk-memory --enable-threads \
+        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+        --asyncify --pass-arg=asyncify-import-globals \
+        --debuginfo \
+        "$NGINX_RAW_WASM" \
+        -o "$NGINX_WASM"
+else
+    echo "[nginx] running wasm-opt (asyncify + epoch injection) to produce runnable nginx.wasm..."
+    "$WASM_OPT" \
+        --fpcast-emu \
+        --epoch-injection \
+        --asyncify \
+        --debuginfo \
+        -O2 \
+        "$NGINX_RAW_WASM" \
+        -o "$NGINX_WASM"
+fi
 echo "[nginx] optimized runnable module: $NGINX_WASM"
 
 if [[ "$ARTIFACT_MODE" == "full" ]]; then
@@ -832,6 +899,21 @@ fi
 if [[ ! -f "$NGINX_OPT_WASM" ]]; then
   echo "[nginx] ERROR: Failed to generate "$NGINX_OPT_WASM"; Exiting.."
   exit 1
+fi
+
+###############################################################################
+# 5.5. Add dylink exports via add-export-tool (dynamic mode only)
+###############################################################################
+
+if [[ "$LIND_DYLINK" == "1" ]]; then
+    echo "[nginx] adding dylink exports via add-export-tool..."
+    "$ADD_EXPORT_TOOL" "$NGINX_OPT_WASM" "$NGINX_OPT_WASM" \
+        __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+    "$ADD_EXPORT_TOOL" "$NGINX_OPT_WASM" "$NGINX_OPT_WASM" \
+        __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+    "$ADD_EXPORT_TOOL" "$NGINX_OPT_WASM" "$NGINX_OPT_WASM" \
+        __stack_pointer global __stack_pointer
+    echo "[nginx] dylink exports added to $NGINX_OPT_WASM"
 fi
 
 ###############################################################################
