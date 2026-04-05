@@ -136,12 +136,23 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
     "${DYLINK_CRT_OBJS[@]}"
   )
+  # Configure-only LDFLAGS: use the static link flags so autoconf feature
+  # detection correctly fails for missing symbols. The --allow-undefined +
+  # --unresolved-symbols=import-dynamic flags in LDFLAGS_WASM make link tests
+  # succeed for every function, producing false positives on platform-specific
+  # functions (pstat_getdynamic, nanotime, getppriv, etc.).
+  LDFLAGS_CONFIGURE=(
+    "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+  )
 else
   LDFLAGS_WASM=(
     "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
     -L"$MERGED_SYSROOT/lib/wasm32-wasi"
     -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
   )
+  LDFLAGS_CONFIGURE=("${LDFLAGS_WASM[@]}")
 fi
 
 echo "[coreutils] using CLANG       = $CLANG"
@@ -250,7 +261,7 @@ export lt_cv_prog_compiler_static_works=yes
 export ac_cv_prog_cc_pic_works=no
 export CFLAGS="${CFLAGS:-} ${CFLAGS_WASM[*]}"
 export CPPFLAGS="${CPPFLAGS:-} -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi"
-export LDFLAGS="${LDFLAGS:-} ${LDFLAGS_WASM[*]}"
+export LDFLAGS="${LDFLAGS:-} ${LDFLAGS_CONFIGURE[*]}"
 
 CONFIG_SITE_FILE="$BUILD_ROOT/config.site"
 ##################
@@ -483,7 +494,7 @@ if (( need_configure )); then
       RANLIB="$RANLIB" \
       CFLAGS="${CFLAGS_WASM[*]}" \
       CPPFLAGS="$CPPFLAGS" \
-      LDFLAGS="${LDFLAGS_WASM[*]}" \
+      LDFLAGS="${LDFLAGS_CONFIGURE[*]}" \
       || echo "[coreutils] WARNING: configure exited nonzero ($?)."
   )
   patch_generated_signal_h_after_configure
