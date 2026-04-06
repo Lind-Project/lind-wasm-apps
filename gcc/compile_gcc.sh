@@ -112,7 +112,7 @@ CFLAGS_WASM="-Os"
 CXXFLAGS_WASM="-Os"
 
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
-  -Wl,--export=__stack_pointer,--export=__stack_low \
+  -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base \
   -L$MERGED_SYSROOT/lib/wasm32-wasi \
   -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
   -lc++ -lc++abi"
@@ -192,6 +192,11 @@ echo "[gcc] build dir = $GCC_BUILD"
 # ----------------------------------------------------------------------
 # 4b) Create config.site to override broken sub-configure detections
 # ----------------------------------------------------------------------
+# This lives here (not in a separate MPFR step) because GCC builds MPFR
+# in-tree as part of its own configure/make.  CONFIG_SITE is inherited by
+# all sub-configures, so setting it once in the top-level build directory
+# is the correct way to inject overrides into MPFR's autoconf.
+#
 # MPFR's configure detects __float128 support, then adds -D_Float128=__float128.
 # But the WASI sysroot already has "typedef __float128 _Float128;" in
 # bits/floatn.h, so the macro turns it into "typedef __float128 __float128;"
@@ -297,7 +302,12 @@ if [[ -x "$WASM_OPT" ]]; then
   # instrument.  Asyncify inflates auto-generated pattern matchers and
   # template instantiations by 1000x+, causing cranelift's u32 DFG index
   # to overflow during AOT precompilation.  These are all pure computation
-  # (no I/O or yield points) so skipping is safe:
+  # (no I/O or yield points) so skipping is safe.
+  #
+  # This is a permanent part of the build, not a temporary workaround —
+  # these auto-generated functions will always be too large for asyncify
+  # and will never contain yield points (they are pure tree/RTL rewrites).
+  #
   #   gimple_simplify_*            — match.pd GIMPLE simplifiers
   #   generic_simplify_*           — match.pd GENERIC simplifiers
   #   gimple_bitwise_*, gimple_bit_*, gimple_power_* — match.pd exports

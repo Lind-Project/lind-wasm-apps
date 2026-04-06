@@ -120,33 +120,13 @@ fi
 mkdir -p "$BUILD_DIR"
 
 TOOLCHAIN_FILE="$BUILD_DIR/Toolchain-WASI.cmake"
-cat > "$TOOLCHAIN_FILE" << EOF
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR wasm32)
-
-set(CMAKE_C_COMPILER "$CLANG")
-set(CMAKE_CXX_COMPILER "$CLANGXX")
-set(CMAKE_AR "$AR")
-set(CMAKE_NM "$NM")
-set(CMAKE_RANLIB "$RANLIB")
-set(CMAKE_SYSROOT "$BASE_SYSROOT")
-
-set(CMAKE_C_COMPILER_TARGET wasm32-unknown-wasi)
-set(CMAKE_CXX_COMPILER_TARGET wasm32-unknown-wasi)
-
-set(CMAKE_C_FLAGS_INIT "-pthread -matomics -mbulk-memory -static -nostdlib -nodefaultlibs -fno-exceptions -fno-unwind-tables")
-set(CMAKE_CXX_FLAGS_INIT "-frtti -pthread -matomics -mbulk-memory -static -nostdlib -nodefaultlibs -fno-exceptions -stdlib=libc++ -fno-unwind-tables")
-set(CMAKE_EXE_LINKER_FLAGS_INIT "-static -nostdlib -nodefaultlibs")
-
-set(CMAKE_SKIP_RPATH ON)
-
-set(LLVM_HOST_TRIPLE "wasm32-wasip1")
-set(LLVM_DEFAULT_TARGET_TRIPLE "wasm32-wasip1")
-
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-EOF
+sed -e "s|@CLANG@|$CLANG|g" \
+    -e "s|@CLANGXX@|$CLANGXX|g" \
+    -e "s|@AR@|$AR|g" \
+    -e "s|@NM@|$NM|g" \
+    -e "s|@RANLIB@|$RANLIB|g" \
+    -e "s|@BASE_SYSROOT@|$BASE_SYSROOT|g" \
+    "$SCRIPT_DIR/Toolchain-WASI.cmake.in" > "$TOOLCHAIN_FILE"
 
 echo "[libcxx] generated toolchain file: $TOOLCHAIN_FILE"
 
