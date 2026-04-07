@@ -386,31 +386,22 @@ fi
 # ----------------------------------------------------------------------
 # 9) cwasm generation via lind-boot --precompile
 # ----------------------------------------------------------------------
-# NOTE: cc1 is extremely large and triggers a cranelift index overflow
-# (u32::MAX) during AOT compilation.  If precompile fails, fall back to
-# staging the .wasm directly (Lind will JIT-compile at runtime).
-if [[ -x "$LIND_BOOT" ]]; then
-  echo "[gcc] generating cwasm via lind-boot --precompile…"
-  if "$LIND_BOOT" --precompile "$CC1_OPT_WASM"; then
-    CC1_OPT_CWASM="$SCRIPT_DIR/cc1.opt.cwasm"
-    if [[ -f "$CC1_OPT_CWASM" ]]; then
-      cp "$CC1_OPT_CWASM" "$STAGE_DIR/cc1"
-      echo "[gcc] cc1 staged as $STAGE_DIR/cc1 (precompiled)"
-    else
-      echo "[gcc] WARN: precompile produced no .cwasm — staging .wasm instead"
-      cp "$CC1_OPT_WASM" "$STAGE_DIR/cc1"
-      echo "[gcc] cc1 staged as $STAGE_DIR/cc1 (wasm, will JIT at runtime)"
-    fi
-  else
-    echo "[gcc] WARN: lind-boot --precompile failed (cranelift overflow on large module)"
-    echo "[gcc] staging .wasm instead — Lind will JIT-compile at runtime"
-    cp "$CC1_OPT_WASM" "$STAGE_DIR/cc1"
-    echo "[gcc] cc1 staged as $STAGE_DIR/cc1 (wasm)"
-  fi
-else
-  echo "[gcc] WARN: lind-boot not found at '$LIND_BOOT'; staging .wasm directly"
-  cp "$CC1_OPT_WASM" "$STAGE_DIR/cc1"
+if [[ ! -x "$LIND_BOOT" ]]; then
+  echo "[gcc] ERROR: lind-boot not found at '$LIND_BOOT'"
+  exit 1
 fi
+
+echo "[gcc] generating cwasm via lind-boot --precompile…"
+"$LIND_BOOT" --precompile "$CC1_OPT_WASM"
+
+CC1_OPT_CWASM="$SCRIPT_DIR/cc1.opt.cwasm"
+if [[ ! -f "$CC1_OPT_CWASM" ]]; then
+  echo "[gcc] ERROR: precompile produced no .cwasm"
+  exit 1
+fi
+
+cp "$CC1_OPT_CWASM" "$STAGE_DIR/cc1"
+echo "[gcc] cc1 staged as $STAGE_DIR/cc1 (precompiled)"
 
 popd >/dev/null 2>&1 || true
 

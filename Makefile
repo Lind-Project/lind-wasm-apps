@@ -349,7 +349,9 @@ clean:
 	-rm -rf '$(APPS_BIN_DIR)/nginx'
 	-$(MAKE) -C '$(APPS_ROOT)/nginx' clean || true
 	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
-	-rm -rf '$(APPS_BUILD)/libcxx-build' '$(APPS_BUILD)/libcxx-install' '$(APPS_BUILD)/gcc-build' '$(APPS_BUILD)/binutils-build'
+	'$(APPS_ROOT)/gcc/clean.sh'
+	'$(APPS_ROOT)/binutils/clean.sh'
+	'$(APPS_ROOT)/llvm-project/clean.sh'
 	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)'
 	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 	$(MAKE) -C '$(APPS_ROOT)/libtirpc' distclean || true

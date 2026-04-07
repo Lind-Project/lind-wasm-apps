@@ -174,9 +174,9 @@ post_process_binary() {
 
   # --- wasm-opt ---
   if [[ -x "$WASM_OPT" ]]; then
-    echo "[binutils] running wasm-opt on $NAME (epoch-injection + asyncify + Os)…"
+    echo "[binutils] running wasm-opt on $NAME (epoch-injection + asyncify + O2)…"
     "$WASM_OPT" --epoch-injection --asyncify \
-      --strip-debug -Os \
+      --debuginfo -O2 \
       "$WASM_FILE" -o "$OPT_WASM"
   else
     echo "[binutils] ERROR: wasm-opt not found at '$WASM_OPT'; exiting." >&2
@@ -189,23 +189,22 @@ post_process_binary() {
   fi
 
   # --- lind-boot --precompile ---
-  if [[ -x "$LIND_BOOT" ]]; then
-    echo "[binutils] generating cwasm for $NAME via lind-boot --precompile…"
-    if "$LIND_BOOT" --precompile "$OPT_WASM"; then
-      local OPT_CWASM="$SCRIPT_DIR/${NAME}.opt.cwasm"
-      if [[ -f "$OPT_CWASM" ]]; then
-        cp "$OPT_CWASM" "$STAGE_DIR/$NAME"
-        echo "[binutils] $NAME staged as $STAGE_DIR/$NAME (precompiled)"
-        return 0
-      fi
-    fi
-    echo "[binutils] WARN: precompile failed for $NAME; staging .wasm instead"
-    cp "$OPT_WASM" "$STAGE_DIR/$NAME"
-    echo "[binutils] $NAME staged as $STAGE_DIR/$NAME (wasm, will JIT at runtime)"
-  else
-    echo "[binutils] WARN: lind-boot not found at '$LIND_BOOT'; staging .wasm directly"
-    cp "$OPT_WASM" "$STAGE_DIR/$NAME"
+  if [[ ! -x "$LIND_BOOT" ]]; then
+    echo "[binutils] ERROR: lind-boot not found at '$LIND_BOOT'" >&2
+    exit 1
   fi
+
+  echo "[binutils] generating cwasm for $NAME via lind-boot --precompile…"
+  "$LIND_BOOT" --precompile "$OPT_WASM"
+
+  local OPT_CWASM="$SCRIPT_DIR/${NAME}.opt.cwasm"
+  if [[ ! -f "$OPT_CWASM" ]]; then
+    echo "[binutils] ERROR: precompile produced no .cwasm for $NAME" >&2
+    exit 1
+  fi
+
+  cp "$OPT_CWASM" "$STAGE_DIR/$NAME"
+  echo "[binutils] $NAME staged as $STAGE_DIR/$NAME (precompiled)"
 }
 
 # ----------------------------------------------------------------------
