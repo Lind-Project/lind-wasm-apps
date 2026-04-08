@@ -360,14 +360,3 @@ install-binutils:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' binutils
 
 install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils
-
-# clean:
-# 	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
-# 	-rm -rf '$(APPS_BIN_DIR)/lmbench'
-# 	-rm -rf '$(APPS_BUILD)/lmbench'
-# 	-rm -rf '$(APPS_BIN_DIR)/nginx'
-# 	-$(MAKE) -C '$(APPS_ROOT)/nginx' clean || true
-# 	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
-# 	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)'
-# 	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
-# 	$(MAKE) -C '$(APPS_ROOT)/libtirpc' distclean || true
