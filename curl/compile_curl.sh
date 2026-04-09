@@ -128,7 +128,7 @@ echo "[curl] configuring…"
   --enable-http --enable-proxy --disable-ipv6 \
   --disable-manual --disable-docs --disable-threaded-resolver \
   --disable-websockets --disable-openssl-auto-load-config \
-  --without-ca-bundle --without-ca-path --with-ca-fallback \
+  --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt \
   CC="$CC_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
