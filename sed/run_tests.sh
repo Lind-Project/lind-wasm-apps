@@ -4,7 +4,8 @@ set -uo pipefail
 LIND_WASM_ROOT="${LIND_WASM_ROOT:-/home/lind/lind-wasm}"
 LINDBOOT_BIN="$LIND_WASM_ROOT/build/lind-boot"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
-
+LIND_RUN_CMD="lind_run"
+SED_BINARY="/usr/local/bin/sed"
 cd $LINDFS_ROOT
 
 echo "Starting sed sandbox tests..."
@@ -28,37 +29,37 @@ check_result() {
 }
 
 # 1. Basic Stream Substitution
-ACTUAL=$(echo "Hello World" | lind_run bin/sed 's/World/Sandbox/')
+ACTUAL=$(echo "Hello World" | $LIND_RUN_CMD $SED_BINARY 's/World/Sandbox/')
 check_result "Basic Substitution" "Hello Sandbox" "$ACTUAL"
 
 # 2. Global Substitution
-ACTUAL=$(echo "apple banana apple" | lind_run bin/sed 's/a[a-z]*e/orange/g')
+ACTUAL=$(echo "apple banana apple" | $LIND_RUN_CMD $SED_BINARY 's/a[a-z]*e/orange/g')
 check_result "Global Substitution" "orange banana orange" "$ACTUAL"
 
 # 3. In-Place File Editing (-i)
 # This heavily stresses file-related system calls (open, read, write, rename, unlink)
 echo "Version 1.0" > test_inplace.txt
-lind_run bin/sed -i 's/1.0/2.0/' test_inplace.txt
+$LIND_RUN_CMD $SED_BINARY -i 's/1.0/2.0/' test_inplace.txt
 ACTUAL=$(cat test_inplace.txt)
 check_result "In-Place Editing" "Version 2.0" "$ACTUAL"
 rm -f test_inplace.txt
 
 # 4. Line Deletion
-ACTUAL=$(printf "keep me\ndelete me\nkeep me too\n" | lind_run bin/sed '/delete/d')
+ACTUAL=$(printf "keep me\ndelete me\nkeep me too\n" | $LIND_RUN_CMD $SED_BINARY '/delete/d')
 EXPECTED=$(printf "keep me\nkeep me too")
 check_result "Line Deletion" "$EXPECTED" "$ACTUAL"
 
 # 5. Selective Printing (-n)
-ACTUAL=$(printf "apple\nbanana\ncherry\n" | lind_run bin/sed -n '/banana/p')
+ACTUAL=$(printf "apple\nbanana\ncherry\n" | $LIND_RUN_CMD $SED_BINARY -n '/banana/p')
 check_result "Selective Printing" "banana" "$ACTUAL"
 
 # 6. Multiple Commands (-e)
-ACTUAL=$(echo "foo and bar" | lind_run bin/sed -e 's/foo/baz/' -e 's/bar/qux/')
+ACTUAL=$(echo "foo and bar" | $LIND_RUN_CMD $SED_BINARY -e 's/foo/baz/' -e 's/bar/qux/')
 check_result "Multiple Commands" "baz and qux" "$ACTUAL"
 
 # 7. Reading Commands from a Script (-f)
 echo "s/cat/dog/g" > script.sed
-ACTUAL=$(echo "The cat chased the other cat." | lind_run bin/sed -f script.sed)
+ACTUAL=$(echo "The cat chased the other cat." | $LIND_RUN_CMD $SED_BINARY -f script.sed)
 check_result "Script File" "The dog chased the other dog." "$ACTUAL"
 rm -f script.sed
 
