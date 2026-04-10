@@ -179,7 +179,8 @@ set(CMAKE_EXE_LINKER_FLAGS "\
   -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
   -Wl,--export=__stack_pointer,--export=__stack_low \
   -Wl,--import-memory,--export-memory \
-  -Wl,--max-memory=67108864" CACHE STRING "" FORCE)
+  -Wl,--max-memory=67108864 \
+  $CROSS_BUILD/wasi_stubs.o" CACHE STRING "" FORCE)
 
 # Don't pass -rpath to the linker
 set(CMAKE_SKIP_RPATH TRUE)
@@ -199,6 +200,18 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 CMAKE_EOF
 
 echo "[clang] generated toolchain file: $TOOLCHAIN_FILE"
+
+# ----------------------------------------------------------------------
+# 3b) Compile WASI stubs (missing glibc symbols)
+# ----------------------------------------------------------------------
+WASI_STUBS_SRC="$SCRIPT_DIR/wasi_stubs.c"
+WASI_STUBS_OBJ="$CROSS_BUILD/wasi_stubs.o"
+if [[ -f "$WASI_STUBS_SRC" ]]; then
+  echo "[clang] compiling WASI stubs…"
+  $CLANG --target=wasm32-unknown-wasi --sysroot="$MERGED_SYSROOT" \
+    -pthread -matomics -mbulk-memory -Os \
+    -c "$WASI_STUBS_SRC" -o "$WASI_STUBS_OBJ"
+fi
 
 # ----------------------------------------------------------------------
 # 4) Configure cross-build
