@@ -351,17 +351,25 @@ generate_asyncify_ignorelist() {
   local NAME="$1"
   local OUTFILE="$2"
 
+  # Patterns match against mangled C++ names in the WASM name section.
+  # Use *ClassName* or *FunctionPart* — NOT namespace:: prefixes.
+  # Binaryen * globs match any substring including mangled prefixes.
   cat > "$OUTFILE" << 'PATTERNS'
-# LLVM core — template-heavy pure computation
-llvm::*SmallVector*
-llvm::*DenseMap*
-llvm::*StringRef*
-llvm::*APInt*
-llvm::*APFloat*
-llvm::*FoldingSet*
-llvm::*BumpPtrAllocator*
+# X86 backend — TableGen-generated, enormous switch tables
+*X86Gen*
+*X86Inst*
+*X86MCCodeEmitter*
+*X86AsmParser*
+*X86Disassembler*
+*X86TargetLowering*
+*X86InstrInfo*
+*X86RegisterInfo*
+*X86Subtarget*
+*X86DAGToDAGISel*
+*X86ISelLowering*
+*X86FrameLowering*
 
-# Instruction selection (TableGen-generated, huge switch tables)
+# Instruction selection (TableGen-generated)
 *SelectCode*
 *SelectAddr*
 *EmitNode*
@@ -371,70 +379,122 @@ llvm::*BumpPtrAllocator*
 *CheckType*
 *CheckComplexPat*
 *MorphNodeTo*
+*SelectionDAG*
+*DAGISel*
 
-# DAG combiner / legalizer — pure rewrites
+# DAG combiner / legalizer
+*DAGCombiner*
 *DAGCombine*
+*LegalizeDAG*
 *LegalizeOp*
+*LegalizeTypes*
 *PromoteNode*
 *ExpandNode*
 *SoftPromoteHalf*
+*TargetLowering*
 
-# X86 backend (TableGen-generated, very large)
-*X86Gen*
-*X86Inst*
-x86::*
-X86::*
-
-# InstCombine — pure transforms
+# InstCombine
 *InstCombine*
-*visitAdd*
-*visitSub*
-*visitMul*
-*visitAnd*
-*visitOr*
-*visitXor*
-*visitICmp*
-*visitFCmp*
-*visitSelect*
-*visitCall*
-*visitShl*
-*visitLShr*
-*visitAShr*
-*visitTrunc*
-*visitZExt*
-*visitSExt*
+*InstCombiner*
 
-# Clang CodeGen — pure AST->IR lowering
+# Instruction visitor pattern (all visit* methods are pure transforms)
+*visit*
+
+# Clang Sema — huge template-heavy semantic analysis
+*Sema*
+*TreeTransform*
+*TemplateInstantiator*
+*TemplateDeclInstantiator*
+*ExprEvaluator*
+*IntExprEvaluator*
+
+# Clang CodeGen
 *CodeGenFunction*
 *CodeGenModule*
+*CGOpenMP*
 *EmitScalar*
 *EmitAggregate*
 *EmitLValue*
+*CGBuiltin*
 
-# Clang Sema — pure semantic analysis
-*Sema::*Check*
-*Sema::*Diagnose*
-*TreeTransform*
-*TemplateInstantiator*
+# Clang Parser
+*Parser*
 
-# Clang parser internals — returns are through values, not I/O
-*ParseExpression*
-*ParseStatement*
-*ParseDeclaration*
+# Clang AST
+*ASTReader*
+*ASTWriter*
+*ASTDeclReader*
+*ASTDeclWriter*
+*ASTStmtReader*
+*ASTStmtWriter*
 
 # Scalar evolution / loop analysis
 *ScalarEvolution*
 *computeExitLimit*
+*LoopStrengthReduce*
 
-# Register allocation
-*RegAllocEviction*
+# Register allocation / live intervals
+*RegAlloc*
 *LiveInterval*
 *InterferenceCache*
+*VirtRegMap*
+*LiveRange*
 
-# LLD linker — symbol resolution / relocation (pure computation)
+# Global instruction selection
+*GlobalISel*
+*InstructionSelect*
+*Legalizer*
+*RegBankSelect*
+
+# LLVM core template-heavy utilities (mangled, no namespace prefix)
+*SmallVector*
+*DenseMap*
+*StringSwitch*
+*APInt*
+*APFloat*
+*FoldingSet*
+*BumpPtrAllocator*
+*StringMap*
+*ValueMap*
+
+# MC layer — assembly/object emission
+*MCCodeEmitter*
+*MCAsmBackend*
+*MCObjectWriter*
+*MCAssembler*
+*MCELFStreamer*
+
+# Optimization passes — pure transforms
+*GVN*
+*SROA*
+*SimplifyCFG*
+*JumpThreading*
+*CorrelatedValuePropagation*
+*IndVarSimplify*
+*LoopVectorize*
+*SLPVectorizer*
+*MemCpyOpt*
+*DeadStoreElimination*
+*AggressiveInstCombine*
+*Reassociate*
+*ConstantFold*
+*InstructionSimplify*
+*ValueTracking*
+*LazyValueInfo*
+
+# Diagnostics (large table lookups)
+*DiagnosticIDs*
+*Diagnostic*
+
+# LLD linker
 *relocateOne*
 *finalizeContents*
 *scanRelocs*
+*LinkerDriver*
+*SymbolTable*
+*InputSection*
+*OutputSection*
+*Writer*
 PATTERNS
 }
 
