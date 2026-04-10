@@ -16,6 +16,9 @@ if [[ ! -r "$BASE_SYSROOT/include/wasm32-wasi/stdio.h" ]]; then
   echo "ERROR: sysroot headers missing at $BASE_SYSROOT"; exit 1
 fi
 
+LIND_DYLINK="${LIND_DYLINK:-0}"
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+
 CC_WASI="$LLVM_BIN/clang --target=wasm32-unknown-wasi --sysroot=$BASE_SYSROOT"
 AR="$LLVM_BIN/llvm-ar"
 RANLIB="$LLVM_BIN/llvm-ranlib"
@@ -40,4 +43,63 @@ cp libz.a "$OVERLAY/usr/lib/wasm32-wasi/libz.a"
 cp zlib.h zconf.h "$OVERLAY/usr/include/"
 
 popd >/dev/null
-echo "[zlib] done → $OVERLAY/usr/lib/wasm32-wasi/libz.a"
+
+if [[ "$LIND_DYLINK" != "1" ]]; then
+        echo "[zlib] done ?~F~R $OVERLAY/usr/lib/wasm32-wasi/libz.a"
+        exit 0
+fi
+
+mkdir -p "$OVERLAY/lib"
+ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
+
+STATIC_LIB="$OVERLAY/usr/lib/wasm32-wasi/libz.a"
+DYNAMIC_LIB_WASM="$OVERLAY/usr/lib/wasm32-wasi/libz.wasm"
+DYNAMIC_LIB_OPT="$OVERLAY/usr/lib/wasm32-wasi/libz.opt.wasm"
+DYNAMIC_LIB_OPT_CWASM="$OVERLAY/usr/lib/wasm32-wasi/libz.opt.cwasm"
+DYNAMIC_STAGED_LIB="$OVERLAY/lib/libz.so"
+"$LLVM_BIN/clang" \
+    --target=wasm32-unknown-wasi \
+    -fPIC \
+    --sysroot "$BASE_SYSROOT" \
+    -fvisibility=default \
+    -Wl,--import-memory \
+    -Wl,--shared-memory \
+    -Wl,--export-dynamic \
+    -Wl,--experimental-pic \
+    -Wl,--unresolved-symbols=import-dynamic \
+    -Wl,-shared \
+    -Wl,--whole-archive \
+    "$STATIC_LIB" \
+    -Wl,--no-whole-archive \
+    "$LIND_WASM_ROOT/src/glibc/build/lind_debug.o" \
+    -g -O0 -o "$DYNAMIC_LIB_WASM" || { echo "[zlib] ERROR: clang compilation failed"; exit 1; }
+
+if [[ ! -f "$DYNAMIC_LIB_WASM" ]]; then
+  echo "[zlib] ERROR: Failed to generate '$DYNAMIC_LIB_WASM'; Exiting.."
+  exit 1
+fi
+
+"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional || { echo "[zlib] ERROR: add-export-tool tls failed"; exit 1; }
+
+"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional || { echo "[zlib] ERROR: add-export-tool global failed"; exit 1; }
+
+"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM"  __stack_pointer global __stack_pointer optional || { echo "[zlib] ERROR: add-export-tool stack pointer failed"; exit 1; }
+
+
+$WASM_OPT --enable-bulk-memory --enable-threads --epoch-injection --pass-arg=epoch-import --asyncify --pass-arg=asyncify-import-globals -O2 --debuginfo "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[zlib] ERROR: wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.."; exit 1; }
+
+if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
+  echo "[zlib] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'; Exiting.."
+  exit 1
+fi
+
+# do precompile
+$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT"|| { echo "[zlib] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."; exit 1; }
+
+if [[ ! -f "$DYNAMIC_LIB_OPT_CWASM" ]]; then
+  echo "[zlib] ERROR: Failed to generate '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."
+  exit 1
+fi
+
+cp "$DYNAMIC_LIB_OPT_CWASM" "$DYNAMIC_STAGED_LIB"
+echo "[zlib] Dynamic shared library staged as $DYNAMIC_STAGED_LIB"
