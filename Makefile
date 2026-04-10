@@ -55,8 +55,8 @@ test:
 	    *" $$app "*) ;; \
 	    *) echo "ERROR: unsupported test app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
 	  esac; \
-	  if [[ -x '$(APPS_ROOT)/'"$$app"'/test.sh' ]]; then \
-	    '$(APPS_ROOT)/'"$$app"'/test.sh' "$$app"; \
+	  if [[ -x '$(APPS_ROOT)/'"$$app"'/run_tests.sh' ]]; then \
+	    '$(APPS_ROOT)/'"$$app"'/run_tests.sh' "$$app"; \
 	  else \
 	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/run_tests.sh"; \
 	  fi; \
