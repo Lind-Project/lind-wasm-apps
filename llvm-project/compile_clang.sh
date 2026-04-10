@@ -239,8 +239,8 @@ echo "[clang] configuring cross-build…"
   -DCMAKE_SKIP_RPATH=ON \
   -DCMAKE_SKIP_INSTALL_RPATH=ON \
   \
-  -DCMAKE_C_STANDARD_LIBRARIES="-lc -lcompiler_rt" \
-  -DCMAKE_CXX_STANDARD_LIBRARIES="-lc++ -lc++abi -lcompiler_rt -lc" \
+  -DCMAKE_C_STANDARD_LIBRARIES="-lc" \
+  -DCMAKE_CXX_STANDARD_LIBRARIES="-lc++ -lc++abi -lc" \
   \
   -DHAVE_LIBRT=0 \
   -DHAVE_LIBATOMIC=1 \
