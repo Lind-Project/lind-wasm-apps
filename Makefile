@@ -20,11 +20,13 @@ LIBTIRPC_STAMP := $(APPS_BUILD)/.stamp_libtirpc
 GNULIB_STAMP   := $(APPS_BUILD)/.stamp_gnulib
 ZLIB_STAMP     := $(APPS_BUILD)/.stamp_zlib
 OPENSSL_STAMP  := $(APPS_BUILD)/.stamp_openssl
+LIBCXX_STAMP   := $(APPS_BUILD)/.stamp_libcxx
 MERGE_BASE_STAMP    := $(APPS_BUILD)/.stamp_merge_base_sysroot
 MERGE_TIRPC_STAMP   := $(APPS_BUILD)/.stamp_merge_tirpc
 MERGE_GNULIB_STAMP  := $(APPS_BUILD)/.stamp_merge_gnulib
 MERGE_ZLIB_STAMP    := $(APPS_BUILD)/.stamp_merge_zlib
 MERGE_OPENSSL_STAMP := $(APPS_BUILD)/.stamp_merge_openssl
+MERGE_LIBCXX_STAMP  := $(APPS_BUILD)/.stamp_merge_libcxx
 MERGE_ALL_STAMP     := $(APPS_BUILD)/.stamp_merge_sysroot
 
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
@@ -76,6 +78,25 @@ check-build:
 	  '$(APPS_ROOT)/scripts/check-build.sh' "$$app"; \
 	done
 
+clean:
+	@if [[ -z "$(strip $(APP))" ]]; then \
+	  echo "ERROR: no apps selected; set APP to one or more of: $(TESTABLE_APPS)"; \
+	  exit 1; \
+	fi
+	@for app in $(APP); do \
+	  case " $(TESTABLE_APPS) " in \
+	    *" $$app "*) ;; \
+	    *) echo "ERROR: unsupported clean app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
+	  esac; \
+	  if [[ -x '$(APPS_ROOT)/'"$$app"'/clean.sh' ]]; then \
+	    '$(APPS_ROOT)/'"$$app"'/clean.sh' "$$app"; \
+	  else \
+	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/clean.sh"; \
+	  fi; \
+	done
+	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
+	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)'
+	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
 
 print-config:
 	@echo "LIND_WASM_ROOT=$(LIND_WASM_ROOT)"
@@ -161,6 +182,14 @@ $(OPENSSL_STAMP): $(APPS_ROOT)/openssl/compile_openssl.sh | $(TOOL_ENV)
 
 openssl: $(OPENSSL_STAMP)
 
+# ---------------- libc++ (via compile_libcxx.sh) ------------------------------
+$(LIBCXX_STAMP): $(APPS_ROOT)/llvm-project/compile_libcxx.sh | $(TOOL_ENV)
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/llvm-project/compile_libcxx.sh'
+	touch '$@'
+
+libcxx: $(LIBCXX_STAMP)
+
 # ---------------- Merge sysroot + overlay -------------------------------------
 $(MERGE_BASE_STAMP): | $(TOOL_ENV)
 	@echo "[merge] refreshing base merged sysroot"
@@ -211,7 +240,16 @@ $(MERGE_OPENSSL_STAMP): $(MERGE_BASE_STAMP) $(OPENSSL_STAMP)
 	touch '$@'
 
 
-$(MERGE_ALL_STAMP): $(MERGE_TIRPC_STAMP) $(MERGE_GNULIB_STAMP) $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
+$(MERGE_LIBCXX_STAMP): $(MERGE_BASE_STAMP) $(LIBCXX_STAMP)
+	# libc++ headers (into include/wasm32-wasi/c++/ so clang's -isystem finds them)
+	mkdir -p '$(MERGED_SYSROOT)/include/wasm32-wasi/c++'
+	rsync -a '$(APPS_OVERLAY)/usr/include/c++/' '$(MERGED_SYSROOT)/include/wasm32-wasi/c++/' || true
+	rsync -a '$(APPS_OVERLAY)/usr/lib/wasm32-wasi/' '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
+	rsync -a '$(APPS_OVERLAY)/lib/wasm32-wasi/'     '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
+	touch '$@'
+
+
+$(MERGE_ALL_STAMP): $(MERGE_TIRPC_STAMP) $(MERGE_GNULIB_STAMP) $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP) $(MERGE_LIBCXX_STAMP)
 	touch '$@'
 
 merge-sysroot: $(MERGE_ALL_STAMP)
@@ -276,12 +314,27 @@ sed: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/sed/compile_sed.sh'
 
+# ---------------- gcc (WASM build) --------------------------------------------
+# Uses gcc/compile_gcc.sh to cross-compile GCC cc1 as a wasm32-wasi binary.
+# Requires libc++ in the merged sysroot (for compiling GCC's C++ source).
+# Stages artifacts under build/gcc/usr/local/bin.
+gcc: $(MERGE_LIBCXX_STAMP)
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/gcc/compile_gcc.sh'
+
+# ---------------- binutils (WASM build) ----------------------------------------
+# Uses binutils/compile_binutils.sh to cross-compile ld and as as wasm32-wasi
+# binaries.  Pure C — no libc++ needed.  Stages to build/binutils/usr/local/bin.
+binutils: $(MERGE_ZLIB_STAMP)
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/binutils/compile_binutils.sh'
+
 rebuild-libs:
-	rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' \
-	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
+	rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)' \
+	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 
 rebuild-sysroot:
-	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
+	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 
 # ---------------- cpython (WASM build) ----------------------------------------
 # Placeholder target to preserve the per-app staging/layering pattern.
@@ -317,15 +370,10 @@ install-lmbench:
 install-coreutils:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' coreutils
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils
+install-gcc:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' gcc
 
-clean:
-	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
-	-rm -rf '$(APPS_BIN_DIR)/lmbench'
-	-rm -rf '$(APPS_BUILD)/lmbench'
-	-rm -rf '$(APPS_BIN_DIR)/nginx'
-	-$(MAKE) -C '$(APPS_ROOT)/nginx' clean || true
-	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
-	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)'
-	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
-	$(MAKE) -C '$(APPS_ROOT)/libtirpc' distclean || true
+install-binutils:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' binutils
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils
