@@ -1,6 +1,6 @@
 ##################################################################
 # Sample usage
-# docker build -f Dockerfile \#   
+# docker build -f Dockerfile \   
 #   --build-arg BASE_IMAGE=securesystemslab/lind-wasm-dev:latest \
 #   -t lind-wasm-apps:dev .
 ##################################################################
