@@ -41,7 +41,7 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot test install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils postgres clean clean-all rebuild-libs rebuild-sysroot test install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
