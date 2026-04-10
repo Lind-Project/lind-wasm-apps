@@ -171,7 +171,7 @@ set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
 set(CMAKE_C_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -D__linux__" CACHE STRING "" FORCE)
 
 # WASM C++ flags — use libc++, no exceptions/RTTI/unwind to reduce binary size
-set(CMAKE_CXX_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -D__linux__ -nostdinc++ -isystem $LIBCXX_INCLUDE" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -D__linux__ -nostdinc++ -isystem $LIBCXX_INCLUDE -include $SCRIPT_DIR/fix_std_maxmin.h" CACHE STRING "" FORCE)
 
 # Linker flags
 set(CMAKE_EXE_LINKER_FLAGS "\
