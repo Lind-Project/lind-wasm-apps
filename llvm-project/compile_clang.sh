@@ -242,7 +242,11 @@ echo "[clang] configuring cross-build…"
   -DCMAKE_CXX_FLAGS="-Os" \
   \
   -DHAVE_LIBRT=0 \
-  -DHAVE_LIBATOMIC=1
+  -DHAVE_LIBATOMIC=1 \
+  -DHAVE_CXX_ATOMICS_WITHOUT_LIB=ON \
+  -DHAVE_CXX_ATOMICS64_WITHOUT_LIB=ON \
+  -DHAVE_CXX_ATOMICS_WITH_LIB=OFF \
+  -DHAVE_CXX_ATOMICS64_WITH_LIB=OFF
 
 # ----------------------------------------------------------------------
 # 5) Build clang and lld
