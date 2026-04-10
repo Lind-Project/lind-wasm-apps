@@ -62,24 +62,20 @@ check-build:
 	done
 
 clean:
-	@if [[ -z "$(strip $(APP))" ]]; then \
-	  echo "ERROR: no apps selected; set APP to one or more of: $(TESTABLE_APPS)"; \
-	  exit 1; \
-	fi
+	@# Per-app clean scripts (optional — skips apps without clean.sh)
 	@for app in $(APP); do \
 	  case " $(TESTABLE_APPS) " in \
 	    *" $$app "*) ;; \
-	    *) echo "ERROR: unsupported clean app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
+	    *) continue ;; \
 	  esac; \
 	  if [[ -x '$(APPS_ROOT)/'"$$app"'/clean.sh' ]]; then \
 	    '$(APPS_ROOT)/'"$$app"'/clean.sh' "$$app"; \
-	  else \
-	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/clean.sh"; \
 	  fi; \
 	done
+	@# Infrastructure: stamps, sysroot, overlay, toolchain env
 	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
-	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)'
-	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
+	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)'
+	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 
 print-config:
 	@echo "LIND_WASM_ROOT=$(LIND_WASM_ROOT)"
