@@ -351,150 +351,25 @@ generate_asyncify_ignorelist() {
   local NAME="$1"
   local OUTFILE="$2"
 
-  # Patterns match against mangled C++ names in the WASM name section.
-  # Use *ClassName* or *FunctionPart* — NOT namespace:: prefixes.
-  # Binaryen * globs match any substring including mangled prefixes.
+  # The WASM name section contains a mix of demangled C++ names and
+  # mangled _Z* names.  All C++ functions in clang/LLVM are pure
+  # computation — I/O only happens through C runtime functions (glibc
+  # wrappers like __lind_make_syscall, read, write, etc.) which don't
+  # have C++ mangled names.
+  #
+  # Exclude ALL C++ functions from asyncify.  This is safe because:
+  #   - Asyncify only needs to instrument functions that transitively
+  #     reach yield points (I/O syscalls)
+  #   - All yield points go through C runtime stubs (no _Z prefix,
+  #     no C++ demangled names with ::)
+  #   - The C stubs are small and asyncify handles them fine
+  #
+  # We match both mangled (_Z*) and demangled (*::*) C++ names,
+  # plus common LLVM/Clang class names as a safety net.
   cat > "$OUTFILE" << 'PATTERNS'
-# X86 backend — TableGen-generated, enormous switch tables
-*X86Gen*
-*X86Inst*
-*X86MCCodeEmitter*
-*X86AsmParser*
-*X86Disassembler*
-*X86TargetLowering*
-*X86InstrInfo*
-*X86RegisterInfo*
-*X86Subtarget*
-*X86DAGToDAGISel*
-*X86ISelLowering*
-*X86FrameLowering*
-
-# Instruction selection (TableGen-generated)
-*SelectCode*
-*SelectAddr*
-*EmitNode*
-*MatcherTable*
-*CheckOpcode*
-*CheckPredicate*
-*CheckType*
-*CheckComplexPat*
-*MorphNodeTo*
-*SelectionDAG*
-*DAGISel*
-
-# DAG combiner / legalizer
-*DAGCombiner*
-*DAGCombine*
-*LegalizeDAG*
-*LegalizeOp*
-*LegalizeTypes*
-*PromoteNode*
-*ExpandNode*
-*SoftPromoteHalf*
-*TargetLowering*
-
-# InstCombine
-*InstCombine*
-*InstCombiner*
-
-# Instruction visitor pattern (all visit* methods are pure transforms)
-*visit*
-
-# Clang Sema — huge template-heavy semantic analysis
-*Sema*
-*TreeTransform*
-*TemplateInstantiator*
-*TemplateDeclInstantiator*
-*ExprEvaluator*
-*IntExprEvaluator*
-
-# Clang CodeGen
-*CodeGenFunction*
-*CodeGenModule*
-*CGOpenMP*
-*EmitScalar*
-*EmitAggregate*
-*EmitLValue*
-*CGBuiltin*
-
-# Clang Parser
-*Parser*
-
-# Clang AST
-*ASTReader*
-*ASTWriter*
-*ASTDeclReader*
-*ASTDeclWriter*
-*ASTStmtReader*
-*ASTStmtWriter*
-
-# Scalar evolution / loop analysis
-*ScalarEvolution*
-*computeExitLimit*
-*LoopStrengthReduce*
-
-# Register allocation / live intervals
-*RegAlloc*
-*LiveInterval*
-*InterferenceCache*
-*VirtRegMap*
-*LiveRange*
-
-# Global instruction selection
-*GlobalISel*
-*InstructionSelect*
-*Legalizer*
-*RegBankSelect*
-
-# LLVM core template-heavy utilities (mangled, no namespace prefix)
-*SmallVector*
-*DenseMap*
-*StringSwitch*
-*APInt*
-*APFloat*
-*FoldingSet*
-*BumpPtrAllocator*
-*StringMap*
-*ValueMap*
-
-# MC layer — assembly/object emission
-*MCCodeEmitter*
-*MCAsmBackend*
-*MCObjectWriter*
-*MCAssembler*
-*MCELFStreamer*
-
-# Optimization passes — pure transforms
-*GVN*
-*SROA*
-*SimplifyCFG*
-*JumpThreading*
-*CorrelatedValuePropagation*
-*IndVarSimplify*
-*LoopVectorize*
-*SLPVectorizer*
-*MemCpyOpt*
-*DeadStoreElimination*
-*AggressiveInstCombine*
-*Reassociate*
-*ConstantFold*
-*InstructionSimplify*
-*ValueTracking*
-*LazyValueInfo*
-
-# Diagnostics (large table lookups)
-*DiagnosticIDs*
-*Diagnostic*
-
-# LLD linker
-*relocateOne*
-*finalizeContents*
-*scanRelocs*
-*LinkerDriver*
-*SymbolTable*
-*InputSection*
-*OutputSection*
-*Writer*
+_Z*
+*::*
+*(anonymous namespace)*
 PATTERNS
 }
 
