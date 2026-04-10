@@ -163,19 +163,20 @@ set(CMAKE_C_COMPILER_WORKS TRUE)
 set(CMAKE_CXX_COMPILER_WORKS TRUE)
 set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
 
-# WASM C flags
-set(CMAKE_C_FLAGS_INIT "-pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables")
+# WASM C flags — use -Os to minimize binary size (clang is huge)
+# Use CACHE FORCE so nothing can override these (not even a stale CMakeCache)
+set(CMAKE_C_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables" CACHE STRING "" FORCE)
 
 # WASM C++ flags — use libc++, no exceptions/RTTI/unwind to reduce binary size
-set(CMAKE_CXX_FLAGS_INIT "-pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -nostdinc++ -isystem $LIBCXX_INCLUDE")
+set(CMAKE_CXX_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -nostdinc++ -isystem $LIBCXX_INCLUDE" CACHE STRING "" FORCE)
 
 # Linker flags
-set(CMAKE_EXE_LINKER_FLAGS_INIT "\
+set(CMAKE_EXE_LINKER_FLAGS "\
   -L$MERGED_SYSROOT/lib/wasm32-wasi \
   -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
   -Wl,--export=__stack_pointer,--export=__stack_low \
   -Wl,--import-memory,--export-memory \
-  -Wl,--max-memory=67108864")
+  -Wl,--max-memory=67108864" CACHE STRING "" FORCE)
 
 # Don't pass -rpath to the linker
 set(CMAKE_SKIP_RPATH TRUE)
@@ -237,9 +238,6 @@ echo "[clang] configuring cross-build…"
   \
   -DCMAKE_C_STANDARD_LIBRARIES="-lc -lcompiler_rt" \
   -DCMAKE_CXX_STANDARD_LIBRARIES="-lc++ -lc++abi -lcompiler_rt -lc" \
-  \
-  -DCMAKE_C_FLAGS="-Os" \
-  -DCMAKE_CXX_FLAGS="-Os" \
   \
   -DHAVE_LIBRT=0 \
   -DHAVE_LIBATOMIC=1 \
