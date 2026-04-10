@@ -165,11 +165,13 @@ set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
 
 # WASM C flags — use -Os to minimize binary size (clang is huge)
 # Use CACHE FORCE so nothing can override these (not even a stale CMakeCache)
-# -D__GNU__: WASI uses glibc, so tell LLVM headers to use <endian.h> etc.
-set(CMAKE_C_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -D__GNU__" CACHE STRING "" FORCE)
+# WASI uses glibc headers — define __linux__ so LLVM uses <endian.h>,
+# Linux-style struct fields, etc.  (WASI is not Linux, but its glibc
+# sysroot matches the Linux ABI for these purposes.)
+set(CMAKE_C_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -D__linux__" CACHE STRING "" FORCE)
 
 # WASM C++ flags — use libc++, no exceptions/RTTI/unwind to reduce binary size
-set(CMAKE_CXX_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -D__GNU__ -nostdinc++ -isystem $LIBCXX_INCLUDE" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -D__linux__ -nostdinc++ -isystem $LIBCXX_INCLUDE" CACHE STRING "" FORCE)
 
 # Linker flags
 set(CMAKE_EXE_LINKER_FLAGS "\
