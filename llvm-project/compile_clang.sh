@@ -299,7 +299,7 @@ post_process_binary() {
   echo "[clang] running wasm-opt on $NAME (epoch-injection + asyncify + ${OPT_FLAGS[*]})…"
   "$WASM_OPT" --epoch-injection --asyncify \
     --pass-arg=asyncify-removelist@@"$ASYNCIFY_IGNORE" \
-    --strip-debug "${OPT_FLAGS[@]}" \
+    --debuginfo "${OPT_FLAGS[@]}" \
     "$WASM_FILE" -o "$OPT_WASM"
 
   if [[ ! -f "$OPT_WASM" ]]; then
