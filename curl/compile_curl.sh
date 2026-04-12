@@ -218,6 +218,17 @@ else
   exit 1
 fi
 
+# ----------------------------------------------------------------------
+# 10) Stage CA certificate bundle
+# ----------------------------------------------------------------------
+CA_BUNDLE_DEST="$APPS_BUILD/curl/etc/ssl/certs"
+mkdir -p "$CA_BUNDLE_DEST"
+if [[ -f /etc/ssl/certs/ca-certificates.crt ]]; then
+  cp /etc/ssl/certs/ca-certificates.crt "$CA_BUNDLE_DEST/ca-certificates.crt"
+  echo "[curl] CA bundle staged to $CA_BUNDLE_DEST"
+else
+  echo "[curl] WARNING: /etc/ssl/certs/ca-certificates.crt not found on host; HTTPS may fail at runtime."
+fi
 
 echo
 echo "[curl] build complete. Outputs under:"
