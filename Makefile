@@ -47,6 +47,22 @@ APP            ?= $(TESTABLE_APPS)
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
+test:
+	@if [[ -z "$(strip $(APP))" ]]; then \
+	  echo "ERROR: no apps selected; set APP to one or more of: $(TESTABLE_APPS)"; \
+	  exit 1; \
+	fi
+	@for app in $(APP); do \
+	  case " $(TESTABLE_APPS) " in \
+	    *" $$app "*) ;; \
+	    *) echo "ERROR: unsupported test app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
+	  esac; \
+	  if [[ -x '$(APPS_ROOT)/'"$$app"'/run_tests.sh' ]]; then \
+	    '$(APPS_ROOT)/'"$$app"'/run_tests.sh' "$$app"; \
+	  else \
+	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/run_tests.sh"; \
+	  fi; \
+	done
 
 check-build:
 	@if [[ -z "$(strip $(APP))" ]]; then \
@@ -58,6 +74,7 @@ check-build:
 	    *" $$app "*) ;; \
 	    *) echo "ERROR: unsupported test app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
 	  esac; \
+	  
 	  '$(APPS_ROOT)/scripts/check-build.sh' "$$app"; \
 	done
 
