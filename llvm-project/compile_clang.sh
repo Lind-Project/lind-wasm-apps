@@ -95,6 +95,7 @@ LIBCXX_INCLUDE="$MERGED_SYSROOT/include/wasm32-wasi/c++/v1"
 echo "[clang] using CLANG          = $CLANG"
 echo "[clang] using CLANGXX        = $CLANGXX"
 echo "[clang] using AR             = $AR"
+echo "[clang] using LD             = $LD"
 echo "[clang] LIND_WASM_ROOT       = $LIND_WASM_ROOT"
 echo "[clang] merged sysroot       = $MERGED_SYSROOT"
 echo "[clang] libc++ headers       = $LIBCXX_INCLUDE"
@@ -134,88 +135,42 @@ else
 fi
 
 # ----------------------------------------------------------------------
-# 3) Generate CMake toolchain file for cross-compilation
+# 3) Build compiler-rt
 # ----------------------------------------------------------------------
-CROSS_BUILD="$APPS_BUILD/llvm-wasm-build"
-mkdir -p "$CROSS_BUILD"
+echo "[clang] building compiler-rt…"
 
-TOOLCHAIN_FILE="$CROSS_BUILD/Toolchain-WASI-LLVM.cmake"
-cat > "$TOOLCHAIN_FILE" << CMAKE_EOF
-# Auto-generated CMake toolchain for cross-compiling LLVM to wasm32-wasi
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR wasm32)
+"$SCRIPT_DIR/compile_compiler-rt.sh"
 
-# Compiler and tools
-set(CMAKE_C_COMPILER "$CLANG")
-set(CMAKE_CXX_COMPILER "$CLANGXX")
-set(CMAKE_AR "$AR")
-set(CMAKE_NM "$NM")
-set(CMAKE_RANLIB "$RANLIB")
-set(CMAKE_LINKER "$LLVM_BIN_DIR/wasm-ld")
-set(CMAKE_SYSROOT "$MERGED_SYSROOT")
+# ----------------------------------------------------------------------
+# 4) Generate CMake toolchain file for wasm32-wasi cross-compilation
+# ----------------------------------------------------------------------
+mkdir -p "$BUILD_DIR"
 
-# Target configuration
-set(CMAKE_C_COMPILER_TARGET wasm32-unknown-wasi)
-set(CMAKE_CXX_COMPILER_TARGET wasm32-unknown-wasi)
-
-# Force CMake to accept compilers without try-run (can't run wasm on host)
-set(CMAKE_C_COMPILER_WORKS TRUE)
-set(CMAKE_CXX_COMPILER_WORKS TRUE)
-set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
-
-# WASM C flags — use -Os to minimize binary size (clang is huge)
-# Use CACHE FORCE so nothing can override these (not even a stale CMakeCache)
-# WASI uses glibc headers — define __linux__ so LLVM uses <endian.h>,
-# Linux-style struct fields, etc.  (WASI is not Linux, but its glibc
-# sysroot matches the Linux ABI for these purposes.)
-set(CMAKE_C_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -D__linux__" CACHE STRING "" FORCE)
-
-# WASM C++ flags — use libc++, no exceptions/RTTI/unwind to reduce binary size
-set(CMAKE_CXX_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -D__linux__ -nostdinc++ -isystem $LIBCXX_INCLUDE -include $SCRIPT_DIR/fix_std_maxmin.h" CACHE STRING "" FORCE)
-
-# Linker flags
-set(CMAKE_EXE_LINKER_FLAGS "\
-  -L$MERGED_SYSROOT/lib/wasm32-wasi \
-  -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
-  -Wl,--export=__stack_pointer,--export=__stack_low \
-  -Wl,--import-memory,--export-memory \
-  -Wl,--max-memory=67108864" CACHE STRING "" FORCE)
-
-# Don't pass -rpath to the linker
-set(CMAKE_SKIP_RPATH TRUE)
-set(CMAKE_SKIP_INSTALL_RPATH TRUE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
-
-# Prevent try-run errors
-set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
-
-# Skip old toolchain warnings
-set(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN ON CACHE BOOL "" FORCE)
-
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-CMAKE_EOF
+TOOLCHAIN_FILE="$BUILD_DIR/Toolchain-WASI-LLVM.cmake"
+sed -e "s|@CLANG@|$CLANG|g" \
+    -e "s|@CLANGXX@|$CLANGXX|g" \
+    -e "s|@AR@|$AR|g" \
+    -e "s|@NM@|$NM|g" \
+    -e "s|@LD@|$LD|g" \
+    -e "s|@RANLIB@|$RANLIB|g" \
+    -e "s|@BASE_SYSROOT@|$BASE_SYSROOT|g" \
+    "$SCRIPT_DIR/Toolchain-WASI.cmake.in" > "$TOOLCHAIN_FILE"
 
 echo "[clang] generated toolchain file: $TOOLCHAIN_FILE"
 
 # ----------------------------------------------------------------------
-# 4) Configure cross-build
+# 5) Configure cross-build
 # ----------------------------------------------------------------------
 echo "[clang] configuring cross-build…"
 
 "$CMAKE" -B "$CROSS_BUILD" -S "$LLVM_SRC" \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
   -DCMAKE_BUILD_TYPE=Release \
-  \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_HOST_TRIPLE="wasm32-unknown-wasi" \
   -DLLVM_DEFAULT_TARGET_TRIPLE="x86_64-unknown-linux-gnu" \
   -DLLVM_TARGETS_TO_BUILD="X86" \
-  \
   -DLLVM_NATIVE_TOOL_DIR="$NATIVE_BUILD/bin" \
-  \
   -DLLVM_ENABLE_THREADS=OFF \
   -DLLVM_ENABLE_PIC=OFF \
   -DLLVM_ENABLE_LIBCXX=ON \
@@ -226,22 +181,17 @@ echo "[clang] configuring cross-build…"
   -DLLVM_INCLUDE_EXAMPLES=OFF \
   -DLLVM_INCLUDE_BENCHMARKS=OFF \
   -DLLVM_INCLUDE_GOOGLETEST=OFF \
-  \
   -DLLVM_TOOL_CLANG_BUILD=ON \
   -DLLVM_TOOL_LLD_BUILD=ON \
   -DLLVM_TOOL_LLI_BUILD=OFF \
   -DLLVM_TOOL_LLVM_JITLINK_EXECUTOR_BUILD=OFF \
-  \
   -DLLD_ENABLE_TARGETS="ELF" \
   -DCLANG_INCLUDE_TESTS=OFF \
   -DLLD_INCLUDE_TESTS=OFF \
-  \
   -DCMAKE_SKIP_RPATH=ON \
   -DCMAKE_SKIP_INSTALL_RPATH=ON \
-  \
-  -DCMAKE_C_STANDARD_LIBRARIES="-lc" \
-  -DCMAKE_CXX_STANDARD_LIBRARIES="-lc++ -lc++abi -lc" \
-  \
+  -DCMAKE_C_STANDARD_LIBRARIES="-lc -lcompiler_rt" \
+  -DCMAKE_CXX_STANDARD_LIBRARIES="-lc++ -lc++abi -lc -lcompiler_rt" \
   -DHAVE_LIBRT=0 \
   -DHAVE_LIBATOMIC=1 \
   -DHAVE_CXX_ATOMICS_WITHOUT_LIB=ON \
@@ -250,7 +200,7 @@ echo "[clang] configuring cross-build…"
   -DHAVE_CXX_ATOMICS64_WITH_LIB=OFF
 
 # ----------------------------------------------------------------------
-# 5) Build clang and lld
+# 6) Build clang and lld
 # ----------------------------------------------------------------------
 echo "[clang] building clang…"
 "$CMAKE" --build "$CROSS_BUILD" --target clang -j"$JOBS"
@@ -258,8 +208,11 @@ echo "[clang] building clang…"
 echo "[clang] building lld…"
 "$CMAKE" --build "$CROSS_BUILD" --target lld -j"$JOBS"
 
+echo "[clang] installing core resource headers…"
+"$CMAKE" --build "$CROSS_BUILD" --target install-core-resource-headers -j"$JOBS"
+
 # ----------------------------------------------------------------------
-# 6) Post-processing helper
+# 7) Post-processing helper
 # ----------------------------------------------------------------------
 post_process_binary() {
   local NAME="$1"
@@ -327,7 +280,7 @@ post_process_binary() {
 }
 
 # ----------------------------------------------------------------------
-# 7) Asyncify ignore list generator
+# 8) Asyncify ignore list generator
 #
 # Like GCC's cc1, clang is a massive C++ binary with auto-generated
 # code (TableGen instruction selection, pattern matchers) and
@@ -361,7 +314,7 @@ PATTERNS
 }
 
 # ----------------------------------------------------------------------
-# 8) Locate and post-process binaries
+# 9) Locate and post-process binaries
 # ----------------------------------------------------------------------
 # clang binary — CMake produces bin/clang-18.wasm (or similar)
 CLANG_BIN=""
