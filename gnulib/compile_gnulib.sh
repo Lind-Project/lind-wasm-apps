@@ -88,13 +88,22 @@ if [[ -x ./bootstrap ]]; then
   ./bootstrap --no-git --skip-po || true
 fi
 
+# ---------------------------------------------------------
+# Branch libgnu build flags based on Dylink mode
+# ---------------------------------------------------------
 if [[ "$LIND_DYLINK" == "1" ]]; then
-    EXTRA_CFLAGS="-fPIC"
-    CONFIG_ARGS="--enable-shared --disable-static"
+  echo "[libgnu] Building with PIC and default visibility for Dynamic Linking..."
+  EXTRA_CFLAGS="-fPIC -fvisibility=default"
+  # We MUST keep static enabled to avoid libtool/wasm-ld ELF errors,
+  # but the -fPIC flag above ensures the objects inside libgnu.a are position-independent.
+  CONFIG_ARGS="--disable-shared --enable-static"
 else
-    EXTRA_CFLAGS=""
-    CONFIG_ARGS="--disable-shared --enable-static"
+  echo "[libgnu] Building standard static objects for Static Linking..."
+  EXTRA_CFLAGS=""
+  CONFIG_ARGS="--disable-shared --enable-static"
 fi
+
+
 
 CC="$CC_WASI" AR="$AR" RANLIB="$RANLIB" \
 CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g $EXTRA_CFLAGS" \
