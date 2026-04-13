@@ -364,6 +364,11 @@ if [[ -f "$PG_CONFIG_H" ]]; then
     echo "[postgres] [wasm] disabling signalfd in pg_config.h..."
     sed -i 's/#define HAVE_SYS_SIGNALFD_H.*$/\/* #undef HAVE_SYS_SIGNALFD_H -- disabled for WASI *\//' "$PG_CONFIG_H"
   fi
+
+  # Force pwritev/preadv off — not implemented in lind-wasm RawPOSIX.
+  # Postgres falls back to looping pwrite/pread which ARE implemented.
+  sed -i 's/#define HAVE_DECL_PWRITEV 1/#define HAVE_DECL_PWRITEV 0/' "$PG_CONFIG_H"
+  sed -i 's/#define HAVE_DECL_PREADV 1/#define HAVE_DECL_PREADV 0/' "$PG_CONFIG_H"
 fi
 
 # Patch out the root-user check — inside the Lind sandbox geteuid() returns 0
