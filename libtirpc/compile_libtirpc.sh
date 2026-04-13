@@ -29,12 +29,32 @@ echo "[libtirpc] CC=$CC_WASI"
 pushd "$REPO_ROOT/libtirpc" >/dev/null
 
 autoreconf -fi
+
+# ---------------------------------------------------------
+# Branch libtirpc build flags based on Dylink mode
+# ---------------------------------------------------------
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[libtirpc] Building with PIC and default visibility for Dynamic Linking..."
+  EXTRA_CFLAGS="-fPIC -fvisibility=default"
+  CONFIG_ARGS="--disable-shared --enable-static --with-pic"
+else
+  echo "[libtirpc] Building standard static objects for Static Linking..."
+  EXTRA_CFLAGS=""
+  CONFIG_ARGS="--disable-shared --enable-static"
+fi
+
 CC="$CC_WASI" AR="$AR" RANLIB="$RANLIB" \
-CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g" \
+CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g $EXTRA_CFLAGS" \
 LDFLAGS="--sysroot=$BASE_SYSROOT" \
 PKG_CONFIG=false \
-./configure --host=wasm32-unknown-wasi --disable-gssapi --disable-shared --enable-static --with-pic --sysconfdir=/etc \
-  ac_cv_func_malloc_0_nonnull=yes ac_cv_func_memset=yes ac_cv_func_strchr=yes
+./configure --host=wasm32-unknown-wasi \
+  --disable-gssapi \
+  $CONFIG_ARGS \
+  --sysconfdir=/etc \
+  ac_cv_func_malloc_0_nonnull=yes \
+  ac_cv_func_memset=yes \
+  ac_cv_func_strchr=yes
+
 
 make -j
 rsync -a "tirpc/" "$OVERLAY/usr/include/tirpc/"
