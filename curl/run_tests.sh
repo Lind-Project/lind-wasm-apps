@@ -26,7 +26,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
     LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
+LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run --preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 CURL_BIN="usr/local/bin/curl"
 
