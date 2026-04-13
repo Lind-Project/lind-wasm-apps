@@ -6,6 +6,8 @@ set -euo pipefail
 #
 # Cross-compiles GNU grep 3.12 to wasm32-wasi using the merged sysroot and
 # toolchain detected by the top-level Makefile preflight target.
+#
+# Supports both Static (default) and Dynamic (LIND_DYLINK=1) builds.
 ###############################################################################
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,6 +28,7 @@ WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
+LIND_DYLINK="${LIND_DYLINK:-0}"
 
 # ----------------------------------------------------------------------
 # 1) Load toolchain from Makefile preflight
@@ -55,7 +58,7 @@ fi
 mkdir -p "$STAGE_DIR"
 
 # ----------------------------------------------------------------------
-# 2) WASM toolchain flags
+# 2) Base WASM Toolchain Flags
 # ----------------------------------------------------------------------
 CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
 
@@ -65,11 +68,78 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
 
-LDFLAGS_WASM=(
-  "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
-  -L"$MERGED_SYSROOT/lib/wasm32-wasi"
-  -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
-)
+# ----------------------------------------------------------------------
+# 3) Branch Logic: Dynamic vs Static Settings
+# ----------------------------------------------------------------------
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[grep] Mode: DYNAMIC LINKING (LIND_DYLINK=1)"
+  CFLAGS_WASM+=(-fPIC)
+
+  ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
+  if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+    echo "[grep] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'" >&2
+    exit 1
+  fi
+
+  DYLINK_CRT_OBJS=(
+    "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o"
+  )
+  for obj in "${DYLINK_CRT_OBJS[@]}"; do
+    if [[ ! -f "$obj" ]]; then
+      echo "[grep] ERROR: required dylink CRT object '$obj' not found." >&2
+      exit 1
+    fi
+  done
+
+  LDFLAGS_WASM=(
+    "-nostartfiles"
+    "-Wl,-pie"
+    "-Wl,--import-table"
+    "-Wl,--import-memory"
+    "-Wl,--export-memory"
+    "-Wl,--shared-memory"
+    "-Wl,--max-memory=67108864"
+    "-Wl,--allow-undefined"
+    "-Wl,--unresolved-symbols=import-dynamic"
+    "-Wl,--export=__wasm_call_ctors"
+    "-Wl,--export-if-defined=__wasm_init_tls"
+    "-Wl,--export=__tls_base"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+    "${DYLINK_CRT_OBJS[@]}"
+  )
+  
+  LDFLAGS_CONFIGURE=(
+    "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+  )
+
+  export enable_shared=no
+  export enable_static=yes
+  export lt_cv_prog_compiler_pic_works=yes
+  export lt_cv_prog_compiler_static_works=yes
+else
+  echo "[grep] Mode: STATIC LINKING (LIND_DYLINK=0 or unset)"
+  
+  LDFLAGS_WASM=(
+    "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+  )
+  LDFLAGS_CONFIGURE=("${LDFLAGS_WASM[@]}")
+
+  export enable_shared=no
+  export enable_static=yes
+  export lt_cv_prog_compiler_pic_works=no
+  export lt_cv_prog_compiler_static_works=yes
+fi
+
+export CFLAGS="${CFLAGS:-} ${CFLAGS_WASM[*]}"
+export CPPFLAGS="${CPPFLAGS:-} -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi"
+export LDFLAGS="${LDFLAGS:-} ${LDFLAGS_CONFIGURE[*]}"
 
 echo "[grep] using CLANG       = $CLANG"
 echo "[grep] using AR          = $AR"
@@ -79,18 +149,6 @@ echo "[grep] merged sysroot    = $MERGED_SYSROOT"
 echo "[grep] stage dir         = $STAGE_DIR"
 echo "[grep] CC_WASM           = $CC_WASM"
 echo
-
-# ----------------------------------------------------------------------
-# 3) Force static-only
-# ----------------------------------------------------------------------
-export enable_shared=no
-export enable_static=yes
-export lt_cv_prog_compiler_pic_works=no
-export lt_cv_prog_compiler_static_works=yes
-
-export CFLAGS="${CFLAGS:-} ${CFLAGS_WASM[*]}"
-export CPPFLAGS="${CPPFLAGS:-} -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi"
-export LDFLAGS="${LDFLAGS:-} ${LDFLAGS_WASM[*]}"
 
 # ----------------------------------------------------------------------
 # 4) Patch gnulib fpending.c — add __wasi__ fallback before #error
@@ -163,7 +221,7 @@ echo "[grep] configuring…"
     RANLIB="$RANLIB" \
     CFLAGS="${CFLAGS_WASM[*]}" \
     CPPFLAGS="$CPPFLAGS" \
-    LDFLAGS="${LDFLAGS_WASM[*]}"
+    LDFLAGS="${LDFLAGS_CONFIGURE[*]}"
 )
 
 if [[ ! -f "$GREP_ROOT/Makefile" ]]; then
@@ -175,7 +233,11 @@ fi
 # 7) Build
 # ----------------------------------------------------------------------
 echo "[grep] building…"
-make -C "$GREP_ROOT" -j"$JOBS" V=1
+
+# Inject the true Wasm LDFLAGS and CFLAGS for the make step
+make -C "$GREP_ROOT" -j"$JOBS" V=1 \
+  CFLAGS="${CFLAGS_WASM[*]}" \
+  LDFLAGS="${LDFLAGS_WASM[*]}"
 
 # ----------------------------------------------------------------------
 # 8) Stage binary
@@ -191,20 +253,41 @@ GREP_OPT_WASM="$SCRIPT_DIR/grep.opt.wasm"
 cp "$GREP_BIN" "$GREP_WASM"
 
 # ----------------------------------------------------------------------
-# 9) wasm-opt (best-effort)
+# 9) wasm-opt & exports
 # ----------------------------------------------------------------------
 if [[ -x "$WASM_OPT" ]]; then
-  echo "[grep] running wasm-opt…"
-  "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
-    "$GREP_WASM" -o "$GREP_OPT_WASM" || true
+  echo "[grep] running wasm-opt (asyncify + optimization)…"
+  if [[ "$LIND_DYLINK" == "1" ]]; then
+    "$WASM_OPT" \
+      --enable-bulk-memory --enable-threads \
+      --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+      --asyncify --pass-arg=asyncify-import-globals \
+      --debuginfo \
+      "$GREP_WASM" -o "$GREP_OPT_WASM" || true
+  else
+    "$WASM_OPT" \
+      --epoch-injection \
+      --asyncify \
+      --debuginfo \
+      -O2 \
+      "$GREP_WASM" -o "$GREP_OPT_WASM" || true
+  fi
 else
   echo "[grep] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
   exit 1
 fi
 
 if [[ ! -f "$GREP_OPT_WASM" ]]; then
-  echo "[grep] ERROR: Failed to generate "$GREP_OPT_WASM"; Exiting.."
+  echo "[grep] ERROR: Failed to generate $GREP_OPT_WASM; Exiting.."
   exit 1
+fi
+
+# Add dylink exports if dynamic linking is enabled
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[grep] adding dylink exports via add-export-tool..."
+  "$ADD_EXPORT_TOOL" "$GREP_OPT_WASM" "$GREP_OPT_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+  "$ADD_EXPORT_TOOL" "$GREP_OPT_WASM" "$GREP_OPT_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+  "$ADD_EXPORT_TOOL" "$GREP_OPT_WASM" "$GREP_OPT_WASM" __stack_pointer global __stack_pointer
 fi
 
 # ----------------------------------------------------------------------
@@ -215,7 +298,6 @@ if [[ -x "$LIND_BOOT" ]]; then
   if "$LIND_BOOT" --precompile "$GREP_OPT_WASM"; then
     
     GREP_OPT_CWASM="$SCRIPT_DIR/grep.opt.cwasm"
-
 
     if [[ -f "$GREP_OPT_CWASM" ]]; then
       cp "$GREP_OPT_CWASM" "$STAGE_DIR/grep"
@@ -235,8 +317,9 @@ else
   exit 1
 fi
 
-
 echo
 echo "[grep] build complete. Outputs under:"
 echo "  $STAGE_DIR"
 ls -lh "$STAGE_DIR" || true
+
+
