@@ -31,8 +31,17 @@ pushd "$REPO_ROOT/zlib" >/dev/null
 
 make distclean || true
 
+# Branch zlib build flags based on Dylink mode
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[zlib] Building with PIC and default visibility for Dynamic Linking..."
+  ZLIB_CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g -fPIC -fvisibility=default"
+else
+  echo "[zlib] Building standard static objects for Static Linking..."
+  ZLIB_CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g"
+fi
+
 CC="$CC_WASI" AR="$AR" RANLIB="$RANLIB" \
-CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g" \
+CFLAGS="$ZLIB_CFLAGS" \
 LDFLAGS="--sysroot=$BASE_SYSROOT" \
 ./configure --static --prefix="$OVERLAY/usr"
 

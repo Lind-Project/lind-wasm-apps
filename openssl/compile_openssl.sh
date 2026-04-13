@@ -32,10 +32,25 @@ pushd "$REPO_ROOT/openssl" >/dev/null
 
 make distclean || true
 
+# ---------------------------------------------------------
+# Branch OpenSSL build flags based on Dylink mode
+# ---------------------------------------------------------
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[openssl] Building with PIC and default visibility for Dynamic Linking..."
+  SSL_CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g -fPIC -fvisibility=default"
+  SSL_PIC_FLAG="enable-pic"
+else
+  echo "[openssl] Building standard static objects for Static Linking..."
+  SSL_CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g"
+  SSL_PIC_FLAG=""
+fi
+
+# Pass the conditional variables into the build environment
 CC="$CC_WASI" AR="$AR" RANLIB="$RANLIB" \
-CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g" \
+CFLAGS="$SSL_CFLAGS" \
 LDFLAGS="--sysroot=$BASE_SYSROOT" \
 ./Configure linux-generic32 \
+  $SSL_PIC_FLAG \
   no-asm no-shared no-dso no-async \
   no-engine no-afalgeng no-ui-console no-tests \
   --prefix="$INSTALL_DIR" --openssldir="$INSTALL_DIR/ssl"
