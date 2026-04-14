@@ -78,12 +78,6 @@ echo "[python] Dynamic shared library staged as $DYNAMIC_STAGED_LIB"
 
 #compile shared python
 
-DYLINK_CRT_OBJS=(
-    "$SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
-    "$SYSROOT/lib/wasm32-wasi/crt1_shared.o"
-    "$SYSROOT/lib/wasm32-wasi/lind_utils.o"
-  )
-
 PYTHON_WASM="$BUILD_WASM/python_shared.wasm"
 PYTHON_OPT_WASM="$BUILD_WASM/python_shared.opt.wasm"
 PYTHON_OPT_CWASM="$BUILD_WASM/python_shared.opt.cwasm"
