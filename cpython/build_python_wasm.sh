@@ -68,11 +68,8 @@ fi
 make AR="llvm-ar" ARFLAGS="crs"
 
 # install necessary files into lind filesystem
-sudo make install DESTDIR="${LINDFS}"
+sudo make install DESTDIR="${PYTHON_OUT_DIR}"
 
-# apply wasm-opt
-# /home/lind/lind-wasm/tools/binaryen/bin/wasm-opt --epoch-injection --asyncify -O2 --debuginfo python.wasm -o python.wasm
-# /home/lind/lind-wasm/src/wasmtime/target/debug/wasmtime compile python.wasm -o python.cwasm
 
 # 6. Apply wasm-opt (best-effort)
 ###############################################################################
