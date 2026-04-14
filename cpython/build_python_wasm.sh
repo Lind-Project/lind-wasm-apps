@@ -20,48 +20,6 @@ PYTHON_OUT_DIR="$APPS_ROOT/build/cpython"
 
 cd $SCRIPT_DIR
 
-# --- Clean Target ---
-if [[ "${1:-}" == "clean" ]]; then
-    echo "=> Cleaning build environment..."
-    
-    # Clean native and wasm build
-    rm -rf build-native
-    rm -rf build-wasm
-
-    # 3. Clean WASI placeholder libraries
-    rm -f "${SYSROOT}/lib/wasm32-wasi/libwasi-emulated-getpid.a"
-    rm -f "${SYSROOT}/lib/wasm32-wasi/libwasi-emulated-signal.a"
-    rm -f "${SYSROOT}/lib/wasm32-wasi/libwasi-emulated-process-clocks.a"
-    
-    
-
-    # Clean the Lind filesystem installation
-    # Remove the main library and include directories
-    sudo rm -rf "$LINDFS/usr/local/lib/python3.14"
-    sudo rm -rf "$LINDFS/usr/local/include/python3.14"
-
-    # Remove the static library
-    sudo rm -f "$LINDFS/usr/local/lib/libpython3.14.a"
-
-    # Remove the pkg-config files
-    sudo rm -f "$LINDFS/usr/local/lib/pkgconfig/python3.pc"
-    sudo rm -f "$LINDFS/usr/local/lib/pkgconfig/python-3.14-embed.pc"
-    sudo rm -f "$LINDFS/usr/local/lib/pkgconfig/python3-embed.pc"
-    sudo rm -f "$LINDFS/usr/local/lib/pkgconfig/python-3.14.pc"
-
-    # Remove the manual pages
-    sudo rm -f "$LINDFS/usr/local/share/man/man1/python3.1"*
-
-    # Remove the executables
-    sudo rm -f "$LINDFS/usr/local/bin/python3.14"*
-    sudo rm -f "$LINDFS/usr/local/bin/python3-config"*
-
-
-    
-    echo "=> Clean complete."
-    exit 0
-fi
-
 echo "Starting python build process..."
 
 # build native python if not exist
@@ -109,7 +67,7 @@ fi
 # build python
 make AR="llvm-ar" ARFLAGS="crs"
 
-# install nescessary files into lind filesystem
+# install necessary files into lind filesystem
 sudo make install DESTDIR="${LINDFS}"
 
 # apply wasm-opt
