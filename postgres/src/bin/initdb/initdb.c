@@ -816,7 +816,7 @@ get_id(void)
 {
 	const char *username;
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__wasi__)
 	if (geteuid() == 0)			/* 0 is root's uid */
 	{
 		pg_log_error("cannot be run as root");
@@ -1129,7 +1129,7 @@ test_config_settings(void)
 	 */
 	printf(_("selecting dynamic shared memory implementation ... "));
 	fflush(stdout);
-	dynamic_shared_memory_type = "sysv";
+	dynamic_shared_memory_type = "mmap";
 	printf("%s\n", dynamic_shared_memory_type);
 
 	printf(_("selecting default \"max_connections\" ... "));
@@ -2902,7 +2902,7 @@ setup_signals(void)
 	pqsignal(SIGTERM, trapsig);
 
 	/* the following are not valid on Windows */
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__wasi__)
 	pqsignal(SIGHUP, trapsig);
 	pqsignal(SIGQUIT, trapsig);
 

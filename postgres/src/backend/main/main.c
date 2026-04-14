@@ -447,7 +447,7 @@ static void
 check_root(const char *progname)
 {
 #ifndef WIN32
-	if (geteuid() == 0)
+	if (0 /* geteuid() == 0 -- disabled for WASI */)
 	{
 		write_stderr("\"root\" execution of the PostgreSQL server is not permitted.\n"
 					 "The server must be started under an unprivileged user ID to prevent\n"

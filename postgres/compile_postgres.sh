@@ -92,7 +92,7 @@ CFLAGS_WASM="-O2 -g -pthread \
 
 # 256 MB max memory — PG allocates shared buffers even in single-user mode
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,\
---max-memory=268435456,--export=__stack_pointer,--export=__stack_low \
+--max-memory=268435456,--export=__stack_pointer,--export=__stack_low,-z,stack-size=8388608 \
 -L$MERGED_SYSROOT/lib/wasm32-wasi \
 -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
 
