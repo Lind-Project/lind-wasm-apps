@@ -15,6 +15,9 @@ WASM_OPT="${LIND_WASM_ROOT}/tools/binaryen/bin/wasm-opt"
 
 CLANG_BIN="${LIND_WASM_ROOT}/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang"
 
+LIND_DYLINK="${LIND_DYLINK:-0}"
+PYTHON_OUT_DIR="$APPS_ROOT/build/cpython"
+
 cd $SCRIPT_DIR
 
 # --- Clean Target ---
@@ -115,18 +118,28 @@ sudo make install DESTDIR="${LINDFS}"
 
 # 6. Apply wasm-opt (best-effort)
 ###############################################################################
-PYTHON_WASM="python.wasm"
+
+if [[ "$LIND_DYLINK" == "1" ]]; then
+    exit 0
+fi
+
+PYTHON_WASM="$SCRIPT_DIR/build-wasm/python.wasm"
+PYTHON_OPT_WASM="$SCRIPT_DIR/build-wasm/python.opt.wasm"
+PYTHON_OPT_CWASM="$SCRIPT_DIR/build-wasm/python.opt.cwasm"
 
 if [[ -x "$WASM_OPT" ]]; then
-  echo "=> running wasm-opt (best-effort)..."
-  OPT_WASM="python.opt.wasm"
+  echo "[python] running wasm-opt (best-effort)..."
+  
   "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
-    "$PYTHON_WASM" -o "$OPT_WASM"
-
-  # Point the working variable to the optimized binary for the next step
-  PYTHON_WASM="$OPT_WASM"
+    "$PYTHON_WASM" -o "$PYTHON_OPT_WASM"
 else
-  echo "=> NOTE: wasm-opt not found; skipping optimization step."
+  echo "[python] ERROR: wasm-opt not found; skipping optimization step and exiting."
+  exit 1
+fi
+
+if [[ ! -f "$PYTHON_OPT_WASM" ]]; then
+  echo "[python] ERROR: Failed to generate $PYTHON_OPT_WASM; Exiting.."
+  exit 1
 fi
 
 # 7. cwasm generation via lind-boot (best-effort)
@@ -135,28 +148,29 @@ if [[ -x "$LIND_BOOT" ]]; then
   echo "=> generating cwasm via lind-boot --precompile..."
 
   # Pass the (potentially optimized) Wasm file to lind-boot
-  if "$LIND_BOOT" --precompile "$PYTHON_WASM"; then
+  if "$LIND_BOOT" --precompile "$PYTHON_OPT_WASM"; then
 
-    # lind-boot appends .cwasm. If we passed python.opt.wasm, it made python.opt.cwasm.
-    # We want to strip out the '.opt' so the final file is always python.cwasm.
-    OPT_CWASM="${PYTHON_WASM%.wasm}.cwasm"
-    CLEAN_CWASM="${OPT_CWASM/.opt/}"
-
-    if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-      mv "$OPT_CWASM" "$CLEAN_CWASM"
+    if [[ -f "$PYTHON_OPT_CWASM" ]]; then
+      mkdir -p "$PYTHON_OUT_DIR/usr/local/bin"
+      cp "$PYTHON_OPT_CWASM" "$PYTHON_OUT_DIR/usr/local/bin/python"
+      echo "[python] python staged as $PYTHON_OUT_DIR/usr/local/bin/python"
+    else
+      echo "[python] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting .."
+      exit 1
     fi
-    echo "=> Successfully generated ${CLEAN_CWASM}"
 
   else
-    echo "=> WARNING: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[python] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[python] ERROR: No binaries copied to the build folder. Exiting.."
+    exit 1
   fi
 else
-  echo "=> NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[python] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[python] ERROR: No binaries copied to the build folder. Exiting.."
+  exit 1
 fi
 
 echo
-echo "=> Build complete. Outputs generated in current directory."
-ls -lh python*.wasm python*.cwasm 2>/dev/null || true
-
-#Copying python.cwasm to lindfs
-cp python.cwasm ${LINDFS}/usr/local/bin/python.cwasm
+echo "[python] build complete. Outputs under:"
+echo "  $PYTHON_OUT_DIR"
+ls -lh "$PYTHON_OUT_DIR" || true
