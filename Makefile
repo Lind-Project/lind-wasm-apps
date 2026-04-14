@@ -43,7 +43,7 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils postgres clean clean-all rebuild-libs rebuild-sysroot test install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils postgres clean clean-all rebuild-libs rebuild-sysroot test install-bash install-nginx install-cpython install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -337,9 +337,12 @@ rebuild-sysroot:
 	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 
 # ---------------- cpython (WASM build) ----------------------------------------
-# Placeholder target to preserve the per-app staging/layering pattern.
+# Uses cpython/compile_python.sh to build python. If LIND_DYLINK=1 is set, then produces
+# a dynamically linked python binary else a statically linked python binary
 cpython: merge-sysroot
-	mkdir -p '$(APPS_BIN_DIR)/cpython/wasm32-wasi'
+	mkdir -p '$(APPS_BIN_DIR)/cpython'
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/cpython/compile_python.sh'
 
 # ---------------- postgres (WASM build) ---------------------------------------
 # Placeholder target to preserve the per-app staging/layering pattern.
@@ -376,4 +379,7 @@ install-gcc:
 install-binutils:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' binutils
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils
+install-cpython:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' cpython
+
+install: install-bash install-nginx install-cpython install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils
