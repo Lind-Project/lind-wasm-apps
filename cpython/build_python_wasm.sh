@@ -68,7 +68,7 @@ fi
 make AR="llvm-ar" ARFLAGS="crs"
 
 # install necessary files into lind filesystem
-sudo make install DESTDIR="${PYTHON_OUT_DIR}"
+make install DESTDIR="${PYTHON_OUT_DIR}"
 
 
 # 6. Apply wasm-opt (best-effort)
