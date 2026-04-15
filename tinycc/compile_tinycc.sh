@@ -111,9 +111,9 @@ else
   exit 1
 fi
 
-mkdir -p $STAGE_DIR/usr/local/bin/tcc
+mkdir -p $STAGE_DIR/usr/local/lib/tcc
 #libtcc1.a is required to run tinycc
-cp libtcc1.a $STAGE_DIR/usr/local/bin/tcc/
+cp libtcc1.a $STAGE_DIR/usr/local/lib/tcc/
 
 #These headers are required to compile C programs using tinycc
 tar -xvzf tcc_headers.tar.gz
