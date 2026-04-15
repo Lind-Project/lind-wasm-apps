@@ -42,6 +42,7 @@ RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
+ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ##################
@@ -53,6 +54,16 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ARTIFACT_MODE="${ARTIFACT_MODE:-full}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
+##################
+# BUILD_MODE controls whether we produce a statically-linked or a shared
+# (PIE/dynamic) wasm binary.  Set BUILD_MODE=shared to get the shared path;
+# the default is static.  The shared path adds the PIE linker flags, links in
+# lind_debug.o and set_stack_pointer.o, runs add-export-tool to inject the
+# __wasm_apply_* and __stack_pointer exports, uses the additional wasm-opt
+# passes required for shared modules, and drives precompilation through
+# lind-clang rather than lind-boot.
+##################
+BUILD_MODE="${BUILD_MODE:-static}"
 
 # Output location
 BASH_OUT_DIR="$APPS_ROOT/build/bash/bin"
@@ -85,24 +96,62 @@ if [[ ! -f "$WASM_COMPAT_H" ]]; then
   exit 1
 fi
 
+if [[ "$BUILD_MODE" == "shared" ]]; then
+  LIND_DEBUG_O="$LIND_WASM_ROOT/src/glibc/build/lind_debug.o"
+  SET_STACK_O="$LIND_WASM_ROOT/src/glibc/build/csu/set_stack_pointer.o"
+  if [[ ! -f "$LIND_DEBUG_O" ]]; then
+    echo "[bash] ERROR: shared build requires '$LIND_DEBUG_O' (run 'make sysroot' in lind-wasm)."
+    exit 1
+  fi
+  if [[ ! -f "$SET_STACK_O" ]]; then
+    echo "[bash] ERROR: shared build requires '$SET_STACK_O' (run 'make sysroot' in lind-wasm)."
+    exit 1
+  fi
+  if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+    echo "[bash] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'."
+    exit 1
+  fi
+fi
+
 CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
 
-CFLAGS_WASM="-O2 -g -std=gnu89 -pthread \
+if [[ "$BUILD_MODE" == "shared" ]]; then
+  CFLAGS_WASM="-O2 -g -std=gnu89 -pthread -fPIC \
   -DHAVE_STRSIGNAL=1 -DHAVE_MKTIME=1 \
   -include $WASM_COMPAT_H \
   -I$MERGED_SYSROOT/include \
   -I$MERGED_SYSROOT/include/wasm32-wasi"
+else
+  CFLAGS_WASM="-O2 -g -std=gnu89 -pthread \
+  -DHAVE_STRSIGNAL=1 -DHAVE_MKTIME=1 \
+  -include $WASM_COMPAT_H \
+  -I$MERGED_SYSROOT/include \
+  -I$MERGED_SYSROOT/include/wasm32-wasi"
+fi
 
-LDFLAGS_WASM="-Wl,--import-memory,--export-memory,\
+if [[ "$BUILD_MODE" == "shared" ]]; then
+  # Shared (PIE) build: import the function table and allow undefined symbols
+  # so that dynamic relocations are resolved at runtime by lind-dylink.
+  # __tls_base is not exported here; it is injected by add-export-tool below.
+  LDFLAGS_WASM="-Wl,-pie,--import-table,\
+--import-memory,--export-memory,\
+--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,\
+--allow-undefined,--unresolved-symbols=import-dynamic \
+-L$MERGED_SYSROOT/lib/wasm32-wasi \
+-L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+else
+  LDFLAGS_WASM="-Wl,--import-memory,--export-memory,\
 --max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base \
 -L$MERGED_SYSROOT/lib/wasm32-wasi \
 -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+fi
 
 echo "[bash] using CLANG       = $CLANG"
 echo "[bash] using AR          = $AR"
 echo "[bash] LIND_WASM_ROOT    = $LIND_WASM_ROOT"
 echo "[bash] merged sysroot    = $MERGED_SYSROOT"
 echo "[bash] output dir        = $BASH_OUT_DIR"
+echo "[bash] build mode        = $BUILD_MODE"
 echo "[bash] artifact mode     = $ARTIFACT_MODE"
 echo
 
@@ -448,6 +497,12 @@ BASH_WASM="$SCRIPT_DIR/bash.wasm"
 BASH_CWASM="$SCRIPT_DIR/bash.cwasm"
 rm -f "$BASH_RAW_WASM" "$BASH_WASM" "$BASH_CWASM" "$BASH_OUT_DIR/bash"
 
+# Extra objects required only for the shared (PIE) build.
+SHARED_EXTRA_OBJS=()
+if [[ "$BUILD_MODE" == "shared" ]]; then
+  SHARED_EXTRA_OBJS=("$LIND_DEBUG_O" "$SET_STACK_O")
+fi
+
 echo "[bash] [wasm] linking bash -> $BASH_RAW_WASM ..."
 $CC_WASM \
   -L./builtins \
@@ -467,11 +522,22 @@ $CC_WASM \
   bashhist.o bashline.o siglist.o list.o stringlib.o locale.o \
   findcmd.o redir.o pcomplete.o pcomplib.o syntax.o xmalloc.o \
   "$TPUTS_STUB_O" \
+  "${SHARED_EXTRA_OBJS[@]}" \
   -lbuiltins -lglob -lsh -lreadline -lhistory -ltilde
 
 if [[ ! -f "$BASH_RAW_WASM" ]]; then
   echo "[bash] ERROR: bash.raw.wasm was not produced."
   exit 1
+fi
+
+if [[ "$BUILD_MODE" == "shared" ]]; then
+  echo "[bash] [shared] injecting wasm exports via add-export-tool..."
+  "$ADD_EXPORT_TOOL" "$BASH_RAW_WASM" "$BASH_RAW_WASM" \
+    __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+  "$ADD_EXPORT_TOOL" "$BASH_RAW_WASM" "$BASH_RAW_WASM" \
+    __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+  "$ADD_EXPORT_TOOL" "$BASH_RAW_WASM" "$BASH_RAW_WASM" \
+    __stack_pointer global __stack_pointer
 fi
 
 ##################
@@ -488,8 +554,20 @@ fi
 
 ### Added `--fpcast-emu` flag to fix bash errors liked indirect function mismatch and others
 echo "[bash] running wasm-opt to produce runnable bash.wasm..."
-"$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
-  "$BASH_RAW_WASM" -o "$BASH_WASM"
+if [[ "$BUILD_MODE" == "shared" ]]; then
+  # Shared modules require the import-table and import-globals passes so that
+  # lind-dylink can patch relocations at load time.
+  "$WASM_OPT" \
+    --enable-bulk-memory --enable-threads \
+    --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+    --asyncify --pass-arg=asyncify-import-globals \
+    --fpcast-emu --pass-arg=relocatable-fpcast \
+    --debuginfo -O2 \
+    "$BASH_RAW_WASM" -o "$BASH_WASM"
+else
+  "$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
+    "$BASH_RAW_WASM" -o "$BASH_WASM"
+fi
 
 ### If choosing the fast path, .cwasm is not generated
 ### Only .cwasm is copied to the build folder
@@ -502,7 +580,24 @@ if [[ "$ARTIFACT_MODE" == "fast" ]]; then
 	exit 1
 fi
 
-if [[ -x "$LIND_BOOT" ]]; then
+if [[ "$BUILD_MODE" == "shared" ]]; then
+  # Shared binaries are precompiled through lind-clang, which understands the
+  # PIE/dylink metadata embedded by the shared link and wasm-opt passes.
+  echo "[bash] generating cwasm via lind-clang --precompile-only..."
+  if lind-clang --precompile-only "$BASH_WASM"; then
+    if [[ -f "$BASH_CWASM" ]]; then
+      cp "$BASH_CWASM" "$BASH_OUT_DIR/bash"
+      echo "[bash] staged final binary: $BASH_OUT_DIR/bash"
+    else
+      echo "[bash] ERROR: No .cwasm binary generated and hence no binaries copied to build/bash folder."
+      echo "[bash] ERROR: Exiting.."
+      exit 1
+    fi
+  else
+    echo "[bash] ERROR: lind-clang --precompile-only failed; skipping cwasm generation."
+    exit 1
+  fi
+elif [[ -x "$LIND_BOOT" ]]; then
    echo "[bash] generating cwasm via lind-boot --precompile..."
    if "$LIND_BOOT" --precompile "$BASH_WASM"; then
       if [[ -f "$BASH_CWASM" ]]; then
@@ -510,7 +605,7 @@ if [[ -x "$LIND_BOOT" ]]; then
         cp "$BASH_CWASM" "$BASH_OUT_DIR/bash"
         echo "[bash] staged final binary: $BASH_OUT_DIR/bash"
       else
-        echo "[bash] ERROR: No .cwasm binary generated and hence no binaries copied to build/bash folder." 
+        echo "[bash] ERROR: No .cwasm binary generated and hence no binaries copied to build/bash folder."
 	echo "[bash] ERROR: Exiting.."
 	exit 1
       fi
