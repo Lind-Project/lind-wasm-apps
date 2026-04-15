@@ -22,7 +22,7 @@ LINDFS="${LIND_WASM_ROOT}/lindfs"
 LIND_BOOT="${LIND_WASM_ROOT}/src/lind-boot/target/debug/lind-boot"
 
 CLANG_BIN="${LIND_WASM_ROOT}/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang"
-STAGE_DIR="$LIND_WASM_ROOT/build/tinycc"
+STAGE_DIR="$APPS_ROOT/build/tinycc"
 
 mkdir -p "$STAGE_DIR"
 
@@ -93,9 +93,9 @@ if [[ -x "$LIND_BOOT" ]]; then
 
     #Staging the final .cwasm binary to the build folder
     if [[ -f "$TCC_OPT_CWASM" ]]; then
-      cp "$TCC_OPT_CWASM" "$STAGE_DIR/tinycc"
-      mkdir -p $STAGE_DIR/usr/local/bin
-      echo "[tinycc] tinycc staged as $STAGE_DIR/usr/local/bin/tinycc"
+      mkdir -p $STAGE_DIR/bin
+      cp "$TCC_OPT_CWASM" "$STAGE_DIR/bin/tinycc"
+      echo "[tinycc] tinycc staged as $STAGE_DIR/bin/tinycc"
     else
       echo "[tinycc] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. "
       exit 1
@@ -111,13 +111,13 @@ else
   exit 1
 fi
 
-
+mkdir -p $STAGE_DIR/usr/local/bin/tcc
 #libtcc1.a is required to run tinycc
-cp libtcc1.a $APPS_ROOT/build/tinycc/usr/local/bin/tcc/
+cp libtcc1.a $STAGE_DIR/usr/local/bin/tcc/
 
 #These headers are required to compile C programs using tinycc
 tar -xvzf tcc_headers.tar.gz
-rsync -a "${SCRIPT_DIR}/tcc_headers/" "$APPS_ROOT/build/tinycc/"
+rsync -a "${SCRIPT_DIR}/tcc_headers/" "$STAGE_DIR/"
 
 #While running tinycc to compile C programs as 32-bit binaries, it
 #requires 32-bit versions of libc.so, ld.so, libc_nonshared.a and crt object files
@@ -125,14 +125,16 @@ rsync -a "${SCRIPT_DIR}/tcc_headers/" "$APPS_ROOT/build/tinycc/"
 #relative to lindfs. We first create these paths with respect to the build folder
 #Later at 'make install' stage, all the files within the build folder copied to lindfs folder
 
-mkdir -p "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
-cp /usr/i686-linux-gnu/lib/crt*.o "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
-cp /usr/i686-linux-gnu/lib/libc.so* "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
-cp /usr/i686-linux-gnu/lib/ld-linux.so.2 "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
-cp /usr/i686-linux-gnu/lib/libc_nonshared.a "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/"
+mkdir -p "$STAGE_DIR/usr/lib/i386-linux-gnu/"
+cp /usr/i686-linux-gnu/lib/crt*.o "$STAGE_DIR/usr/lib/i386-linux-gnu/"
+cp /usr/i686-linux-gnu/lib/libc.so* "$STAGE_DIR/usr/lib/i386-linux-gnu/"
+cp /usr/i686-linux-gnu/lib/ld-linux.so.2 "$STAGE_DIR/usr/lib/i386-linux-gnu/"
+cp /usr/i686-linux-gnu/lib/libc_nonshared.a "$STAGE_DIR/usr/lib/i386-linux-gnu/"
 
 #While running tinycc, it checks for libc.so which is a stub that looks for ld.so, libc_nonshared.a and libc.so.6. We change the absolute paths of these which were with respect to the root filesystem, so tinycc can locate these files with respect to lindfs 
-sed -i 's|[^ ]*/libc\.so\.6|libc.so.6|g; s|[^ ]*/libc_nonshared\.a|libc_nonshared.a|g; s|[^ ]*/ld-linux\.so\.2|ld-linux.so.2|g' "$APPS_ROOT/build/tinycc/usr/lib/i386-linux-gnu/libc.so"
+sed -i 's|[^ ]*/libc\.so\.6|libc.so.6|g; s|[^ ]*/libc_nonshared\.a|libc_nonshared.a|g; s|[^ ]*/ld-linux\.so\.2|ld-linux.so.2|g' "$STAGE_DIR/usr/lib/i386-linux-gnu/libc.so"
 
 #To run dynamically linked executable using tinycc, it expects its linker at /lib/ld-linux.so.2, hence we map the 32-bit linker to that file
-sudo ln -s /usr/i686-linux-gnu/lib/ld-linux.so.2 /lib/ld-linux.so.2
+if [ ! -e /lib/ld-linux.so.2 ]; then
+    sudo ln -s /usr/i686-linux-gnu/lib/ld-linux.so.2 /lib/ld-linux.so.2
+fi
