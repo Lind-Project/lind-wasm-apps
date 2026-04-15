@@ -94,8 +94,8 @@ if [[ -x "$LIND_BOOT" ]]; then
     #Staging the final .cwasm binary to the build folder
     if [[ -f "$TCC_OPT_CWASM" ]]; then
       mkdir -p $STAGE_DIR/bin
-      cp "$TCC_OPT_CWASM" "$STAGE_DIR/bin/tinycc"
-      echo "[tinycc] tinycc staged as $STAGE_DIR/bin/tinycc"
+      cp "$TCC_OPT_CWASM" "$STAGE_DIR/bin/tcc"
+      echo "[tinycc] tinycc staged as $STAGE_DIR/bin/tcc"
     else
       echo "[tinycc] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. "
       exit 1
@@ -138,3 +138,5 @@ sed -i 's|[^ ]*/libc\.so\.6|libc.so.6|g; s|[^ ]*/libc_nonshared\.a|libc_nonshare
 if [ ! -e /lib/ld-linux.so.2 ]; then
     sudo ln -s /usr/i686-linux-gnu/lib/ld-linux.so.2 /lib/ld-linux.so.2
 fi
+echo "/usr/i686-linux-gnu/lib" | sudo tee /etc/ld.so.conf.d/i686-cross.conf
+sudo ldconfig
