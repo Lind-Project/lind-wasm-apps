@@ -9,7 +9,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 LINDFS="${LIND_WASM_ROOT}/lindfs"
-
+TINYCC_BIN="bin/tcc"
 TEST_DIR="$LINDFS/tests/tinycc"
 TEST_DIR_RELATIVE="tests/tinycc"
 
@@ -25,9 +25,34 @@ CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+STAGE_DIR="$APPS_ROOT/build/tinycc"
 
+# Verify tinycc is built
+echo "[test] Checking staged binary..."
 
+if [[ ! -f "$STAGE_DIR/bin/tcc" ]]; then
+  echo "  ERROR: tcc binary not found at $STAGE_DIR/bin/tcc"
+  echo "  Please build tcc first by running:"
+  echo "    make tinycc"
+  exit 1
+fi
 
+echo "  OK: staged binary found : $STAGE_DIR/bin/tcc"
+
+# Verify tinycc is installed in lindfs
+
+echo
+echo "[test] Checking lindfs installation..."
+
+if [[ ! -f "$LINDFS/$TINYCC_BIN" ]]; then
+  echo "  ERROR: grep is not installed in lindfs ($LINDFS/$TINYCC_BIN not found)"
+  echo "  Please build and install tinycc by running:"
+  echo "    make tinycc"
+  echo "    make install-tinycc"
+  exit 1
+fi
+
+echo "  OK: tinycc installed at $LINDFS_ROOT/$TINYCC_BIN"
 
 # Initialize Test Directory
 mkdir -p "$TEST_DIR"
