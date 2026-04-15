@@ -8,7 +8,7 @@
 
 # To run dynamically linked executables produced by tinycc, dynamic linker is used. Since the executable is run natively, we provide a symbolic link to the 32-bit dynamic linker within /lib of the root filesystem so that the kernel can locate the dynamic linker.
 
-
+set -x
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -22,6 +22,9 @@ LINDFS="${LIND_WASM_ROOT}/lindfs"
 LIND_BOOT="${LIND_WASM_ROOT}/src/lind-boot/target/debug/lind-boot"
 
 CLANG_BIN="${LIND_WASM_ROOT}/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang"
+STAGE_DIR="$LIND_WASM_ROOT/build/tinycc"
+
+mkdir -p "$STAGE_DIR"
 
 CFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$SYSROOT -pthread -matomics -mbulk-memory -fno-pie -fvisibility=default -fno-builtin"
 
@@ -52,28 +55,62 @@ fi
 gcc -m32 -O2 -DTCC_TARGET_I386 -c lib/libtcc1.c -o libtcc1.o
 ar rcs libtcc1.a libtcc1.o
 
-# opt and precompile
-echo "Precompiling"
-lind_compile --opt-only tcc.wasm -o tcc.opt.wasm
-if [ -s "tcc.opt.wasm" ]; then
-	echo "Generating cwasm from opt.wasm"
-	lind_compile --precompile-only tcc.opt.wasm -o tcc.cwasm
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
+TCC_WASM="$SCRIPT_DIR/tcc.wasm"
+TCC_OPT_WASM="$SCRIPT_DIR/tcc.opt.wasm"
+
+# ----------------------------------------------------------------------
+# 8) wasm-opt (best-effort)
+# ----------------------------------------------------------------------
+if [[ -x "$WASM_OPT" ]]; then
+  echo "[tinycc] running wasm-opt (asyncify + optimization)…"
+  "$WASM_OPT" \
+    --epoch-injection \
+    --asyncify \
+    --debuginfo \
+    -O2 \
+    "$TCC_WASM" \
+    -o "$TCC_OPT_WASM" || true
 else
-	echo "Generating cwasm from wasm"
-	lind_compile --precompile-only tcc.wasm -o tcc.cwasm
+  echo "[tinycc] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  exit 1
 fi
 
-# copy to app build folder preserving the directory structure
-mkdir -p $APPS_ROOT/build/tinycc/bin
-mkdir -p $APPS_ROOT/build/tinycc/usr/local/bin/tcc/
-if [ -s "tcc.cwasm" ]; then
-	cp tcc.cwasm $APPS_ROOT/build/tinycc/bin/tcc
-elif [ -s "tcc.wasm" ]; then
-	cp tcc.wasm $APPS_ROOT/build/tinycc/bin/tcc
-else
-	echo "No wasm binary created"
-	exit 1
+if [[ ! -f "$TCC_OPT_WASM" ]]; then
+  echo "[tinycc] ERROR: Failed to generate "$TCC_OPT_WASM"; Exiting.."
+  exit 1
 fi
+
+# ----------------------------------------------------------------------
+# 9) cwasm generation (best-effort) via lind-boot --precompile
+# ----------------------------------------------------------------------
+if [[ -x "$LIND_BOOT" ]]; then
+  echo "[git] generating cwasm via lind-boot --precompile..."
+  if "$LIND_BOOT" --precompile "$TCC_OPT_WASM"; then
+  
+    TCC_OPT_CWASM="$SCRIPT_DIR/tcc.opt.cwasm"
+
+    #Staging the final .cwasm binary to the build folder
+    if [[ -f "$TCC_OPT_CWASM" ]]; then
+      cp "$TCC_OPT_CWASM" "$STAGE_DIR/tinycc"
+      mkdir -p $STAGE_DIR/usr/local/bin
+      echo "[tinycc] tinycc staged as $STAGE_DIR/usr/local/bin/tinycc"
+    else
+      echo "[tinycc] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. "
+      exit 1
+    fi
+  else
+    echo "[tinycc] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[tinycc] ERROR: No binaries copied to the build folder. Exiting.."
+    exit 1
+  fi
+else
+  echo "[tinycc] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[tinycc] ERROR: No binaries copied to the build folder. Exiting.."
+  exit 1
+fi
+
 
 #libtcc1.a is required to run tinycc
 cp libtcc1.a $APPS_ROOT/build/tinycc/usr/local/bin/tcc/
