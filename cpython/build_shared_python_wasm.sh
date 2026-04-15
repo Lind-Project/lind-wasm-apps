@@ -56,7 +56,7 @@ fi
 "$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM"  __stack_pointer global __stack_pointer optional || { echo "[python] ERROR: add-export-tool stack pointer failed"; exit 1; }
 
 
-#$WASM_OPT --enable-bulk-memory --enable-threads --epoch-injection --pass-arg=epoch-import --asyncify --pass-arg=asyncify-import-globals -O2 --debuginfo "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[python] ERROR: wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.."; exit 1; }
+$WASM_OPT --enable-bulk-memory --enable-threads --epoch-injection --pass-arg=epoch-import --asyncify --pass-arg=asyncify-import-globals -O2 --debuginfo "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[python] ERROR: wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.."; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
   echo "[python] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'; Exiting.."
@@ -64,7 +64,7 @@ if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
 fi
 
 # do precompile
-#$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT"|| { echo "[python] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."; exit 1; }
+$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT"|| { echo "[python] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT_CWASM" ]]; then
   echo "[python] ERROR: Failed to generate '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."
