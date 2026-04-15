@@ -50,8 +50,8 @@ else
     exit 1
 fi
 
-PYTHON_BINARY="$LINDFS_ROOT/lib/libpython3.14.so"
-LIBPYTHON_LIB="$LINDFS_ROOT/usr/local/bin/python"
+LIBPYTHON_LIB="$LINDFS_ROOT/lib/libpython3.14.so"
+PYTHON_BINARY="$LINDFS_ROOT/usr/local/bin/python"
 if [[ ! -f "$PYTHON_BINARY" ]]; then
   echo "ERROR: $PYTHON_BINARY not found. Exiting.."
   exit 1
