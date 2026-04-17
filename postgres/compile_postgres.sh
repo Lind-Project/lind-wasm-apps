@@ -335,11 +335,11 @@ if [[ -f "$PG_CONFIG_H" ]]; then
   echo "[postgres] [wasm] patching pg_config.h for WASI..."
 
   # EXEC_BACKEND: use exec() model instead of fork() for spawning backends
-  # Testing whether this helps with multi-worker postgres
-  if ! grep -q '#define EXEC_BACKEND' "$PG_CONFIG_H"; then
-    echo '#define EXEC_BACKEND 1' >> "$PG_CONFIG_H"
-    echo "[postgres] [wasm] enabled EXEC_BACKEND in pg_config.h"
-  fi
+  # Disabled to test shmdt issue — fork model doesn't need shmdt before child runs
+  # if ! grep -q '#define EXEC_BACKEND' "$PG_CONFIG_H"; then
+  #   echo '#define EXEC_BACKEND 1' >> "$PG_CONFIG_H"
+  #   echo "[postgres] [wasm] enabled EXEC_BACKEND in pg_config.h"
+  # fi
 
   # Force USE_UNNAMED_POSIX_SEMAPHORES off if set — we stub semaphores
   if grep -q '#define USE_UNNAMED_POSIX_SEMAPHORES' "$PG_CONFIG_H"; then
