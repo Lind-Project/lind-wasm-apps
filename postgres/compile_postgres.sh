@@ -334,9 +334,11 @@ PG_CONFIG_H="$PG_ROOT/src/include/pg_config.h"
 if [[ -f "$PG_CONFIG_H" ]]; then
   echo "[postgres] [wasm] patching pg_config.h for WASI..."
 
-  # Force EXEC_BACKEND off — we don't have fork()
-  if grep -q '#define EXEC_BACKEND' "$PG_CONFIG_H"; then
-    sed -i 's/#define EXEC_BACKEND.*$/\/* #undef EXEC_BACKEND -- disabled for WASI *\//' "$PG_CONFIG_H"
+  # EXEC_BACKEND: use exec() model instead of fork() for spawning backends
+  # Testing whether this helps with multi-worker postgres
+  if ! grep -q '#define EXEC_BACKEND' "$PG_CONFIG_H"; then
+    echo '#define EXEC_BACKEND 1' >> "$PG_CONFIG_H"
+    echo "[postgres] [wasm] enabled EXEC_BACKEND in pg_config.h"
   fi
 
   # Force USE_UNNAMED_POSIX_SEMAPHORES off if set — we stub semaphores
