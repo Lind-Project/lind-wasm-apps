@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+set -x
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -11,7 +13,7 @@ fi
 LINDFS_ROOT="${LINDFS_ROOT:-$LIND_WASM_ROOT/lindfs}"
 
 BUILD_WASM="$SCRIPT_DIR/build-wasm"
-SYSROOT="$LIND_WASM_ROOT/src/glibc/sysroot"
+SYSROOT="$LIND_WASM_ROOT/build/sysroot"
 LIND_BOOT="${LIND_WASM_ROOT}/src/lind-boot/target/debug/lind-boot"
 CLANG_BIN="${LIND_WASM_ROOT}/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang"
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
@@ -40,7 +42,10 @@ $CLANG_BIN \
     -Wl,--whole-archive \
     "$STATIC_LIB" \
     -Wl,--no-whole-archive \
-    "$LIND_WASM_ROOT/src/glibc/build/lind_debug.o" \
+    -Wl,--export=__wasm_call_ctors \
+    -Wl,--export-if-defined=__wasm_init_tls \
+    -Wl,--export=__tls_base \
+    "$SYSROOT/lib/wasm32-wasi/lind_utils.o" \
     -g -O0 -o "$DYNAMIC_LIB_WASM" 	|| { echo "[python] ERROR: clang compilation failed"; exit 1; }
 
 
@@ -64,7 +69,7 @@ if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
 fi
 
 # do precompile
-$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT"|| { echo "[python] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."; exit 1; }
+"$LIND_BOOT" --precompile "$DYNAMIC_LIB_OPT"|| { echo "[python] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT_CWASM" ]]; then
   echo "[python] ERROR: Failed to generate '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."
@@ -87,6 +92,7 @@ $CLANG_BIN \
     -fPIC \
     --target=wasm32-unknown-wasi \
     --sysroot "$SYSROOT" \
+    -nostartfiles \
     -Wl,-pie \
     -Wl,--import-table \
     -Wl,--import-memory \
@@ -100,6 +106,9 @@ $CLANG_BIN \
     -Wl,--export=__tls_base \
     -Wl,--allow-undefined \
     -Wl,--unresolved-symbols=import-dynamic \
+    -Wl,--export=__wasm_call_ctors \
+    -Wl,--export-if-defined=__wasm_init_tls \
+    -Wl,--export=__tls_base \
     -D _FILE_OFFSET_BITS=64 \
     -D __USE_LARGEFILE64 \
     -g -O0 \
@@ -113,6 +122,9 @@ $CLANG_BIN \
     "$BUILD_WASM/Modules/_decimal/libmpdec/libmpdec.a" \
     "$BUILD_WASM/Modules/_hacl/libHacl_HMAC.a" \
     "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA3.a" \
+    "$SYSROOT/lib/wasm32-wasi/set_stack_pointer.o" \
+    "$SYSROOT/lib/wasm32-wasi/crt1_shared.o" \
+    "$SYSROOT/lib/wasm32-wasi/lind_utils.o" \
     -ldl -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lpthread -lm
 
 

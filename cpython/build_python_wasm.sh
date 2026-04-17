@@ -8,7 +8,7 @@ APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
-SYSROOT="${LIND_WASM_ROOT}/src/glibc/sysroot"
+SYSROOT="${LIND_WASM_ROOT}/build/sysroot"
 LINDFS="${LIND_WASM_ROOT}/lindfs"
 LIND_BOOT="${LIND_WASM_ROOT}/src/lind-boot/target/debug/lind-boot"
 WASM_OPT="${LIND_WASM_ROOT}/tools/binaryen/bin/wasm-opt"
@@ -65,7 +65,7 @@ if [ ! -f "Makefile" ]; then
 fi
 
 # build python
-make AR="llvm-ar" ARFLAGS="crs"
+make AR="llvm-ar" ARFLAGS="crs" &> make.log
 
 # install necessary files into lind filesystem
 make install DESTDIR="${PYTHON_OUT_DIR}"
