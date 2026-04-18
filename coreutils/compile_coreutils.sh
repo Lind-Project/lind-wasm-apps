@@ -38,6 +38,7 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 # enables explicit switches for from-scratch rebuilds and for the old richer artifact set
 # and generates .cwasm binary
 ##################
+LIND_DYLINK="${LIND_DYLINK:-0}"
 ARTIFACT_MODE="${ARTIFACT_MODE:-full}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
@@ -93,11 +94,66 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
 
-LDFLAGS_WASM=(
-  "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
-  -L"$MERGED_SYSROOT/lib/wasm32-wasi"
-  -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
-)
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[coreutils] Dynamic linking mode enabled (LIND_DYLINK=1)"
+  CFLAGS_WASM+=(-fPIC)
+
+  # add-export-tool is used after wasm-opt to export relocation and stack symbols
+  ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
+  if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+    echo "[coreutils] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'" >&2
+    exit 1
+  fi
+
+  # Extra CRT objects required for dynamic PIE executables
+  DYLINK_CRT_OBJS=(
+    "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o"
+  )
+  for obj in "${DYLINK_CRT_OBJS[@]}"; do
+    if [[ ! -f "$obj" ]]; then
+      echo "[coreutils] ERROR: required dylink CRT object '$obj' not found." >&2
+      echo "[coreutils] Hint: rebuild sysroot on the dylink branch (make sysroot in lind-wasm)." >&2
+      exit 1
+    fi
+  done
+
+  LDFLAGS_WASM=(
+    "-nostartfiles"
+    "-Wl,-pie"
+    "-Wl,--import-table"
+    "-Wl,--import-memory"
+    "-Wl,--export-memory"
+    "-Wl,--shared-memory"
+    "-Wl,--max-memory=67108864"
+    "-Wl,--allow-undefined"
+    "-Wl,--unresolved-symbols=import-dynamic"
+    "-Wl,--export=__wasm_call_ctors"
+    "-Wl,--export-if-defined=__wasm_init_tls"
+    "-Wl,--export=__tls_base"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+    "${DYLINK_CRT_OBJS[@]}"
+  )
+  # Configure-only LDFLAGS: use the static link flags so autoconf feature
+  # detection correctly fails for missing symbols. The --allow-undefined +
+  # --unresolved-symbols=import-dynamic flags in LDFLAGS_WASM make link tests
+  # succeed for every function, producing false positives on platform-specific
+  # functions (pstat_getdynamic, nanotime, getppriv, etc.).
+  LDFLAGS_CONFIGURE=(
+    "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+  )
+else
+  LDFLAGS_WASM=(
+    "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+  )
+  LDFLAGS_CONFIGURE=("${LDFLAGS_WASM[@]}")
+fi
 
 echo "[coreutils] using CLANG       = $CLANG"
 echo "[coreutils] using AR          = $AR"
@@ -106,6 +162,7 @@ echo "[coreutils] merged sysroot    = $MERGED_SYSROOT"
 echo "[coreutils] build dir         = $BUILD_DIR"
 echo "[coreutils] stage dir         = $STAGE_DIR"
 echo "[coreutils] artifact mode     = $ARTIFACT_MODE"
+echo "[coreutils] dylink mode       = $LIND_DYLINK"
 echo
 
 ##################
@@ -162,11 +219,25 @@ run_wasm_opt_replace() {
   local out="$3"
   local tmp="${out}.tmp"
   cp "$src" "$raw"
-  if "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
-    mv "$tmp" "$out"
+  if [[ "$LIND_DYLINK" == "1" ]]; then
+    if "$WASM_OPT" \
+        --enable-bulk-memory --enable-threads \
+        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+        --asyncify --pass-arg=asyncify-import-globals \
+        --debuginfo \
+        "$raw" -o "$tmp"; then
+      mv "$tmp" "$out"
+    else
+      rm -f "$tmp"
+      return 1
+    fi
   else
-    rm -f "$tmp"
-    return 1
+    if "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
+      mv "$tmp" "$out"
+    else
+      rm -f "$tmp"
+      return 1
+    fi
   fi
 }
 
@@ -190,7 +261,7 @@ export lt_cv_prog_compiler_static_works=yes
 export ac_cv_prog_cc_pic_works=no
 export CFLAGS="${CFLAGS:-} ${CFLAGS_WASM[*]}"
 export CPPFLAGS="${CPPFLAGS:-} -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi"
-export LDFLAGS="${LDFLAGS:-} ${LDFLAGS_WASM[*]}"
+export LDFLAGS="${LDFLAGS:-} ${LDFLAGS_CONFIGURE[*]}"
 
 CONFIG_SITE_FILE="$BUILD_ROOT/config.site"
 ##################
@@ -382,6 +453,7 @@ host=$HOST_TRIPLET
 build=$BUILD_TRIPLET
 cflags=${CFLAGS_WASM[*]}
 ldflags=${LDFLAGS_WASM[*]}
+dylink=$LIND_DYLINK
 EOF
 }
 
@@ -422,7 +494,7 @@ if (( need_configure )); then
       RANLIB="$RANLIB" \
       CFLAGS="${CFLAGS_WASM[*]}" \
       CPPFLAGS="$CPPFLAGS" \
-      LDFLAGS="${LDFLAGS_WASM[*]}" \
+      LDFLAGS="${LDFLAGS_CONFIGURE[*]}" \
       || echo "[coreutils] WARNING: configure exited nonzero ($?)."
   )
   patch_generated_signal_h_after_configure
@@ -548,7 +620,16 @@ fi
 echo "[coreutils] Step 1: Converting .wasm to .opt.wasm..."
 for w in "${wasm_files[@]}"; do
   opt_file="${w%.wasm}.opt.wasm"
-  run_limited "$JOBS" "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$w" -o "$opt_file"
+  if [[ "$LIND_DYLINK" == "1" ]]; then
+    run_limited "$JOBS" "$WASM_OPT" \
+      --enable-bulk-memory --enable-threads \
+      --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+      --asyncify --pass-arg=asyncify-import-globals \
+      --debuginfo \
+      "$w" -o "$opt_file"
+  else
+    run_limited "$JOBS" "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$w" -o "$opt_file"
+  fi
 done
 wait_for_background_jobs
 
@@ -560,6 +641,15 @@ shopt -u nullglob
 if (( ${#opt_files[@]} == 0 || ${#opt_files[@]} != ${#wasm_files[@]} )); then
   echo "[coreutils] ERROR: Failed to generate all .opt.wasm files." >&2
   exit 1
+fi
+
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[coreutils] adding dylink exports via add-export-tool..."
+  for w in "${opt_files[@]}"; do
+    "$ADD_EXPORT_TOOL" "$w" "$w" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+    "$ADD_EXPORT_TOOL" "$w" "$w" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+    "$ADD_EXPORT_TOOL" "$w" "$w" __stack_pointer global __stack_pointer
+  done
 fi
 
 if [[ "$ARTIFACT_MODE" != "full" ]]; then

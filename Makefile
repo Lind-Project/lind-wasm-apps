@@ -20,11 +20,13 @@ LIBTIRPC_STAMP := $(APPS_BUILD)/.stamp_libtirpc
 GNULIB_STAMP   := $(APPS_BUILD)/.stamp_gnulib
 ZLIB_STAMP     := $(APPS_BUILD)/.stamp_zlib
 OPENSSL_STAMP  := $(APPS_BUILD)/.stamp_openssl
+LIBCXX_STAMP   := $(APPS_BUILD)/.stamp_libcxx
 MERGE_BASE_STAMP    := $(APPS_BUILD)/.stamp_merge_base_sysroot
 MERGE_TIRPC_STAMP   := $(APPS_BUILD)/.stamp_merge_tirpc
 MERGE_GNULIB_STAMP  := $(APPS_BUILD)/.stamp_merge_gnulib
 MERGE_ZLIB_STAMP    := $(APPS_BUILD)/.stamp_merge_zlib
 MERGE_OPENSSL_STAMP := $(APPS_BUILD)/.stamp_merge_openssl
+MERGE_LIBCXX_STAMP  := $(APPS_BUILD)/.stamp_merge_libcxx
 MERGE_ALL_STAMP     := $(APPS_BUILD)/.stamp_merge_sysroot
 
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
@@ -33,28 +35,68 @@ JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
 LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 
 # Keep this list in sync as app-specific expected-binaries manifests come online.
-TESTABLE_APPS  := lmbench
-TEST_APPS      ?= $(if $(APP),$(APP),$(TESTABLE_APPS))
+# Usage:
+#   make check-build                # runs the full TESTABLE_APPS list
+#   make check-build APP=nginx      # runs a single app on demand
+#   make check-build APP="nginx grep sed"  # runs multiple apps on demand
+TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc
+APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed postgres clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-postgres install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils postgres clean clean-all rebuild-libs rebuild-sysroot test install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-postgres install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
-
-check-build:
-	@if [[ -z "$(strip $(TEST_APPS))" ]]; then \
-	  echo "ERROR: no apps selected; set TEST_APPS to one or more of: $(TESTABLE_APPS)"; \
+test:
+	@if [[ -z "$(strip $(APP))" ]]; then \
+	  echo "ERROR: no apps selected; set APP to one or more of: $(TESTABLE_APPS)"; \
 	  exit 1; \
 	fi
-	@for app in $(TEST_APPS); do \
+	@for app in $(APP); do \
 	  case " $(TESTABLE_APPS) " in \
 	    *" $$app "*) ;; \
 	    *) echo "ERROR: unsupported test app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
 	  esac; \
+	  if [[ -x '$(APPS_ROOT)/'"$$app"'/run_tests.sh' ]]; then \
+	    '$(APPS_ROOT)/'"$$app"'/run_tests.sh' "$$app"; \
+	  else \
+	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/run_tests.sh"; \
+	  fi; \
+	done
+
+check-build:
+	@if [[ -z "$(strip $(APP))" ]]; then \
+	  echo "ERROR: no apps selected; set APP to one or more of: $(TESTABLE_APPS)"; \
+	  exit 1; \
+	fi
+	@for app in $(APP); do \
+	  case " $(TESTABLE_APPS) " in \
+	    *" $$app "*) ;; \
+	    *) echo "ERROR: unsupported test app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
+	  esac; \
+	  
 	  '$(APPS_ROOT)/scripts/check-build.sh' "$$app"; \
 	done
 
+clean:
+	@if [[ -z "$(strip $(APP))" ]]; then \
+	  echo "ERROR: no apps selected; set APP to one or more of: $(TESTABLE_APPS)"; \
+	  exit 1; \
+	fi
+	@for app in $(APP); do \
+	  case " $(TESTABLE_APPS) " in \
+	    *" $$app "*) ;; \
+	    *) echo "ERROR: unsupported clean app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
+	  esac; \
+	  if [[ -x '$(APPS_ROOT)/'"$$app"'/clean.sh' ]]; then \
+	    '$(APPS_ROOT)/'"$$app"'/clean.sh' "$$app"; \
+	  else \
+	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/clean.sh"; \
+	  fi; \
+	done
+	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
+	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)'
+	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
 
 print-config:
 	@echo "LIND_WASM_ROOT=$(LIND_WASM_ROOT)"
@@ -140,6 +182,14 @@ $(OPENSSL_STAMP): $(APPS_ROOT)/openssl/compile_openssl.sh | $(TOOL_ENV)
 
 openssl: $(OPENSSL_STAMP)
 
+# ---------------- libc++ (via compile_libcxx.sh) ------------------------------
+$(LIBCXX_STAMP): $(APPS_ROOT)/llvm-project/compile_libcxx.sh | $(TOOL_ENV)
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/llvm-project/compile_libcxx.sh'
+	touch '$@'
+
+libcxx: $(LIBCXX_STAMP)
+
 # ---------------- Merge sysroot + overlay -------------------------------------
 $(MERGE_BASE_STAMP): | $(TOOL_ENV)
 	@echo "[merge] refreshing base merged sysroot"
@@ -190,7 +240,16 @@ $(MERGE_OPENSSL_STAMP): $(MERGE_BASE_STAMP) $(OPENSSL_STAMP)
 	touch '$@'
 
 
-$(MERGE_ALL_STAMP): $(MERGE_TIRPC_STAMP) $(MERGE_GNULIB_STAMP) $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
+$(MERGE_LIBCXX_STAMP): $(MERGE_BASE_STAMP) $(LIBCXX_STAMP)
+	# libc++ headers (into include/wasm32-wasi/c++/ so clang's -isystem finds them)
+	mkdir -p '$(MERGED_SYSROOT)/include/wasm32-wasi/c++'
+	rsync -a '$(APPS_OVERLAY)/usr/include/c++/' '$(MERGED_SYSROOT)/include/wasm32-wasi/c++/' || true
+	rsync -a '$(APPS_OVERLAY)/usr/lib/wasm32-wasi/' '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
+	rsync -a '$(APPS_OVERLAY)/lib/wasm32-wasi/'     '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
+	touch '$@'
+
+
+$(MERGE_ALL_STAMP): $(MERGE_TIRPC_STAMP) $(MERGE_GNULIB_STAMP) $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP) $(MERGE_LIBCXX_STAMP)
 	touch '$@'
 
 merge-sysroot: $(MERGE_ALL_STAMP)
@@ -255,12 +314,27 @@ sed: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/sed/compile_sed.sh'
 
+# ---------------- gcc (WASM build) --------------------------------------------
+# Uses gcc/compile_gcc.sh to cross-compile GCC cc1 as a wasm32-wasi binary.
+# Requires libc++ in the merged sysroot (for compiling GCC's C++ source).
+# Stages artifacts under build/gcc/usr/local/bin.
+gcc: $(MERGE_LIBCXX_STAMP)
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/gcc/compile_gcc.sh'
+
+# ---------------- binutils (WASM build) ----------------------------------------
+# Uses binutils/compile_binutils.sh to cross-compile ld and as as wasm32-wasi
+# binaries.  Pure C — no libc++ needed.  Stages to build/binutils/usr/local/bin.
+binutils: $(MERGE_ZLIB_STAMP)
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/binutils/compile_binutils.sh'
+
 rebuild-libs:
-	rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' \
-	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
+	rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)' \
+	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 
 rebuild-sysroot:
-	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
+	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 
 # ---------------- cpython (WASM build) ----------------------------------------
 # Placeholder target to preserve the per-app staging/layering pattern.
@@ -284,7 +358,7 @@ install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
 
 install-nginx:
-	'$(APPS_ROOT)/nginx/nginx_post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' nginx
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' nginx
 
 install-git:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' git
@@ -307,15 +381,10 @@ install-coreutils:
 install-postgres:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' postgres
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-postgres
+install-gcc:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' gcc
 
-clean:
-	$(MAKE) -C '$(APPS_ROOT)/lmbench/src' clean || true
-	-rm -rf '$(APPS_BIN_DIR)/lmbench'
-	-rm -rf '$(APPS_BUILD)/lmbench'
-	-rm -rf '$(APPS_BIN_DIR)/nginx'
-	-$(MAKE) -C '$(APPS_ROOT)/nginx' clean || true
-	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
-	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)'
-	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_ALL_STAMP)'
-	$(MAKE) -C '$(APPS_ROOT)/libtirpc' distclean || true
+install-binutils:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' binutils
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-postgres

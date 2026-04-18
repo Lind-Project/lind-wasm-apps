@@ -54,16 +54,16 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ##################
 # These script-level knobs are where the new performance policy lives.
 # `ARTIFACT_MODE=fast` means "build the actual nginx wasm binary quickly,"
-# while the force flags preserve an explicit path back to the old
-# always-refresh behavior when that is useful for debugging.
+# skipping .cwasm generation while the default `ARTIFACT_MODE=full` performs
+# optimization and .cwasm binary generation
 ##################
-ARTIFACT_MODE="${ARTIFACT_MODE:-fast}"
+ARTIFACT_MODE="${ARTIFACT_MODE:-full}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
 CACHE_REVISION="2"
 
 # Output location
-NGINX_OUT_DIR="$APPS_ROOT/build/bin/nginx/wasm32-wasi"
+NGINX_OUT_DIR="$APPS_ROOT/build/nginx"
 mkdir -p "$NGINX_OUT_DIR"
 NGINX_STATE_DIR="$APPS_ROOT/build/.nginx_state"
 CONFIG_SIG_FILE="$NGINX_STATE_DIR/config.sig"
@@ -650,11 +650,13 @@ echo "[nginx] configuring for wasm32-wasi cross-compilation..."
     --with-cc="$CLANG" \
     --with-cc-opt="--target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT $CFLAGS_WASM" \
     --prefix=/usr/local/nginx \
+    --sbin-path=/usr/sbin/nginx \
     --conf-path=/etc/nginx/nginx.conf \
+    --modules-path=/usr/lib/nginx/modules \
     --error-log-path=/var/log/nginx/error.log \
     --http-log-path=/var/log/nginx/access.log \
-    --pid-path=/var/run/nginx.pid \
-    --lock-path=/var/run/nginx.lock \
+    --pid-path=/var/run/nginx/nginx.pid \
+    --lock-path=/var/run/nginx/nginx.lock \
     --with-poll_module \
     --without-select_module \
     --without-http_rewrite_module \
@@ -779,9 +781,14 @@ if [[ ! -f objs/nginx ]]; then
     exit 1
 fi
 
-# Copy the binary to output directory
-NGINX_RAW_WASM="$NGINX_OUT_DIR/nginx.raw.wasm"
-NGINX_WASM="$NGINX_OUT_DIR/nginx.wasm"
+#This creates the build folder (build/nginx) and creates necessary folders and copies files (binaries/configuration files) to the build folder
+
+make install DESTDIR=$NGINX_OUT_DIR
+
+NGINX_RAW_WASM="$SCRIPT_DIR/nginx.raw.wasm"
+NGINX_WASM="$SCRIPT_DIR/nginx.wasm"
+NGINX_OPT_WASM="$SCRIPT_DIR/nginx.opt.wasm"
+NGINX_OPT_CWASM="$SCRIPT_DIR/nginx.opt.cwasm"
 cp objs/nginx "$NGINX_RAW_WASM"
 echo "[nginx] built raw module: $NGINX_RAW_WASM"
 
@@ -789,7 +796,8 @@ echo "[nginx] built raw module: $NGINX_RAW_WASM"
 # 5. Optimize with wasm-opt (asyncify for fork/exec support)
 ###############################################################################
 
-rm -f "$NGINX_WASM" "$NGINX_OUT_DIR/nginx.opt.wasm" "$NGINX_OUT_DIR/nginx.cwasm"
+rm -f "$NGINX_WASM" "$NGINX_OPT_WASM" "$NGINX_OPT_CWASM"
+
 ##################
 # Lind expects the runnable module to include the epoch-injection transform, so
 # `wasm-opt` is part of producing a correct default artifact here, not just an
@@ -804,6 +812,7 @@ fi
 
 echo "[nginx] running wasm-opt (asyncify + epoch injection) to produce runnable nginx.wasm..."
 "$WASM_OPT" \
+    --fpcast-emu \
     --epoch-injection \
     --asyncify \
     --debuginfo \
@@ -813,31 +822,40 @@ echo "[nginx] running wasm-opt (asyncify + epoch injection) to produce runnable 
 echo "[nginx] optimized runnable module: $NGINX_WASM"
 
 if [[ "$ARTIFACT_MODE" == "full" ]]; then
-    cp "$NGINX_WASM" "$NGINX_OUT_DIR/nginx.opt.wasm"
+    cp "$NGINX_WASM" "$NGINX_OPT_WASM"
 else
-    echo "[nginx] artifact mode is fast; keeping nginx.wasm runnable and skipping only cwasm generation."
+    echo "[nginx] artifact mode is fast; keeping nginx.wasm runnable and skipping cwasm generation."
+    echo "No binaries copied to the build folder. Exiting.."
+    exit 1
+fi
+
+if [[ ! -f "$NGINX_OPT_WASM" ]]; then
+  echo "[nginx] ERROR: Failed to generate "$NGINX_OPT_WASM"; Exiting.."
+  exit 1
 fi
 
 ###############################################################################
 # 6. cwasm generation (best-effort)
 ###############################################################################
 
-if [[ "$ARTIFACT_MODE" == "full" && -x "$LIND_BOOT" ]]; then
+if [[ -x "$LIND_BOOT" ]]; then
     echo "[nginx] generating cwasm via lind-boot --precompile..."
-    if "$LIND_BOOT" --precompile "$NGINX_OUT_DIR/nginx.opt.wasm"; then
-        # Rename nginx.opt.cwasm → nginx.cwasm (drop .opt)
-        OPT_CWASM="$NGINX_OUT_DIR/nginx.opt.cwasm"
-        CLEAN_CWASM="${OPT_CWASM/.opt/}"
-        if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
-            mv "$OPT_CWASM" "$CLEAN_CWASM"
-        fi
+    if "$LIND_BOOT" --precompile "$NGINX_OPT_WASM"; then
+	#We are replacing the wasm binary which was staged to build/nginx/usr/sbin when we did `make install` with .cwasm binary
+	if [[ -f "$NGINX_OPT_CWASM" ]]; then
+      		cp "$NGINX_OPT_CWASM" "$NGINX_OUT_DIR/usr/sbin/nginx"
+      		echo "[nginx] nginx staged as $NGINX_OUT_DIR/usr/sbin/nginx"
+	else
+		echo "[nginx] ERROR: $NGINX_OPT_CWASM not produced. Exiting.."
+		exit 1
+	fi
     else
-        echo "[nginx] WARNING: lind-boot --precompile failed; skipping cwasm generation."
+        echo "[nginx] WARNING: lind-boot --precompile failed; skipping cwasm generation. Exiting.."
+        exit 1
     fi
-elif [[ "$ARTIFACT_MODE" == "full" ]]; then
-    echo "[nginx] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
 else
-    echo "[nginx] artifact mode is fast; skipping cwasm generation."
+    echo "[nginx] NOTE: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+    exit 1
 fi
 
 ###############################################################################
@@ -845,12 +863,11 @@ fi
 ###############################################################################
 
 echo "[nginx] copying configuration files..."
-mkdir -p "$NGINX_OUT_DIR/conf"
-cp -r "$NGINX_ROOT/conf/"* "$NGINX_OUT_DIR/conf/" 2>/dev/null || true
-cp -r "$NGINX_ROOT/html" "$NGINX_OUT_DIR/" 2>/dev/null || true
+mkdir -p "$NGINX_OUT_DIR/var/www/html"
+cp "$NGINX_ROOT/html/"* "$NGINX_OUT_DIR/var/www/html" 2>/dev/null || true
 
-# Create a minimal nginx.conf for WASM testing
-write_if_changed "$NGINX_OUT_DIR/conf/nginx-wasm.conf" << 'EOF'
+
+write_if_changed "$NGINX_OUT_DIR/etc/nginx/nginx-wasm.conf" << 'EOF'
 # nginx configuration for WASM/Lind runtime
 # Run in foreground, single-process mode for initial testing
 
@@ -879,18 +896,18 @@ http {
         server_name localhost;
 
         location / {
-            root   html;
+            root   /var/www/html;
             index  index.html index.htm;
         }
 
         error_page 500 502 503 504 /50x.html;
         location = /50x.html {
-            root html;
+            root /var/www/html;
         }
     }
 }
 EOF
-echo "[nginx] created minimal config: $NGINX_OUT_DIR/conf/nginx-wasm.conf"
+echo "[nginx] created minimal config: $NGINX_OUT_DIR/etc/nginx/nginx-wasm.conf"
 
 popd >/dev/null
 
@@ -903,7 +920,7 @@ echo "[nginx] build complete. Outputs:"
 ls -lh "$NGINX_OUT_DIR"/*.wasm 2>/dev/null || true
 echo
 echo "To run nginx in Lind:"
-echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.wasm -c /etc/nginx/nginx.conf"
+echo "  $LIND_WASM_ROOT/scripts/lind_run usr/sbin/nginx -c /etc/nginx/nginx.conf"
 echo
 echo "Or with the test config:"
-echo "  $LIND_WASM_ROOT/scripts/lind_run $NGINX_OUT_DIR/nginx.wasm -c conf/nginx-wasm.conf"
+echo "  $LIND_WASM_ROOT/scripts/lind_run usr/sbin/nginx -c /etc/nginx/nginx-wasm.conf"
