@@ -469,7 +469,7 @@ make -C src/bin/pgbench -j"$JOBS" \
   LDFLAGS="-L$PG_ROOT/src/port -L$PG_ROOT/src/common -L$PG_ROOT/src/fe_utils -L$PG_ROOT/src/interfaces/libpq $LDFLAGS_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
-  LIBS="-lpgfeutils -lpq -lpgcommon -lpgport $WASI_STUBS_O -lm" || {
+  LIBS="-lpgfeutils -lpq -lpgcommon -lpgport -lpgcommon $WASI_STUBS_O -lm" || {
     echo "[postgres] WARNING: pgbench build had errors (best-effort, continuing)."
 }
 
