@@ -462,12 +462,24 @@ make -C src/bin/initdb -j"$JOBS" \
     echo "[postgres] WARNING: initdb build had errors (best-effort, continuing)."
 }
 
+echo "[postgres] [wasm] building pgbench..."
+make -C src/bin/pgbench -j"$JOBS" \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  LDFLAGS="-L$PG_ROOT/src/port -L$PG_ROOT/src/common -L$PG_ROOT/src/fe_utils -L$PG_ROOT/src/interfaces/libpq $LDFLAGS_WASM" \
+  AR="$AR" \
+  RANLIB="$RANLIB" \
+  LIBS="-lpgfeutils -lpq -lpgcommon -lpgport $WASI_STUBS_O -lm" || {
+    echo "[postgres] WARNING: pgbench build had errors (best-effort, continuing)."
+}
+
 ###############################################################################
 # Stage binaries
 ###############################################################################
 
 PG_BINARY="$PG_ROOT/src/backend/postgres"
 INITDB_BINARY="$PG_ROOT/src/bin/initdb/initdb"
+PGBENCH_BINARY="$PG_ROOT/src/bin/pgbench/pgbench"
 
 STAGED_BINARIES=()
 
@@ -485,6 +497,14 @@ if [[ -f "$INITDB_BINARY" ]]; then
   echo "[postgres] staged: $STAGE_DIR/initdb.wasm"
 else
   echo "[postgres] WARNING: initdb binary was not produced."
+fi
+
+if [[ -f "$PGBENCH_BINARY" ]]; then
+  cp "$PGBENCH_BINARY" "$STAGE_DIR/pgbench.wasm"
+  STAGED_BINARIES+=("pgbench")
+  echo "[postgres] staged: $STAGE_DIR/pgbench.wasm"
+else
+  echo "[postgres] WARNING: pgbench binary was not produced."
 fi
 
 if [[ ${#STAGED_BINARIES[@]} -eq 0 ]]; then
