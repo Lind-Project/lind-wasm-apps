@@ -42,6 +42,9 @@ LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
+# --- dynamic linking mode ----------------------------------------------------
+LIND_DYLINK="${LIND_DYLINK:-0}"
+
 # --- load toolchain ----------------------------------------------------------
 
 if [[ -r "$TOOL_ENV" ]]; then
@@ -85,6 +88,7 @@ NM="${NM:-"$LLVM_BIN_DIR/llvm-nm"}"
 
 CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT -pthread"
 
+# Base CFLAGS (dylink adds -fPIC below)
 CFLAGS_WASM="-O2 -g -pthread \
   -include $WASM_COMPAT_H \
   -I$MERGED_SYSROOT/include \
@@ -92,16 +96,73 @@ CFLAGS_WASM="-O2 -g -pthread \
   -DUSE_PRIVATE_ENCODING_FUNCS"
 
 # 256 MB max memory — PG allocates shared buffers even in single-user mode
-LDFLAGS_WASM="-Wl,--import-memory,--export-memory,\
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[postgres] Dynamic linking mode enabled (LIND_DYLINK=1)"
+
+  # Add PIC for position-independent code
+  CFLAGS_WASM="$CFLAGS_WASM -fPIC"
+
+  # add-export-tool is used after wasm-opt to export relocation and stack symbols
+  ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
+  if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+    echo "[postgres] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'" >&2
+    exit 1
+  fi
+
+  # Extra CRT objects required for dynamic PIE executables
+  DYLINK_CRT_OBJS=(
+    "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o"
+  )
+  for obj in "${DYLINK_CRT_OBJS[@]}"; do
+    if [[ ! -f "$obj" ]]; then
+      echo "[postgres] ERROR: required dylink CRT object '$obj' not found." >&2
+      echo "[postgres] Hint: rebuild sysroot on the dylink branch (make sysroot in lind-wasm)." >&2
+      exit 1
+    fi
+  done
+
+  # Dylink LDFLAGS for actual build
+  LDFLAGS_WASM="-nostartfiles \
+    -Wl,-pie \
+    -Wl,--import-table \
+    -Wl,--import-memory \
+    -Wl,--export-memory \
+    -Wl,--shared-memory \
+    -Wl,--max-memory=268435456 \
+    -Wl,--allow-undefined \
+    -Wl,--unresolved-symbols=import-dynamic \
+    -Wl,--export=__wasm_call_ctors \
+    -Wl,--export-if-defined=__wasm_init_tls \
+    -Wl,--export=__tls_base \
+    -Wl,-z,stack-size=8388608 \
+    -L$MERGED_SYSROOT/lib/wasm32-wasi \
+    -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
+    ${DYLINK_CRT_OBJS[*]}"
+
+  # Static LDFLAGS for configure (correct feature detection)
+  LDFLAGS_CONFIGURE="-Wl,--import-memory,--export-memory,\
 --max-memory=268435456,--export=__stack_pointer,--export=__stack_low,-z,stack-size=8388608 \
 -L$MERGED_SYSROOT/lib/wasm32-wasi \
 -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+
+else
+  # Static LDFLAGS (original)
+  LDFLAGS_WASM="-Wl,--import-memory,--export-memory,\
+--max-memory=268435456,--export=__stack_pointer,--export=__stack_low,-z,stack-size=8388608 \
+-L$MERGED_SYSROOT/lib/wasm32-wasi \
+-L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+
+  LDFLAGS_CONFIGURE="$LDFLAGS_WASM"
+fi
 
 echo "[postgres] using CLANG       = $CLANG"
 echo "[postgres] using AR          = $AR"
 echo "[postgres] LIND_WASM_ROOT    = $LIND_WASM_ROOT"
 echo "[postgres] merged sysroot    = $MERGED_SYSROOT"
 echo "[postgres] stage dir         = $STAGE_DIR"
+echo "[postgres] dylink mode       = $LIND_DYLINK"
 echo
 
 cd "$PG_ROOT"
@@ -305,7 +366,7 @@ echo "[postgres] [wasm] configuring for wasm32-wasi..."
   RANLIB="$RANLIB" \
   NM="$NM" \
   CFLAGS="$CFLAGS_WASM" \
-  LDFLAGS="$LDFLAGS_WASM" \
+  LDFLAGS="$LDFLAGS_CONFIGURE" \
   PKG_CONFIG=false
 
 # --- Post-configure fixups ---------------------------------------------------
@@ -520,27 +581,50 @@ fi
 
 for bin_name in "${STAGED_BINARIES[@]}"; do
   RAW_WASM="$STAGE_DIR/${bin_name}.wasm"
+  OPT_WASM="$STAGE_DIR/${bin_name}.opt.wasm"
 
   if [[ -x "$WASM_OPT" ]]; then
     echo "[postgres] running wasm-opt on ${bin_name} (asyncify + optimization)..."
-    "$WASM_OPT" \
-      --epoch-injection \
-      --asyncify \
-      --debuginfo \
-      -O2 \
-      "$RAW_WASM" \
-      -o "$STAGE_DIR/${bin_name}.opt.wasm" || {
-        echo "[postgres] WARNING: wasm-opt failed for ${bin_name}; skipping optimization."
-        continue
-      }
+    if [[ "$LIND_DYLINK" == "1" ]]; then
+      # Dylink wasm-opt flags: import epoch/asyncify globals from shared libc
+      "$WASM_OPT" \
+        --enable-bulk-memory --enable-threads \
+        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+        --asyncify --pass-arg=asyncify-import-globals \
+        --debuginfo \
+        "$RAW_WASM" \
+        -o "$OPT_WASM" || {
+          echo "[postgres] WARNING: wasm-opt failed for ${bin_name}; skipping optimization."
+          continue
+        }
+    else
+      # Static wasm-opt flags
+      "$WASM_OPT" \
+        --epoch-injection \
+        --asyncify \
+        --debuginfo \
+        -O2 \
+        "$RAW_WASM" \
+        -o "$OPT_WASM" || {
+          echo "[postgres] WARNING: wasm-opt failed for ${bin_name}; skipping optimization."
+          continue
+        }
+    fi
   else
     echo "[postgres] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
     continue
   fi
 
+  # Dylink: add required exports via add-export-tool
+  if [[ "$LIND_DYLINK" == "1" ]]; then
+    echo "[postgres] adding dylink exports for ${bin_name}..."
+    "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+    "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+    "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __stack_pointer global __stack_pointer
+  fi
+
   if [[ -x "$LIND_BOOT" ]]; then
     echo "[postgres] generating cwasm for ${bin_name} via lind-boot --precompile..."
-    OPT_WASM="$STAGE_DIR/${bin_name}.opt.wasm"
     if [[ -f "$OPT_WASM" ]]; then
       if "$LIND_BOOT" --precompile "$OPT_WASM"; then
         # Rename foo.opt.cwasm → foo.cwasm (drop .opt)
