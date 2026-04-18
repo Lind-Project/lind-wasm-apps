@@ -587,8 +587,10 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
     echo "[postgres] running wasm-opt on ${bin_name} (asyncify + optimization)..."
     if [[ "$LIND_DYLINK" == "1" ]]; then
       # Dylink wasm-opt flags: import epoch/asyncify globals from shared libc
+      # -O2 before asyncify helps reduce locals in large binaries like postgres
       "$WASM_OPT" \
         --enable-bulk-memory --enable-threads \
+        -O2 \
         --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
         --asyncify --pass-arg=asyncify-import-globals \
         --debuginfo \
