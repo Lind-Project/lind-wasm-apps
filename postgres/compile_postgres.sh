@@ -524,10 +524,12 @@ make -C src/bin/initdb -j"$JOBS" \
     echo "[postgres] WARNING: initdb build had errors (best-effort, continuing)."
 }
 
+# pgbench uses ppoll() by default, but ppoll is broken in lind-wasm glibc
+# (SYSCALL_CANCEL returns 0 immediately). Force select() instead.
 echo "[postgres] [wasm] building pgbench..."
 make -C src/bin/pgbench -j"$JOBS" \
   CC="$CC_WASM" \
-  CFLAGS="$CFLAGS_WASM" \
+  CFLAGS="$CFLAGS_WASM -DPGBENCH_USE_SELECT" \
   LDFLAGS="-L$PG_ROOT/src/port -L$PG_ROOT/src/common -L$PG_ROOT/src/fe_utils -L$PG_ROOT/src/interfaces/libpq $LDFLAGS_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
