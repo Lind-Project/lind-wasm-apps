@@ -234,15 +234,14 @@ if [[ -x "$WASM_OPT" ]]; then
       --enable-bulk-memory --enable-threads \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
       --asyncify --pass-arg=asyncify-import-globals \
-      --debuginfo \
-      "$CURL_WASM" -o "$CURL_OPT_WASM" || true
+      -O2 --debuginfo \
+      "$CURL_WASM" -o "$CURL_OPT_WASM"
   else
     "$WASM_OPT" \
       --epoch-injection \
       --asyncify \
-      --debuginfo \
-      -O2 \
-      "$CURL_WASM" -o "$CURL_OPT_WASM" || true
+      -O2 --debuginfo \
+      "$CURL_WASM" -o "$CURL_OPT_WASM"
   fi
 else
   echo "[curl] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
