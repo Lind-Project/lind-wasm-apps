@@ -39,8 +39,28 @@ unsigned long _Unwind_GetCFA(_Unwind_Context *ctx)
     return 0;
 }
 
-/* Wrapper for encoding function - libpgcommon exports _private suffix */
+/* Wrappers for encoding functions - libpgcommon exports _private suffix */
 extern int pg_valid_server_encoding_id_private(int encoding);
 int pg_valid_server_encoding_id(int encoding) {
     return pg_valid_server_encoding_id_private(encoding);
+}
+
+extern int pg_char_to_encoding_private(const char *name);
+int pg_char_to_encoding(const char *name) {
+    return pg_char_to_encoding_private(name);
+}
+
+extern const char *pg_encoding_to_char_private(int encoding);
+const char *pg_encoding_to_char(int encoding) {
+    return pg_encoding_to_char_private(encoding);
+}
+
+extern int pg_valid_server_encoding_private(const char *name);
+int pg_valid_server_encoding(const char *name) {
+    return pg_valid_server_encoding_private(name);
+}
+
+extern int pg_utf_mblen_private(const unsigned char *s);
+int pg_utf_mblen(const unsigned char *s) {
+    return pg_utf_mblen_private(s);
 }
