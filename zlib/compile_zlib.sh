@@ -54,7 +54,7 @@ cp zlib.h zconf.h "$OVERLAY/usr/include/"
 popd >/dev/null
 
 if [[ "$LIND_DYLINK" != "1" ]]; then
-        echo "[zlib] done ?~F~R $OVERLAY/usr/lib/wasm32-wasi/libz.a"
+        echo "[zlib] done → $OVERLAY/usr/lib/wasm32-wasi/libz.a"
         exit 0
 fi
 
@@ -103,7 +103,7 @@ if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
 fi
 
 # do precompile
-$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT"|| { echo "[zlib] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."; exit 1; }
+$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT" || { echo "[zlib] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT_CWASM" ]]; then
   echo "[zlib] ERROR: Failed to generate '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."
