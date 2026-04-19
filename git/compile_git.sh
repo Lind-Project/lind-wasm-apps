@@ -265,11 +265,11 @@ if [[ -x "$WASM_OPT" ]]; then
       --enable-bulk-memory --enable-threads \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
       --asyncify --pass-arg=asyncify-import-globals \
-      --debuginfo \
-      "$GIT_WASM" -o "$GIT_OPT_WASM" || true
+      -O2 --debuginfo \
+      "$GIT_WASM" -o "$GIT_OPT_WASM"
   else
-    "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
-      "$GIT_WASM" -o "$GIT_OPT_WASM" || true
+    "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
+      "$GIT_WASM" -o "$GIT_OPT_WASM"
   fi
 else
   echo "[git] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
