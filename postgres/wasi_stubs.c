@@ -38,3 +38,9 @@ unsigned long _Unwind_GetCFA(_Unwind_Context *ctx)
     (void)ctx;
     return 0;
 }
+
+/* Wrapper for encoding function - libpgcommon exports _private suffix */
+extern int pg_valid_server_encoding_id_private(int encoding);
+int pg_valid_server_encoding_id(int encoding) {
+    return pg_valid_server_encoding_id_private(encoding);
+}

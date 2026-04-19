@@ -93,7 +93,6 @@ CFLAGS_WASM="-O2 -g -pthread \
   -include $WASM_COMPAT_H \
   -I$MERGED_SYSROOT/include \
   -I$MERGED_SYSROOT/include/wasm32-wasi \
-  -DUSE_PRIVATE_ENCODING_FUNCS \
   -DWAIT_USE_POLL"
 
 # 256 MB max memory — PG allocates shared buffers even in single-user mode
