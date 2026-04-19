@@ -262,15 +262,14 @@ if [[ -x "$WASM_OPT" ]]; then
       --enable-bulk-memory --enable-threads \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
       --asyncify --pass-arg=asyncify-import-globals \
-      --debuginfo \
-      "$GREP_WASM" -o "$GREP_OPT_WASM" || true
+      -O2 --debuginfo \
+      "$GREP_WASM" -o "$GREP_OPT_WASM"
   else
     "$WASM_OPT" \
       --epoch-injection \
       --asyncify \
-      --debuginfo \
-      -O2 \
-      "$GREP_WASM" -o "$GREP_OPT_WASM" || true
+      -O2 --debuginfo \
+      "$GREP_WASM" -o "$GREP_OPT_WASM"
   fi
 else
   echo "[grep] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
