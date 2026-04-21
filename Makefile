@@ -349,7 +349,7 @@ rebuild-sysroot:
 # ---------------- cpython (WASM build) ----------------------------------------
 # Uses cpython/compile_cpython.sh to cross-compile CPython for wasm32-wasi.
 # Supports both static (default) and dynamic (LIND_DYLINK=1) builds.
-cpython: merge-sysroot
+cpython: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 	'$(APPS_ROOT)/cpython/compile_cpython.sh'
 
 # ---------------- postgres (WASM build) ---------------------------------------
