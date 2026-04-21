@@ -158,36 +158,38 @@ if [[ ! -f "$BASE_LIBC" ]]; then
   exit 1
 fi
 
-if [[ ! -d "$TIRPC_MERGE_DIR" ]]; then
-  echo "[lmbench] ERROR: expected libtirpc .o dir '$TIRPC_MERGE_DIR' not found" >&2
-  echo "[lmbench] Hint: did 'make libtirpc' succeed?" >&2
-  exit 1
-fi
-
-shopt -s nullglob
-tirpc_objs=("$TIRPC_MERGE_DIR"/*.o)
-shopt -u nullglob
-
-if (( ${#tirpc_objs[@]} == 0 )); then
-  echo "[lmbench] ERROR: no libtirpc .o files under $TIRPC_MERGE_DIR" >&2
-  exit 1
-fi
-
 ##################
-# lmbench is special in this repo because it needs a libc archive that includes
-# the libtirpc objects. Rebuilding that archive every time is unnecessary, so
-# we fingerprint the base libc plus the libtirpc merge inputs and only recreate
-# the combined archive when one of those inputs actually changed.
+# For static builds, lmbench needs a libc archive that includes the libtirpc
+# objects. For dylink builds, libtirpc.so is loaded separately at runtime.
 ##################
-libc_signature() {
-  {
-    echo "rev=$CACHE_REVISION"
-    echo "base=$(hash_file "$BASE_LIBC")"
-    echo "ar=$AR"
-    echo "ranlib=$RANLIB"
-    list_hashes "${tirpc_objs[@]}"
-  } | sha256sum | awk '{print $1}'
-}
+if [[ "$LIND_DYLINK" != "1" ]]; then
+  if [[ ! -d "$TIRPC_MERGE_DIR" ]]; then
+    echo "[lmbench] ERROR: expected libtirpc .o dir '$TIRPC_MERGE_DIR' not found" >&2
+    echo "[lmbench] Hint: did 'make libtirpc' succeed?" >&2
+    exit 1
+  fi
+
+  shopt -s nullglob
+  tirpc_objs=("$TIRPC_MERGE_DIR"/*.o)
+  shopt -u nullglob
+
+  if (( ${#tirpc_objs[@]} == 0 )); then
+    echo "[lmbench] ERROR: no libtirpc .o files under $TIRPC_MERGE_DIR" >&2
+    exit 1
+  fi
+
+  libc_signature() {
+    {
+      echo "rev=$CACHE_REVISION"
+      echo "base=$(hash_file "$BASE_LIBC")"
+      echo "ar=$AR"
+      echo "ranlib=$RANLIB"
+      list_hashes "${tirpc_objs[@]}"
+    } | sha256sum | awk '{print $1}'
+  }
+else
+  echo "[lmbench] dylink mode: skipping tirpc merge (libtirpc.so loaded at runtime)"
+fi
 
 LM_BENCH_BIN_DIR="$REPO_ROOT/lmbench/bin/wasm32-wasi"
 mkdir -p "$LM_BENCH_BIN_DIR"
@@ -261,7 +263,12 @@ if [[ "$ENABLE_WASI_THREADS" == "1" ]]; then
 fi
 
 LDFLAGS="${LDFLAGS_WASM[*]}"
-LDLIBS="-ltirpc -lm"
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  # In dylink mode, tirpc symbols come from libtirpc.so loaded at runtime
+  LDLIBS="-lm"
+else
+  LDLIBS="-ltirpc -lm"
+fi
 
 ##################
 # The compile step has its own signature because a clean rebuild only makes
@@ -283,43 +290,43 @@ build_signature() {
   } | sha256sum | awk '{print $1}'
 }
 
-mkdir -p "$APPS_BUILD/lib"
-COMBINED_LIBC="$APPS_BUILD/lib/libc.a"
-current_libc_sig="$(libc_signature)"
-
 ##################
-# This block is intentionally separate from the main build so it is clear that
-# "rebuild combined libc" and "rebuild lmbench" are different invalidation
-# problems. If the libc inputs are unchanged, we can safely reuse the existing
-# archive and just make sure the merged sysroot copy matches it.
+# For static builds only: create combined libc.a with tirpc objects merged in.
+# For dylink builds, libtirpc.so is loaded separately at runtime.
 ##################
-if [[ "$FORCE_CLEAN" == "1" || "$FORCE_CONFIGURE" == "1" || ! -f "$LIBC_SIG_FILE" || "$(cat "$LIBC_SIG_FILE" 2>/dev/null || true)" != "$current_libc_sig" || ! -f "$COMBINED_LIBC" ]]; then
-  rm -rf "$COMB_DIR"
-  mkdir -p "$COMB_DIR"
+if [[ "$LIND_DYLINK" != "1" ]]; then
+  mkdir -p "$APPS_BUILD/lib"
+  COMBINED_LIBC="$APPS_BUILD/lib/libc.a"
+  current_libc_sig="$(libc_signature)"
 
-  echo "[lmbench] extracting base libc objects..."
-  (
-    cd "$COMB_DIR"
-    "$AR" x "$BASE_LIBC"
-  )
+  if [[ "$FORCE_CLEAN" == "1" || "$FORCE_CONFIGURE" == "1" || ! -f "$LIBC_SIG_FILE" || "$(cat "$LIBC_SIG_FILE" 2>/dev/null || true)" != "$current_libc_sig" || ! -f "$COMBINED_LIBC" ]]; then
+    rm -rf "$COMB_DIR"
+    mkdir -p "$COMB_DIR"
 
-  echo "[lmbench] adding libtirpc objects from $TIRPC_MERGE_DIR..."
-  cp "${tirpc_objs[@]}" "$COMB_DIR/"
+    echo "[lmbench] extracting base libc objects..."
+    (
+      cd "$COMB_DIR"
+      "$AR" x "$BASE_LIBC"
+    )
 
-  echo "[lmbench] creating combined libc.a -> $COMBINED_LIBC"
-  (
-    cd "$COMB_DIR"
-    "$AR" rcs "$COMBINED_LIBC" ./*.o
-    "$RANLIB" "$COMBINED_LIBC" || true
-  )
+    echo "[lmbench] adding libtirpc objects from $TIRPC_MERGE_DIR..."
+    cp "${tirpc_objs[@]}" "$COMB_DIR/"
 
-  printf '%s\n' "$current_libc_sig" >"$LIBC_SIG_FILE"
-else
-  echo "[lmbench] reusing combined libc.a"
-fi
+    echo "[lmbench] creating combined libc.a -> $COMBINED_LIBC"
+    (
+      cd "$COMB_DIR"
+      "$AR" rcs "$COMBINED_LIBC" ./*.o
+      "$RANLIB" "$COMBINED_LIBC" || true
+    )
 
-if ! cmp -s "$COMBINED_LIBC" "$BASE_LIBC"; then
-  cp "$COMBINED_LIBC" "$BASE_LIBC"
+    printf '%s\n' "$current_libc_sig" >"$LIBC_SIG_FILE"
+  else
+    echo "[lmbench] reusing combined libc.a"
+  fi
+
+  if ! cmp -s "$COMBINED_LIBC" "$BASE_LIBC"; then
+    cp "$COMBINED_LIBC" "$BASE_LIBC"
+  fi
 fi
 
 ##################
@@ -499,3 +506,9 @@ if [[ "$ARTIFACT_MODE" != "full" ]]; then
 fi
 
 echo "[lmbench] post-processing complete."
+
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo ""
+  echo "[lmbench] NOTE: dylink mode requires libtirpc.so at runtime."
+  echo "[lmbench] Run with: lind-boot --preload env=/lib/libc.cwasm --preload env=/lib/libm.cwasm --preload env=/lib/libtirpc.so <binary>"
+fi
