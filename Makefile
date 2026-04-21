@@ -5,6 +5,12 @@ SHELL := /bin/bash
 .ONESHELL:
 .SHELLFLAGS := -eu -o pipefail -c
 
+# -------- Build mode ----------------------------------------------------------
+# Set LIND_DYLINK=1 for dynamic/PIE builds, 0 for static.
+# Exported so all compile scripts inherit it.
+LIND_DYLINK    ?= 1
+export LIND_DYLINK
+
 # -------- Paths ---------------------------------------------------------------
 LIND_WASM_ROOT ?= $(HOME)/lind-wasm
 BASE_SYSROOT   ?= $(LIND_WASM_ROOT)/src/glibc/sysroot
