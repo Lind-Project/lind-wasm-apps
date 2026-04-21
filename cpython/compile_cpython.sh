@@ -18,7 +18,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 APPS_BUILD="$APPS_ROOT/build"
-MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -26,7 +25,9 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
+# CPython uses the base glibc sysroot (not the merged overlay sysroot) because
+# libm and other core libs live there, and the configure checks require them.
+SYSROOT="${SYSROOT:-$LIND_WASM_ROOT/build/sysroot}"
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
@@ -54,8 +55,8 @@ PYTHON_OUT_DIR="$APPS_BUILD/cpython"
 BUILD_WASM="$SCRIPT_DIR/build-wasm"
 
 # Sanity
-if [[ ! -d "$MERGED_SYSROOT" ]]; then
-  echo "[cpython] ERROR: merged sysroot '$MERGED_SYSROOT' not found. Run 'make merge-sysroot' first." >&2
+if [[ ! -d "$SYSROOT" ]]; then
+  echo "[cpython] ERROR: merged sysroot '$SYSROOT' not found. Run 'make merge-sysroot' first." >&2
   exit 1
 fi
 
@@ -63,7 +64,7 @@ mkdir -p "$PYTHON_OUT_DIR"
 
 echo "[cpython] using CLANG       = $CLANG"
 echo "[cpython] LIND_WASM_ROOT    = $LIND_WASM_ROOT"
-echo "[cpython] merged sysroot    = $MERGED_SYSROOT"
+echo "[cpython] merged sysroot    = $SYSROOT"
 echo "[cpython] output dir        = $PYTHON_OUT_DIR"
 echo "[cpython] LIND_DYLINK       = $LIND_DYLINK"
 echo
@@ -103,7 +104,7 @@ if [[ ! -f "Makefile" ]]; then
     CC="$CLANG \
     -pthread \
     --target=wasm32-unknown-wasi \
-    --sysroot $MERGED_SYSROOT \
+    --sysroot $SYSROOT \
     -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC" \
     ac_cv_func_working_mktime=yes \
     ac_cv_func_mmap_fixed_mapped=yes \
@@ -203,7 +204,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   "$CLANG" \
     --target=wasm32-unknown-wasi \
     -fPIC \
-    --sysroot "$MERGED_SYSROOT" \
+    --sysroot "$SYSROOT" \
     -fvisibility=default \
     -Wl,--import-memory \
     -Wl,--shared-memory \
@@ -217,7 +218,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     -Wl,--export=__wasm_call_ctors \
     -Wl,--export-if-defined=__wasm_init_tls \
     -Wl,--export=__tls_base \
-    "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o" \
+    "$SYSROOT/lib/wasm32-wasi/lind_utils.o" \
     -g -O0 -o "$DYNAMIC_LIB_WASM" \
     || { echo "[cpython] ERROR: shared libpython compilation failed" >&2; exit 1; }
 
@@ -267,7 +268,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     -pthread \
     -fPIC \
     --target=wasm32-unknown-wasi \
-    --sysroot "$MERGED_SYSROOT" \
+    --sysroot "$SYSROOT" \
     -nostartfiles \
     -Wl,-pie \
     -Wl,--import-table \
@@ -295,9 +296,9 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     "$BUILD_WASM/Modules/_decimal/libmpdec/libmpdec.a" \
     "$BUILD_WASM/Modules/_hacl/libHacl_HMAC.a" \
     "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA3.a" \
-    "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o" \
-    "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o" \
-    "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o" \
+    "$SYSROOT/lib/wasm32-wasi/set_stack_pointer.o" \
+    "$SYSROOT/lib/wasm32-wasi/crt1_shared.o" \
+    "$SYSROOT/lib/wasm32-wasi/lind_utils.o" \
     -ldl -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lpthread -lm
 
   if [[ ! -f "$PYTHON_WASM" ]]; then
