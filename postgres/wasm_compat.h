@@ -19,4 +19,11 @@
 
 #endif /* __wasi__ */
 
+/* Disable MAP_HUGETLB — lind-wasm doesn't support huge pages.
+   Include mman.h first so the #undef takes effect. */
+#include <sys/mman.h>
+#ifdef MAP_HUGETLB
+#undef MAP_HUGETLB
+#endif
+
 #endif /* WASM_COMPAT_H */
