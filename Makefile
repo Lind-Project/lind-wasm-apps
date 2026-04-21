@@ -342,11 +342,6 @@ cpython: merge-sysroot
 	mkdir -p '$(APPS_BIN_DIR)/cpython/wasm32-wasi'
 
 # ---------------- postgres (WASM build) ---------------------------------------
-# Placeholder target to preserve the per-app staging/layering pattern.
-postgres: merge-sysroot
-	mkdir -p '$(APPS_BIN_DIR)/postgres/wasm32-wasi'
-
-# ---------------- postgres (WASM build) ---------------------------------------
 # Uses postgres/compile_postgres.sh to build the PostgreSQL backend as a
 # wasm32-wasi binary using the merged sysroot and toolchain detected by
 # preflight, and stages artifacts under build/bin/postgres/wasm32-wasi/.
@@ -379,7 +374,7 @@ install-coreutils:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' coreutils
 
 install-postgres:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BIN_DIR)' postgres
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' postgres
 
 install-gcc:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' gcc
