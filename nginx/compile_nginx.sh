@@ -30,7 +30,7 @@ if [[ -r "$TOOL_ENV" ]]; then
 fi
 
 if [[ -z "${CLANG:-}" ]]; then
-    echo "[nginx] ERROR: CLANG is not set. Run 'make preflight' from lind-wasm-apps root."
+    echo "[nginx] ERROR: CLANG is not set. Run 'make preflight' from lind-wasm-apps root." >&2
     exit 1
 fi
 
@@ -40,7 +40,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
-MERGED_SYSROOT="${APPS_MERGED:-$APPS_ROOT/build/sysroot_merged}"
+MERGED_SYSROOT="$APPS_ROOT/build/sysroot_merged"
 
 LLVM_BIN_DIR="$(dirname "$CLANG")"
 AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
@@ -81,19 +81,19 @@ WASM_COMPAT_H="$NGINX_ROOT/wasm_compat.h"
 # --- sanity checks -----------------------------------------------------------
 
 if [[ ! -d "$MERGED_SYSROOT" ]]; then
-    echo "[nginx] ERROR: merged sysroot '$MERGED_SYSROOT' not found."
+    echo "[nginx] ERROR: merged sysroot '$MERGED_SYSROOT' not found." >&2
     echo "        Run 'make merge-sysroot' (or 'make all') in lind-wasm-apps first."
     exit 1
 fi
 
 if [[ ! -r "$BASE_SYSROOT/include/wasm32-wasi/stdio.h" ]]; then
-    echo "[nginx] ERROR: base sysroot headers missing at '$BASE_SYSROOT'."
+    echo "[nginx] ERROR: base sysroot headers missing at '$BASE_SYSROOT'." >&2
     echo "        Did you run 'make sysroot' in lind-wasm?"
     exit 1
 fi
 
 if [[ ! -f "$WASM_COMPAT_H" ]]; then
-    echo "[nginx] ERROR: missing nginx/wasm_compat.h (it should be in the repo)."
+    echo "[nginx] ERROR: missing nginx/wasm_compat.h (it should be in the repo)." >&2
     exit 1
 fi
 
@@ -777,7 +777,7 @@ make -j"$JOBS" \
     LINK="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT $LDFLAGS_WASM"
 
 if [[ ! -f objs/nginx ]]; then
-    echo "[nginx] ERROR: nginx binary was not produced."
+    echo "[nginx] ERROR: nginx binary was not produced." >&2
     exit 1
 fi
 
@@ -806,7 +806,7 @@ rm -f "$NGINX_WASM" "$NGINX_OPT_WASM" "$NGINX_OPT_CWASM"
 # path. Full mode still keeps the historical `.opt.wasm` and `.cwasm` aliases.
 ##################
 if [[ ! -x "$WASM_OPT" ]]; then
-    echo "[nginx] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact."
+    echo "[nginx] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact." >&2
     exit 1
 fi
 
@@ -830,7 +830,7 @@ else
 fi
 
 if [[ ! -f "$NGINX_OPT_WASM" ]]; then
-  echo "[nginx] ERROR: Failed to generate "$NGINX_OPT_WASM"; Exiting.."
+  echo "[nginx] ERROR: Failed to generate "$NGINX_OPT_WASM"; Exiting.." >&2
   exit 1
 fi
 
@@ -846,11 +846,11 @@ if [[ -x "$LIND_BOOT" ]]; then
       		cp "$NGINX_OPT_CWASM" "$NGINX_OUT_DIR/usr/sbin/nginx"
       		echo "[nginx] nginx staged as $NGINX_OUT_DIR/usr/sbin/nginx"
 	else
-		echo "[nginx] ERROR: $NGINX_OPT_CWASM not produced. Exiting.."
+		echo "[nginx] ERROR: $NGINX_OPT_CWASM not produced. Exiting.." >&2
 		exit 1
 	fi
     else
-        echo "[nginx] WARNING: lind-boot --precompile failed; skipping cwasm generation. Exiting.."
+        echo "[nginx] WARNING: lind-boot --precompile failed; skipping cwasm generation. Exiting.." >&2
         exit 1
     fi
 else
