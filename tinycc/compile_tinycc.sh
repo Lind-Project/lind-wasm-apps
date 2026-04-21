@@ -1,40 +1,82 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# This build script produces wasm tinycc compiler that  can compile C programs to 32-bit ELF binaries (i386 target). 
+###############################################################################
+# tinycc WASI build helper for lind-wasm-apps
+#
+# Produces a wasm tinycc compiler that can compile C programs to 32-bit ELF
+# binaries (i386 target).
+#
+# libtcc1.a is a static archive used by tcc at compile time to produce correct
+# native binaries. Since the target is i386, libtcc1.a is compiled as an i386
+# object using the host gcc.
+#
+# The required header files and i386 runtime files (libc.so, ld.so,
+# libc_nonshared.a, crt1.o) are also staged to build/ for later installation
+# into lindfs.
+###############################################################################
 
-# libtcc.a is a shared library that is required to run tinycc. Since the target is i386, libtcc.a is also compiled as i386. 
-
-# The required header files, shared libraries and other files (libc.so, ld.so, libc_nonshared.a, crt1.o) which are required to run tinycc is also copied to the build/ folder. 
-
-# To run dynamically linked executables produced by tinycc, dynamic linker is used. Since the executable is run natively, we provide a symbolic link to the 32-bit dynamic linker within /lib of the root filesystem so that the kernel can locate the dynamic linker.
-
-set -x
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+APPS_BUILD="$APPS_ROOT/build"
+MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
+STAGE_DIR="$APPS_BUILD/tinycc"
+TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
-SYSROOT="${LIND_WASM_ROOT}/build/sysroot"
-LINDFS="${LIND_WASM_ROOT}/lindfs"
-LIND_BOOT="${LIND_WASM_ROOT}/src/lind-boot/target/debug/lind-boot"
 
-CLANG_BIN="${LIND_WASM_ROOT}/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang"
-STAGE_DIR="$APPS_ROOT/build/tinycc"
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
+
+# ----------------------------------------------------------------------
+# 1) Load toolchain from Makefile preflight
+# ----------------------------------------------------------------------
+if [[ -r "$TOOL_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$TOOL_ENV"
+else
+  echo "[tinycc] ERROR: missing toolchain env '$TOOL_ENV' (run 'make preflight' first)" >&2
+  exit 1
+fi
+
+: "${CLANG:?missing CLANG in $TOOL_ENV}"
+
+# Sanity
+if [[ ! -d "$MERGED_SYSROOT" ]]; then
+  echo "[tinycc] ERROR: merged sysroot '$MERGED_SYSROOT' not found. Run 'make merge-sysroot' first." >&2
+  exit 1
+fi
 
 mkdir -p "$STAGE_DIR"
 
-CFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$SYSROOT -pthread -matomics -mbulk-memory -fno-pie -fvisibility=default -fno-builtin"
+# ----------------------------------------------------------------------
+# 2) WASM toolchain flags
+# ----------------------------------------------------------------------
+# tinycc uses -O0 because the configure/build system relies on specific code
+# generation behavior that breaks with optimization (e.g. inline assembly
+# patterns for the i386 code generator).
+CFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$MERGED_SYSROOT -pthread -matomics -mbulk-memory -fno-pie -fvisibility=default -fno-builtin"
 
-LDFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$SYSROOT -static -Wl,--import-memory,--export-memory,--shared-memory,--max-memory=67108864,--export="__stack_pointer",--export=__stack_low,--export=__tls_base"
+LDFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$MERGED_SYSROOT -static -Wl,--import-memory,--export-memory,--shared-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
 
-cd $SCRIPT_DIR
+echo "[tinycc] using CLANG       = $CLANG"
+echo "[tinycc] LIND_WASM_ROOT    = $LIND_WASM_ROOT"
+echo "[tinycc] merged sysroot    = $MERGED_SYSROOT"
+echo "[tinycc] stage dir         = $STAGE_DIR"
+echo
+
+# ----------------------------------------------------------------------
+# 3) Configure and build tcc
+# ----------------------------------------------------------------------
+pushd "$SCRIPT_DIR" >/dev/null
 
 ./configure \
   --cpu=i386 \
-  --cc=$CLANG_BIN \
+  --cc="$CLANG" \
   --extra-cflags="$CFLAGS_WASM" \
   --extra-ldflags="$LDFLAGS_WASM" \
   --enable-static --enable-cross --extra-libs=""
@@ -43,100 +85,112 @@ echo "CONFIG_ldl=no" >> config.mak
 
 make tcc
 
-if [ -f "tcc" ]; then
-    mv tcc tcc.wasm
-else
-    echo "Error: tcc binary was not generated!"
-    exit 1
+if [[ ! -f "tcc" ]]; then
+  echo "[tinycc] ERROR: tcc binary was not generated!"
+  exit 1
 fi
 
-# use gcc to compile libtcc1.c to object file, then archive it into a static library
-# `libtcc1` is used by tinycc wasm binary for compiling C programs. Hence `libtcc1` is compiled as an x86  ELF binary in align with the target architecture of tinycc
+mv tcc tcc.wasm
+
+# ----------------------------------------------------------------------
+# 4) Build libtcc1.a (i386 native — used by tcc to produce native binaries)
+# ----------------------------------------------------------------------
 gcc -m32 -O2 -DTCC_TARGET_I386 -c lib/libtcc1.c -o libtcc1.o
 ar rcs libtcc1.a libtcc1.o
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
-LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
+# ----------------------------------------------------------------------
+# 5) wasm-opt (asyncify + optimization)
+# ----------------------------------------------------------------------
 TCC_WASM="$SCRIPT_DIR/tcc.wasm"
 TCC_OPT_WASM="$SCRIPT_DIR/tcc.opt.wasm"
 
-# ----------------------------------------------------------------------
-# 8) wasm-opt (best-effort)
-# ----------------------------------------------------------------------
 if [[ -x "$WASM_OPT" ]]; then
-  echo "[tinycc] running wasm-opt (asyncify + optimization)…"
+  echo "[tinycc] running wasm-opt (asyncify + optimization)..."
   "$WASM_OPT" \
     --epoch-injection \
     --asyncify \
     --debuginfo \
     -O2 \
     "$TCC_WASM" \
-    -o "$TCC_OPT_WASM" || true
+    -o "$TCC_OPT_WASM"
 else
-  echo "[tinycc] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  echo "[tinycc] ERROR: wasm-opt not found at '$WASM_OPT'" >&2
   exit 1
 fi
 
 if [[ ! -f "$TCC_OPT_WASM" ]]; then
-  echo "[tinycc] ERROR: Failed to generate "$TCC_OPT_WASM"; Exiting.."
+  echo "[tinycc] ERROR: Failed to generate $TCC_OPT_WASM" >&2
   exit 1
 fi
 
 # ----------------------------------------------------------------------
-# 9) cwasm generation (best-effort) via lind-boot --precompile
+# 6) cwasm generation via lind-boot --precompile
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
-  echo "[git] generating cwasm via lind-boot --precompile..."
+  echo "[tinycc] generating cwasm via lind-boot --precompile..."
   if "$LIND_BOOT" --precompile "$TCC_OPT_WASM"; then
-  
+
     TCC_OPT_CWASM="$SCRIPT_DIR/tcc.opt.cwasm"
 
-    #Staging the final .cwasm binary to the build folder
     if [[ -f "$TCC_OPT_CWASM" ]]; then
-      mkdir -p $STAGE_DIR/bin
+      mkdir -p "$STAGE_DIR/bin"
       cp "$TCC_OPT_CWASM" "$STAGE_DIR/bin/tcc"
       echo "[tinycc] tinycc staged as $STAGE_DIR/bin/tcc"
     else
-      echo "[tinycc] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. "
+      echo "[tinycc] ERROR: No .cwasm binary generated." >&2
       exit 1
     fi
   else
-    echo "[tinycc] ERROR: lind-boot --precompile failed; skipping cwasm generation."
-    echo "[tinycc] ERROR: No binaries copied to the build folder. Exiting.."
+    echo "[tinycc] ERROR: lind-boot --precompile failed." >&2
     exit 1
   fi
 else
-  echo "[tinycc] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-  echo "[tinycc] ERROR: No binaries copied to the build folder. Exiting.."
+  echo "[tinycc] ERROR: lind-boot not found at '$LIND_BOOT'" >&2
   exit 1
 fi
 
-mkdir -p $STAGE_DIR/usr/local/lib/tcc
-#libtcc1.a is required to run tinycc
-cp libtcc1.a $STAGE_DIR/usr/local/lib/tcc/
+# ----------------------------------------------------------------------
+# 7) Stage supporting files (libtcc1, headers, i386 runtime)
+# ----------------------------------------------------------------------
+mkdir -p "$STAGE_DIR/usr/local/lib/tcc"
+cp libtcc1.a "$STAGE_DIR/usr/local/lib/tcc/"
 
-#These headers are required to compile C programs using tinycc
+# Headers required to compile C programs using tinycc
 tar -xvzf tcc_headers.tar.gz
 rsync -a "${SCRIPT_DIR}/tcc_headers/" "$STAGE_DIR/"
 
-#While running tinycc to compile C programs as 32-bit binaries, it
-#requires 32-bit versions of libc.so, ld.so, libc_nonshared.a and crt object files
-#in the search path. Since tinycc is run within lindfs/ it will search in paths
-#relative to lindfs. We first create these paths with respect to the build folder
-#Later at 'make install' stage, all the files within the build folder copied to lindfs folder
-
+# i386 runtime files: tcc needs 32-bit libc.so, ld.so, libc_nonshared.a and
+# crt object files. These are staged into the build dir and later copied to
+# lindfs at 'make install' time.
 mkdir -p "$STAGE_DIR/usr/lib/i386-linux-gnu/"
 cp /usr/i686-linux-gnu/lib/crt*.o "$STAGE_DIR/usr/lib/i386-linux-gnu/"
 cp /usr/i686-linux-gnu/lib/libc.so* "$STAGE_DIR/usr/lib/i386-linux-gnu/"
 cp /usr/i686-linux-gnu/lib/ld-linux.so.2 "$STAGE_DIR/usr/lib/i386-linux-gnu/"
 cp /usr/i686-linux-gnu/lib/libc_nonshared.a "$STAGE_DIR/usr/lib/i386-linux-gnu/"
 
-#While running tinycc, it checks for libc.so which is a stub that looks for ld.so, libc_nonshared.a and libc.so.6. We change the absolute paths of these which were with respect to the root filesystem, so tinycc can locate these files with respect to lindfs 
+# Rewrite absolute paths in libc.so linker script so tcc can locate these
+# files relative to lindfs
 sed -i 's|[^ ]*/libc\.so\.6|libc.so.6|g; s|[^ ]*/libc_nonshared\.a|libc_nonshared.a|g; s|[^ ]*/ld-linux\.so\.2|ld-linux.so.2|g' "$STAGE_DIR/usr/lib/i386-linux-gnu/libc.so"
 
-#To run dynamically linked executable using tinycc, it expects its linker at /lib/ld-linux.so.2, hence we map the 32-bit linker to that file
-if [ ! -e /lib/ld-linux.so.2 ]; then
-    sudo ln -s /usr/i686-linux-gnu/lib/ld-linux.so.2 /lib/ld-linux.so.2
+# ----------------------------------------------------------------------
+# 8) Host 32-bit dynamic linker setup
+# ----------------------------------------------------------------------
+# Dynamically linked executables produced by tcc expect the i386 linker at
+# /lib/ld-linux.so.2. This is a host-level prerequisite — print instructions
+# rather than modifying the host system with sudo during a build.
+if [[ ! -e /lib/ld-linux.so.2 ]]; then
+  echo ""
+  echo "[tinycc] WARNING: /lib/ld-linux.so.2 not found."
+  echo "  To run dynamically-linked i386 binaries produced by tcc, run:"
+  echo "    sudo ln -s /usr/i686-linux-gnu/lib/ld-linux.so.2 /lib/ld-linux.so.2"
+  echo "    echo '/usr/i686-linux-gnu/lib' | sudo tee /etc/ld.so.conf.d/i686-cross.conf"
+  echo "    sudo ldconfig"
+  echo ""
 fi
-echo "/usr/i686-linux-gnu/lib" | sudo tee /etc/ld.so.conf.d/i686-cross.conf
-sudo ldconfig
+
+popd >/dev/null
+
+echo
+echo "[tinycc] build complete. Outputs under:"
+echo "  $STAGE_DIR"
+ls -lh "$STAGE_DIR/bin" || true

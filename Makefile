@@ -352,7 +352,6 @@ postgres: merge-sysroot
 
 # ---------------- tinycc (WASM build) --------------------------------------
 tinycc: merge-sysroot
-	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/tinycc/compile_tinycc.sh'
 
 install-bash:
