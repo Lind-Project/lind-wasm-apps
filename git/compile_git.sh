@@ -13,6 +13,10 @@ set -euo pipefail
 #   5. Precompile with lind-boot
 #
 # Supports both Static (default) and Dynamic (LIND_DYLINK=1) builds.
+#
+# Prerequisites:
+#   - Run 'make preflight' and 'make merge-sysroot' from lind-wasm-apps root
+#   - Or run 'make all' to build everything including dependencies
 ###############################################################################
 
 # --- basic paths -------------------------------------------------------------
