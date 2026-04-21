@@ -59,9 +59,8 @@ FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
 # (PIE/dynamic) wasm binary.  Set LIND_DYLINK=1 to get the shared path;
 # the default is static (0).  The shared path adds the PIE linker flags, links
 # in lind_debug.o and set_stack_pointer.o, runs add-export-tool to inject the
-# __wasm_apply_* and __stack_pointer exports, uses the additional wasm-opt
-# passes required for shared modules, and drives precompilation through
-# lind-clang rather than lind-boot.
+# __wasm_apply_* and __stack_pointer exports, and uses the additional wasm-opt
+# passes required for shared modules.
 ##################
 LIND_DYLINK="${LIND_DYLINK:-0}"
 
@@ -116,12 +115,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
 
   if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
     echo "[bash] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'." >&2
-    exit 1
-  fi
-
-  LIND_CLANG="${LIND_CLANG:-$LIND_WASM_ROOT/tools/lind-clang/lind-clang}"
-  if [[ ! -x "$LIND_CLANG" ]]; then
-    echo "[bash] ERROR: lind-clang not found at '$LIND_CLANG'." >&2
     exit 1
   fi
 
@@ -595,23 +588,7 @@ if [[ "$ARTIFACT_MODE" == "fast" ]]; then
 	exit 1
 fi
 
-if [[ "$LIND_DYLINK" == "1" ]]; then
-  # Shared binaries are precompiled through lind-clang, which understands the
-  # PIE/dylink metadata embedded by the shared link and wasm-opt passes.
-  echo "[bash] generating cwasm via lind-clang --precompile-only..."
-  if "$LIND_CLANG" --precompile-only "$BASH_WASM"; then
-    if [[ -f "$BASH_CWASM" ]]; then
-      cp "$BASH_CWASM" "$BASH_OUT_DIR/bash"
-      echo "[bash] staged final binary: $BASH_OUT_DIR/bash"
-    else
-      echo "[bash] ERROR: No .cwasm binary generated." >&2
-      exit 1
-    fi
-  else
-    echo "[bash] ERROR: lind-clang --precompile-only failed." >&2
-    exit 1
-  fi
-elif [[ -x "$LIND_BOOT" ]]; then
+if [[ -x "$LIND_BOOT" ]]; then
    echo "[bash] generating cwasm via lind-boot --precompile..."
    if "$LIND_BOOT" --precompile "$BASH_WASM"; then
       if [[ -f "$BASH_CWASM" ]]; then
