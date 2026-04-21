@@ -129,10 +129,11 @@ run_wasm_opt_replace() {
     # are needed because epoch counter and asyncify globals live in the
     # host (libc module), not in the main module.
     if "$WASM_OPT" \
+        --fpcast-emu \
         --enable-bulk-memory --enable-threads \
         --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
         --asyncify --pass-arg=asyncify-import-globals \
-        --debuginfo \
+        -O2 --debuginfo \
         "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else

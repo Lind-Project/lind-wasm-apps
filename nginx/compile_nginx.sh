@@ -873,7 +873,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
         --enable-bulk-memory --enable-threads \
         --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
         --asyncify --pass-arg=asyncify-import-globals \
-        --debuginfo \
+        -O2 --debuginfo \
         "$NGINX_RAW_WASM" \
         -o "$NGINX_WASM"
 else
