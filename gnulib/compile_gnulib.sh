@@ -12,10 +12,10 @@ BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
 LLVM_BIN="${LLVM_BIN:-$(ls -d "$LIND_WASM_ROOT"/clang+llvm-*/bin 2>/dev/null | head -n1)}"
 
 if [[ -z "${LLVM_BIN}" || ! -x "$LLVM_BIN/clang" ]]; then
-  echo "ERROR: LLVM not found under $LIND_WASM_ROOT"; exit 1
+  echo "[gnulib] ERROR: LLVM not found under $LIND_WASM_ROOT" >&2; exit 1
 fi
 if [[ ! -r "$BASE_SYSROOT/include/wasm32-wasi/stdio.h" ]]; then
-  echo "ERROR: sysroot headers missing at $BASE_SYSROOT"; exit 1
+  echo "[gnulib] ERROR: sysroot headers missing at $BASE_SYSROOT" >&2; exit 1
 fi
 
 CC_WASI="$LLVM_BIN/clang --target=wasm32-unknown-wasi --sysroot=$BASE_SYSROOT"
@@ -29,7 +29,7 @@ WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 GNULIB_DIR="${GNULIB_DIR:-$REPO_ROOT/gnulib}"
 
 if [[ ! -x "$GNULIB_DIR/gnulib-tool" && ! -x "$GNULIB_DIR/gnulib-tool.py" ]]; then
-  echo "ERROR: gnulib-tool(.py) not found/executable under $GNULIB_DIR"
+  echo "[gnulib] ERROR: gnulib-tool(.py) not found/executable under $GNULIB_DIR" >&2
   exit 1
 fi
 
@@ -124,7 +124,7 @@ if [[ -f "gllib/libgnu.a" ]]; then
 elif [[ -f "lib/libgnu.a" ]]; then
   LIBGNU_PATH="lib/libgnu.a"
 else
-  echo "ERROR: expected libgnu.a not found; listing archives:"
+  echo "[gnulib] ERROR: expected libgnu.a not found; listing archives:" >&2
   find . -maxdepth 3 -name '*.a' -print
   exit 1
 fi
@@ -178,32 +178,32 @@ DYNAMIC_STAGED_LIB="$OVERLAY/lib/libgnu.so"
     "$STATIC_LIB" \
     -Wl,--no-whole-archive \
     "$LIND_WASM_ROOT/src/glibc/build/lind_debug.o" \
-    -g -O0 -o "$DYNAMIC_LIB_WASM" || { echo "[libgnu] ERROR: clang compilation failed"; exit 1; }
+    -g -O0 -o "$DYNAMIC_LIB_WASM" || { echo "[libgnu] ERROR: clang compilation failed" >&2; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_WASM" ]]; then
-  echo "[libgnu] ERROR: Failed to generate '$DYNAMIC_LIB_WASM'; Exiting.."
+  echo "[libgnu] ERROR: Failed to generate '$DYNAMIC_LIB_WASM'; Exiting.." >&2
   exit 1
 fi
 
-"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional || { echo "[libgnu] ERROR: add-export-tool tls failed"; exit 1; }
+"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional || { echo "[libgnu] ERROR: add-export-tool tls failed" >&2; exit 1; }
 
-"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional || { echo "[libgnu] ERROR: add-export-tool global failed"; exit 1; }
+"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional || { echo "[libgnu] ERROR: add-export-tool global failed" >&2; exit 1; }
 
-"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM"  __stack_pointer global __stack_pointer optional || { echo "[libgnu] ERROR: add-export-tool stack pointer failed"; exit 1; }
+"$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM"  __stack_pointer global __stack_pointer optional || { echo "[libgnu] ERROR: add-export-tool stack pointer failed" >&2; exit 1; }
 
 
-$WASM_OPT --enable-bulk-memory --enable-threads --epoch-injection --pass-arg=epoch-import --asyncify --pass-arg=asyncify-import-globals -O2 --debuginfo "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[libgnu] ERROR: wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.."; exit 1; }
+$WASM_OPT --enable-bulk-memory --enable-threads --epoch-injection --pass-arg=epoch-import --asyncify --pass-arg=asyncify-import-globals -O2 --debuginfo "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[libgnu] ERROR: wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
-  echo "[libgnu] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'; Exiting.."
+  echo "[libgnu] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'; Exiting.." >&2
   exit 1
 fi
 
 # do precompile
-$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT" || { echo "[libgnu] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."; exit 1; }
+$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT" || { echo "[libgnu] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.." >&2; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT_CWASM" ]]; then
-  echo "[libgnu] ERROR: Failed to generate '$DYNAMIC_LIB_OPT_CWASM'; Exiting.."
+  echo "[libgnu] ERROR: Failed to generate '$DYNAMIC_LIB_OPT_CWASM'; Exiting.." >&2
   exit 1
 fi
 

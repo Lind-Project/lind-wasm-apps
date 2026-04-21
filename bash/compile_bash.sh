@@ -34,7 +34,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/build/sysroot}"
-MERGED_SYSROOT="${APPS_MERGED:-$APPS_ROOT/build/sysroot_merged}"
+MERGED_SYSROOT="$APPS_ROOT/build/sysroot_merged"
 
 LLVM_BIN_DIR="$(dirname "$CLANG")"
 AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"

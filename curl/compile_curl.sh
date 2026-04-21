@@ -244,12 +244,12 @@ if [[ -x "$WASM_OPT" ]]; then
       "$CURL_WASM" -o "$CURL_OPT_WASM"
   fi
 else
-  echo "[curl] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  echo "[curl] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.." >&2
   exit 1
 fi
 
 if [[ ! -f "$CURL_OPT_WASM" ]]; then
-  echo "[curl] ERROR: Failed to generate $CURL_OPT_WASM; Exiting.."
+  echo "[curl] ERROR: Failed to generate $CURL_OPT_WASM; Exiting.." >&2
   exit 1
 fi
 
@@ -275,15 +275,15 @@ if [[ -x "$LIND_BOOT" ]]; then
       cp "$CURL_OPT_CWASM" "$STAGE_DIR/curl"
       echo "[curl] curl staged as $STAGE_DIR/curl"
     else
-      echo "[curl] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. "
+      echo "[curl] ERROR: No .cwasm binary generated and no binaries copied to the build folder. Exiting.. " >&2
       exit 1
     fi
   else
-    echo "[curl] ERROR: lind-boot --precompile failed; skipping cwasm generation."
+    echo "[curl] ERROR: lind-boot --precompile failed; skipping cwasm generation." >&2
     exit 1
   fi
 else
-  echo "[curl] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
+  echo "[curl] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation." >&2
   exit 1
 fi
 
@@ -296,7 +296,7 @@ if [[ -f /etc/ssl/certs/ca-certificates.crt ]]; then
   cp /etc/ssl/certs/ca-certificates.crt "$CA_BUNDLE_DEST/ca-certificates.crt"
   echo "[curl] CA bundle staged to $CA_BUNDLE_DEST"
 else
-  echo "[curl] WARNING: /etc/ssl/certs/ca-certificates.crt not found on host; HTTPS may fail at runtime."
+  echo "[curl] WARNING: /etc/ssl/certs/ca-certificates.crt not found on host; HTTPS may fail at runtime." >&2
 fi
 
 echo
