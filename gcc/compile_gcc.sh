@@ -409,3 +409,31 @@ echo
 echo "[gcc] build complete. Outputs under:"
 echo "  $STAGE_DIR"
 ls -lh "$STAGE_DIR" || true
+
+# ----------------------------------------------------------------------
+# 10) Stage headers and libc files for lindfs
+# ----------------------------------------------------------------------
+HOST_GCC_VER=$(gcc -dumpversion | cut -d. -f1)
+TARGET_GCC_VER="15.2.0"
+TARGET_TRIPLET="x86_64-linux-gnu"
+
+INCLUDE_DST="$APPS_BUILD/gcc/usr/include"
+LIB_DST="$APPS_BUILD/gcc/usr/lib/$TARGET_TRIPLET"
+LIB64_DST="$APPS_BUILD/gcc/lib/$TARGET_TRIPLET"
+GCC_INCLUDE_DST="$APPS_BUILD/gcc/usr/local/lib/gcc/$TARGET_TRIPLET/$TARGET_GCC_VER/include"
+LINKER_DST="$APPS_BUILD/gcc/lib64"
+
+mkdir -p "$INCLUDE_DST" "$LIB_DST" "$LIB64_DST" "$GCC_INCLUDE_DST" "$LINKER_DST"
+
+echo "[gcc] staging headers and libc files..."
+cp -r /usr/include/. "$INCLUDE_DST/"
+cp -r /usr/include/$TARGET_TRIPLET/. "$INCLUDE_DST/"
+cp /usr/lib/gcc/$TARGET_TRIPLET/$HOST_GCC_VER/include/*.h "$GCC_INCLUDE_DST/"
+cp /usr/lib/$TARGET_TRIPLET/crt1.o /usr/lib/$TARGET_TRIPLET/crti.o \
+   /usr/lib/$TARGET_TRIPLET/crtn.o /usr/lib/$TARGET_TRIPLET/libc_nonshared.a \
+   /usr/lib/$TARGET_TRIPLET/libc.so "$LIB_DST/"
+cp /usr/lib/$TARGET_TRIPLET/libm* "$LIB_DST/"
+cp /lib/$TARGET_TRIPLET/libc.so.6 /lib/$TARGET_TRIPLET/libm.so.6 \
+   /lib/$TARGET_TRIPLET/libmvec* "$LIB64_DST/"
+cp /lib64/ld-linux-x86-64.so.2 "$LINKER_DST/"
+echo "[gcc] headers and libc staged"
