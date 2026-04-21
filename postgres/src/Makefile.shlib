@@ -231,7 +231,7 @@ endif
 
 .PHONY: all-lib all-static-lib all-shared-lib
 
-#all-lib: all-shared-lib  # disabled for WASI
+all-lib: all-shared-lib
 ifdef soname
 # no static library when building a dynamically loadable module
 all-lib: all-static-lib

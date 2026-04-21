@@ -134,7 +134,7 @@ $(stlib): $(OBJS_STATIC)
 # insert exit() calls for that.  Also skip the test on platforms where libpq
 # infrastructure may be provided by statically-linked libraries, as we can't
 # expect them to honor this coding rule.
-libpq-refs-stamp:
+libpq-refs-stamp: $(shlib)
 ifneq ($(enable_coverage), yes)
 	$(PERL) $(srcdir)/libpq_check.pl --input_file $< --nm='$(NM)'
 endif
