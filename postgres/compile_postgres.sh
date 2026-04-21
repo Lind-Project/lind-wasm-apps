@@ -371,18 +371,17 @@ echo "[postgres] [wasm] configuring for wasm32-wasi..."
 
 # --- Post-configure fixups ---------------------------------------------------
 
-# wasm-ld cannot build shared libraries (no --version-script, no --shared with
-# --export-memory, no crt1-reactor.o).  Neuter the shared-lib targets in
-# Makefile.shlib so that only static libraries are produced.
+# For static builds, disable shared library targets since we only need .a files.
+# For dylink builds, we build .a files first then convert them to shared .wasm
+# in a post-build step (postgres's native shared lib build doesn't work for WASM).
 MAKEFILE_SHLIB="$PG_ROOT/src/Makefile.shlib"
 if [[ -f "$MAKEFILE_SHLIB" ]]; then
-  echo "[postgres] [wasm] patching Makefile.shlib to disable shared libraries..."
+  echo "[postgres] [wasm] patching Makefile.shlib to disable native shared libraries..."
   sed -i 's/^all-lib: all-shared-lib/#all-lib: all-shared-lib  # disabled for WASI/' "$MAKEFILE_SHLIB"
 fi
 
-# Also patch libpq's Makefile: libpq-refs-stamp depends on $(shlib) and runs a
-# Perl symbol check.  Replace it with a trivial no-op so `all` doesn't pull in
-# the shared lib.
+# Patch libpq's Makefile: libpq-refs-stamp depends on $(shlib) and runs a
+# Perl symbol check. Since we don't build native shared libs, remove the dependency.
 LIBPQ_MAKEFILE="$PG_ROOT/src/interfaces/libpq/Makefile"
 if [[ -f "$LIBPQ_MAKEFILE" ]]; then
   echo "[postgres] [wasm] patching libpq Makefile to skip shared-lib ref check..."
@@ -395,13 +394,6 @@ PG_CONFIG_H="$PG_ROOT/src/include/pg_config.h"
 
 if [[ -f "$PG_CONFIG_H" ]]; then
   echo "[postgres] [wasm] patching pg_config.h for WASI..."
-
-  # EXEC_BACKEND: use exec() model instead of fork() for spawning backends
-  # Disabled to test shmdt issue — fork model doesn't need shmdt before child runs
-  # if ! grep -q '#define EXEC_BACKEND' "$PG_CONFIG_H"; then
-  #   echo '#define EXEC_BACKEND 1' >> "$PG_CONFIG_H"
-  #   echo "[postgres] [wasm] enabled EXEC_BACKEND in pg_config.h"
-  # fi
 
   # Force USE_UNNAMED_POSIX_SEMAPHORES off if set — we stub semaphores
   if grep -q '#define USE_UNNAMED_POSIX_SEMAPHORES' "$PG_CONFIG_H"; then
@@ -521,6 +513,89 @@ make -C src/bin/pgbench -j"$JOBS" \
   LIBS="-lpgfeutils -lpq -lpgcommon -lpgport -lpgcommon $WASI_STUBS_O -lm" || {
     echo "[postgres] WARNING: pgbench build had errors (best-effort, continuing)."
 }
+
+###############################################################################
+# Build shared libraries for dylink mode
+###############################################################################
+
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[postgres] [dylink] converting static libraries to shared WASM modules..."
+
+  # Shared library output directory
+  PG_SHARED_LIB_DIR="$STAGE_DIR/lib"
+  mkdir -p "$PG_SHARED_LIB_DIR"
+
+  # Libraries to convert: libpq is the main one needed by client tools
+  # libpgport and libpgcommon are typically linked statically into binaries
+  declare -A PG_SHARED_LIBS=(
+    ["pq"]="$PG_ROOT/src/interfaces/libpq/libpq.a"
+  )
+
+  for lib_name in "${!PG_SHARED_LIBS[@]}"; do
+    STATIC_LIB="${PG_SHARED_LIBS[$lib_name]}"
+    if [[ ! -f "$STATIC_LIB" ]]; then
+      echo "[postgres] [dylink] WARNING: $STATIC_LIB not found, skipping lib${lib_name}.so"
+      continue
+    fi
+
+    SHARED_WASM="$PG_SHARED_LIB_DIR/lib${lib_name}.wasm"
+    SHARED_OPT="$PG_SHARED_LIB_DIR/lib${lib_name}.opt.wasm"
+    SHARED_CWASM="$PG_SHARED_LIB_DIR/lib${lib_name}.opt.cwasm"
+    SHARED_STAGED="$PG_SHARED_LIB_DIR/lib${lib_name}.so"
+
+    echo "[postgres] [dylink] linking lib${lib_name}.a -> lib${lib_name}.wasm..."
+    "$CLANG" \
+      --target=wasm32-unknown-wasi \
+      --sysroot="$MERGED_SYSROOT" \
+      -fPIC \
+      -fvisibility=default \
+      -Wl,--import-memory \
+      -Wl,--shared-memory \
+      -Wl,--export-dynamic \
+      -Wl,--experimental-pic \
+      -Wl,--unresolved-symbols=import-dynamic \
+      -Wl,-shared \
+      -Wl,--whole-archive "$STATIC_LIB" -Wl,--no-whole-archive \
+      -L"$MERGED_SYSROOT/lib/wasm32-wasi" \
+      -g -O2 \
+      -o "$SHARED_WASM" || {
+        echo "[postgres] [dylink] WARNING: failed to link lib${lib_name}.wasm"
+        continue
+      }
+
+    echo "[postgres] [dylink] adding exports to lib${lib_name}.wasm..."
+    "$ADD_EXPORT_TOOL" "$SHARED_WASM" "$SHARED_WASM" \
+      __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional || true
+    "$ADD_EXPORT_TOOL" "$SHARED_WASM" "$SHARED_WASM" \
+      __wasm_apply_global_relocs func __wasm_apply_global_relocs optional || true
+    "$ADD_EXPORT_TOOL" "$SHARED_WASM" "$SHARED_WASM" \
+      __stack_pointer global __stack_pointer optional || true
+
+    echo "[postgres] [dylink] running wasm-opt on lib${lib_name}.wasm..."
+    "$WASM_OPT" \
+      --enable-bulk-memory --enable-threads \
+      --epoch-injection --pass-arg=epoch-import \
+      --asyncify --pass-arg=asyncify-import-globals \
+      -O2 --debuginfo \
+      "$SHARED_WASM" -o "$SHARED_OPT" || {
+        echo "[postgres] [dylink] WARNING: wasm-opt failed for lib${lib_name}"
+        continue
+      }
+
+    echo "[postgres] [dylink] precompiling lib${lib_name}.opt.wasm..."
+    "$LIND_BOOT" --precompile "$SHARED_OPT" || {
+      echo "[postgres] [dylink] WARNING: precompile failed for lib${lib_name}"
+      continue
+    }
+
+    if [[ -f "$SHARED_CWASM" ]]; then
+      cp "$SHARED_CWASM" "$SHARED_STAGED"
+      echo "[postgres] [dylink] staged: $SHARED_STAGED"
+    else
+      echo "[postgres] [dylink] WARNING: $SHARED_CWASM not produced"
+    fi
+  done
+fi
 
 ###############################################################################
 # Stage binaries
