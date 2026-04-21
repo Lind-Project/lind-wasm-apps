@@ -14,6 +14,11 @@ LIND_BOOT="${LIND_WASM_ROOT}/src/lind-boot/target/debug/lind-boot"
 WASM_OPT="${LIND_WASM_ROOT}/tools/binaryen/bin/wasm-opt"
 
 CLANG_BIN="${LIND_WASM_ROOT}/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin/clang"
+# Flags for linking the main python executable
+WASM_MAIN_LDFLAGS="-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low"
+# Flags for building shared extension modules (.so)
+WASM_SHARED_LDFLAGS="-Wl,--import-memory,--shared-memory,--export-dynamic,--experimental-pic,--unresolved-symbols=import-dynamic,-shared"
+BARE_CC="${CLANG_BIN} -pthread --target=wasm32-unknown-wasi --sysroot ${SYSROOT} -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC"
 
 LIND_DYLINK="${LIND_DYLINK:-0}"
 PYTHON_OUT_DIR="$APPS_ROOT/build/cpython"
@@ -61,14 +66,23 @@ if [ ! -f "Makefile" ]; then
     ac_cv_func_memfd_create=no \
     ac_cv_func_eventfd=no \
     ac_cv_func_timerfd_create=no \
+    --disable-ipv6 \
     --verbose
 fi
 
 # build python
-make AR="llvm-ar" ARFLAGS="crs" &> make.log
+MAKE_OVERRIDES=(
+  AR="llvm-ar"
+  ARFLAGS="crs"
+  BLDSHARED="${BARE_CC} ${WASM_SHARED_LDFLAGS}"
+  LINKFORSHARED="${WASM_MAIN_LDFLAGS}"
+  ENSUREPIP=no
+  MODULE__HMAC_LDFLAGS="Modules/_hacl/Hacl_HMAC.o Modules/_hacl/Hacl_Streaming_HMAC.o"
+)
+make "${MAKE_OVERRIDES[@]}" &> make.log
 
 # install necessary files into lind filesystem
-make install DESTDIR="${PYTHON_OUT_DIR}"
+make "${MAKE_OVERRIDES[@]}" install DESTDIR=/home/lind/lind-wasm/lindfs
 
 
 # 6. Apply wasm-opt (best-effort)

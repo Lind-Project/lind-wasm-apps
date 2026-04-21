@@ -21,6 +21,7 @@ ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
 
 PYTHON_OUT_DIR="$APPS_ROOT/build/cpython"
 STATIC_LIB="$BUILD_WASM/libpython3.14.a"
+LIBMPDEC="$BUILD_WASM/Modules/_decimal/libmpdec/libmpdec.a"
 DYNAMIC_LIB_WASM="$BUILD_WASM/libpython3.14.wasm"
 DYNAMIC_LIB_OPT="$BUILD_WASM/libpython3.14.opt.wasm"
 DYNAMIC_LIB_OPT_CWASM="$BUILD_WASM/libpython3.14.opt.cwasm"
@@ -41,6 +42,7 @@ $CLANG_BIN \
     -Wl,-shared \
     -Wl,--whole-archive \
     "$STATIC_LIB" \
+    "$LIBMPDEC" \
     -Wl,--no-whole-archive \
     -Wl,--export=__wasm_call_ctors \
     -Wl,--export-if-defined=__wasm_init_tls \
@@ -114,14 +116,8 @@ $CLANG_BIN \
     -g -O0 \
     -o "$BUILD_WASM/python_shared.wasm" \
     "$BUILD_WASM/Programs/python.o" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA2.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA1.a" \
     "$BUILD_WASM/Modules/expat/libexpat.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_MD5.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_BLAKE2.a" \
     "$BUILD_WASM/Modules/_decimal/libmpdec/libmpdec.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_HMAC.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA3.a" \
     "$SYSROOT/lib/wasm32-wasi/set_stack_pointer.o" \
     "$SYSROOT/lib/wasm32-wasi/crt1_shared.o" \
     "$SYSROOT/lib/wasm32-wasi/lind_utils.o" \
