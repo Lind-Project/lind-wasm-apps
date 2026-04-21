@@ -12,6 +12,8 @@ set -euo pipefail
 #   4. Optimize with wasm-opt (asyncify)
 #   5. Precompile with lind-boot
 #
+# Supports both Static (default) and Dynamic (LIND_DYLINK=1) builds.
+#
 # Prerequisites:
 #   - Run 'make preflight' and 'make merge-sysroot' from lind-wasm-apps root
 #   - Or run 'make all' to build everything including dependencies
@@ -51,6 +53,7 @@ WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
+LIND_DYLINK="${LIND_DYLINK:-0}"
 
 # Output location
 GIT_OUT_DIR="$APPS_ROOT/build/git/usr/local/bin"
@@ -74,14 +77,65 @@ fi
 
 CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
 
-CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
-  -I$MERGED_SYSROOT/include \
-  -I$MERGED_SYSROOT/include/wasm32-wasi"
+# Using arrays for flags to handle dynamic additions cleanly
+CFLAGS_WASM=(
+  -O2 -g -pthread -matomics -mbulk-memory
+  -I"$MERGED_SYSROOT/include"
+  -I"$MERGED_SYSROOT/include/wasm32-wasi"
+)
 
-LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
-  -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base,--shared-memory \
-  -L$MERGED_SYSROOT/lib/wasm32-wasi \
-  -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+# ----------------------------------------------------------------------
+# Branch Logic: Dynamic vs Static Settings
+# ----------------------------------------------------------------------
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[git] Mode: DYNAMIC LINKING (LIND_DYLINK=1)"
+  CFLAGS_WASM+=(-fPIC)
+
+  ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
+  if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+    echo "[git] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'" >&2
+    exit 1
+  fi
+
+  DYLINK_CRT_OBJS=(
+    "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
+    "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o"
+  )
+  for obj in "${DYLINK_CRT_OBJS[@]}"; do
+    if [[ ! -f "$obj" ]]; then
+      echo "[git] ERROR: required dylink CRT object '$obj' not found." >&2
+      exit 1
+    fi
+  done
+
+  LDFLAGS_WASM=(
+    "-nostartfiles"
+    "-Wl,-pie"
+    "-Wl,--import-table"
+    "-Wl,--import-memory"
+    "-Wl,--export-memory"
+    "-Wl,--shared-memory"
+    "-Wl,--max-memory=67108864"
+    "-Wl,--allow-undefined"
+    "-Wl,--unresolved-symbols=import-dynamic"
+    "-Wl,--export=__wasm_call_ctors"
+    "-Wl,--export-if-defined=__wasm_init_tls"
+    "-Wl,--export=__tls_base"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+    "${DYLINK_CRT_OBJS[@]}"
+  )
+else
+  echo "[git] Mode: STATIC LINKING (LIND_DYLINK=0 or unset)"
+  
+  LDFLAGS_WASM=(
+    "-Wl,--import-memory,--export-memory,--max-memory=67108864"
+    "-Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base,--shared-memory"
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi"
+    -L"$MERGED_SYSROOT/usr/lib/wasm32-wasi"
+  )
+fi
 
 echo "[git] using CLANG       = $CLANG"
 echo "[git] using AR          = $AR"
@@ -171,12 +225,13 @@ echo "[git] building git with wasm32-wasi toolchain..."
 # Git's Makefile accepts all configuration via variables — no autoconf needed.
 # We disable features that require libraries or runtimes unavailable in WASI.
 # config.mak (generated above) handles Linux-specific overrides.
+# Injecting our constructed CFLAGS and LDFLAGS arrays here.
 make -j"$JOBS" \
   CC="$CC_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
-  CFLAGS="$CFLAGS_WASM" \
-  LDFLAGS="$LDFLAGS_WASM" \
+  CFLAGS="${CFLAGS_WASM[*]}" \
+  LDFLAGS="${LDFLAGS_WASM[*]}" \
   NO_CURL=1 \
   NO_ICONV=1 \
   NO_EXPAT=1 \
@@ -204,22 +259,38 @@ GIT_OPT_WASM="$SCRIPT_DIR/git.opt.wasm"
 cp git "$GIT_WASM"
 
 ###############################################################################
-# 4. wasm-opt (best-effort)
+# 4. wasm-opt & exports
 ###############################################################################
-
 
 if [[ -x "$WASM_OPT" ]]; then
   echo "[git] running wasm-opt (asyncify + optimization)..."
-  "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
-    "$GIT_WASM" -o "$GIT_OPT_WASM"
+  if [[ "$LIND_DYLINK" == "1" ]]; then
+    "$WASM_OPT" \
+      --enable-bulk-memory --enable-threads \
+      --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+      --asyncify --pass-arg=asyncify-import-globals \
+      -O2 --debuginfo \
+      "$GIT_WASM" -o "$GIT_OPT_WASM"
+  else
+    "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
+      "$GIT_WASM" -o "$GIT_OPT_WASM"
+  fi
 else
   echo "[git] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
   exit 1
 fi
 
 if [[ ! -f "$GIT_OPT_WASM" ]]; then
-  echo "[git] ERROR: Failed to generate "$GIT_OPT_WASM"; Exiting.."
+  echo "[git] ERROR: Failed to generate $GIT_OPT_WASM; Exiting.."
   exit 1
+fi
+
+# Add dylink exports if dynamic linking is enabled
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  echo "[git] adding dylink exports via add-export-tool..."
+  "$ADD_EXPORT_TOOL" "$GIT_OPT_WASM" "$GIT_OPT_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+  "$ADD_EXPORT_TOOL" "$GIT_OPT_WASM" "$GIT_OPT_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+  "$ADD_EXPORT_TOOL" "$GIT_OPT_WASM" "$GIT_OPT_WASM" __stack_pointer global __stack_pointer
 fi
 
 ###############################################################################
