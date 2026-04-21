@@ -118,9 +118,10 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     exit 1
   fi
 
+  # lind_debug.o lives in the glibc build tree (not installed to the sysroot)
   DYLINK_CRT_OBJS=(
-    "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
-    "$MERGED_SYSROOT/lib/wasm32-wasi/lind_debug.o"
+    "$LIND_WASM_ROOT/src/glibc/build/csu/set_stack_pointer.o"
+    "$LIND_WASM_ROOT/src/glibc/build/lind_debug.o"
   )
   for obj in "${DYLINK_CRT_OBJS[@]}"; do
     if [[ ! -f "$obj" ]]; then
