@@ -120,6 +120,7 @@ if [[ ! -f "Makefile" ]]; then
     ac_cv_func_memfd_create=no \
     ac_cv_func_eventfd=no \
     ac_cv_func_timerfd_create=no \
+    ac_cv_libm_c99=yes \
     --verbose
 fi
 
