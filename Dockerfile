@@ -1,6 +1,14 @@
-ARG ARTIFACT_MODE=fast
+##################################################################
+# Sample usage
+# docker build -f Dockerfile \   
+#   --build-arg BASE_IMAGE=securesystemslab/lind-wasm-dev:latest \
+#   -t lind-wasm-apps:dev .
+##################################################################
 
-FROM securesystemslab/lind-wasm-dev:latest AS src
+ARG ARTIFACT_MODE=fast
+ARG BASE_IMAGE=securesystemslab/lind-wasm-dev:latest
+
+FROM ${BASE_IMAGE} AS src
 
 COPY --chown=lind:lind . /home/lind/lind-wasm/lind-wasm-apps
 WORKDIR /home/lind/lind-wasm/lind-wasm-apps
@@ -62,7 +70,7 @@ RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_
     make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" postgres
 
 # Stage 3: final image
-FROM securesystemslab/lind-wasm-dev:latest
+FROM ${BASE_IMAGE}
 WORKDIR /home/lind/lind-wasm/lind-wasm-apps
 
 # 1) Copy the full workspace ONCE (baseline)
