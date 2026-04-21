@@ -131,7 +131,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   done
 
   LDFLAGS_WASM=(
-    "-nostartfiles"
     "-Wl,-pie"
     "-Wl,--import-table"
     "-Wl,--import-memory"
