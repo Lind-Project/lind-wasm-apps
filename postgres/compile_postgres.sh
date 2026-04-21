@@ -514,6 +514,28 @@ make -C src/bin/pgbench -j"$JOBS" \
     echo "[postgres] WARNING: pgbench build had errors (best-effort, continuing)."
 }
 
+echo "[postgres] [wasm] building psql..."
+make -C src/bin/psql -j"$JOBS" \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM" \
+  LDFLAGS="-L$PG_ROOT/src/port -L$PG_ROOT/src/common -L$PG_ROOT/src/fe_utils -L$PG_ROOT/src/interfaces/libpq $LDFLAGS_WASM" \
+  AR="$AR" \
+  RANLIB="$RANLIB" \
+  LIBS="-lpgfeutils -lpq -lpgcommon -lpgport -lpgcommon $WASI_STUBS_O -lm" || {
+    echo "[postgres] WARNING: psql build had errors (best-effort, continuing)."
+}
+
+echo "[postgres] [wasm] building pg_regress..."
+make -C src/test/regress -j"$JOBS" \
+  CC="$CC_WASM" \
+  CFLAGS="$CFLAGS_WASM -I$PG_ROOT/src/port -I$PG_ROOT/src/interfaces/libpq -DHOST_TUPLE=\"wasm32-unknown-wasi\" -DSHELLPROG=\"/bin/sh\"" \
+  LDFLAGS="-L$PG_ROOT/src/port -L$PG_ROOT/src/common -L$PG_ROOT/src/interfaces/libpq $LDFLAGS_WASM" \
+  AR="$AR" \
+  RANLIB="$RANLIB" \
+  LIBS="-lpq -lpgcommon -lpgport -lpgcommon $WASI_STUBS_O -lm" || {
+    echo "[postgres] WARNING: pg_regress build had errors (best-effort, continuing)."
+}
+
 ###############################################################################
 # Build shared libraries for dylink mode
 ###############################################################################
@@ -604,6 +626,8 @@ fi
 PG_BINARY="$PG_ROOT/src/backend/postgres"
 INITDB_BINARY="$PG_ROOT/src/bin/initdb/initdb"
 PGBENCH_BINARY="$PG_ROOT/src/bin/pgbench/pgbench"
+PSQL_BINARY="$PG_ROOT/src/bin/psql/psql"
+PG_REGRESS_BINARY="$PG_ROOT/src/test/regress/pg_regress"
 
 STAGED_BINARIES=()
 
@@ -629,6 +653,22 @@ if [[ -f "$PGBENCH_BINARY" ]]; then
   echo "[postgres] staged: $STAGE_DIR/pgbench.wasm"
 else
   echo "[postgres] WARNING: pgbench binary was not produced."
+fi
+
+if [[ -f "$PSQL_BINARY" ]]; then
+  cp "$PSQL_BINARY" "$STAGE_DIR/psql.wasm"
+  STAGED_BINARIES+=("psql")
+  echo "[postgres] staged: $STAGE_DIR/psql.wasm"
+else
+  echo "[postgres] WARNING: psql binary was not produced."
+fi
+
+if [[ -f "$PG_REGRESS_BINARY" ]]; then
+  cp "$PG_REGRESS_BINARY" "$STAGE_DIR/pg_regress.wasm"
+  STAGED_BINARIES+=("pg_regress")
+  echo "[postgres] staged: $STAGE_DIR/pg_regress.wasm"
+else
+  echo "[postgres] WARNING: pg_regress binary was not produced."
 fi
 
 if [[ ${#STAGED_BINARIES[@]} -eq 0 ]]; then
