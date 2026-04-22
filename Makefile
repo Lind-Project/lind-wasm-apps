@@ -45,7 +45,7 @@ LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 #   make check-build                # runs the full TESTABLE_APPS list
 #   make check-build APP=nginx      # runs a single app on demand
 #   make check-build APP="nginx grep sed"  # runs multiple apps on demand
-TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc
+TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
@@ -347,9 +347,10 @@ rebuild-sysroot:
 	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 
 # ---------------- cpython (WASM build) ----------------------------------------
-# Placeholder target to preserve the per-app staging/layering pattern.
-cpython: merge-sysroot
-	mkdir -p '$(APPS_BIN_DIR)/cpython/wasm32-wasi'
+# Uses cpython/compile_cpython.sh to cross-compile CPython for wasm32-wasi.
+# Supports both static (default) and dynamic (LIND_DYLINK=1) builds.
+cpython: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
+	'$(APPS_ROOT)/cpython/compile_cpython.sh'
 
 # ---------------- postgres (WASM build) ---------------------------------------
 # Placeholder target to preserve the per-app staging/layering pattern.
