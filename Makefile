@@ -49,7 +49,7 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -360,6 +360,12 @@ postgres: merge-sysroot
 tinycc: merge-sysroot
 	'$(APPS_ROOT)/tinycc/compile_tinycc.sh'
 
+# ---------------- diffutils (WASM build) --------------------------------------
+# Cross-compiles GNU diffutils (cmp, diff, diff3, sdiff) to wasm32-wasi.
+# Stages to build/diffutils/usr/local/bin.
+diffutils: $(MERGE_BASE_STAMP)
+	'$(APPS_ROOT)/diffutils/compile_diffutils.sh'
+
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
 
@@ -402,4 +408,7 @@ install-cpython:
 install-postgres:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' postgres
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres
+install-diffutils:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' diffutils
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils
