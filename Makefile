@@ -373,10 +373,10 @@ install-bash:
 install-nginx:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' nginx
 
-install-git:
+install-git: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' git
 
-install-curl:
+install-curl: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' curl
 
 install-grep:
@@ -385,7 +385,7 @@ install-grep:
 install-sed:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' sed
 
-install-lmbench:
+install-lmbench: install-libtirpc
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' lmbench
 
 install-coreutils:
