@@ -155,9 +155,6 @@ $(LIBTIRPC_STAMP): $(APPS_ROOT)/libtirpc/compile_libtirpc.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/libtirpc/compile_libtirpc.sh'
 	touch '$@'
-	if [[ "$(LIND_DYLINK)" == "1" ]]; then \
-		'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' libtirpc; \
-	fi
 
 libtirpc: $(LIBTIRPC_STAMP)
 
@@ -166,9 +163,6 @@ $(GNULIB_STAMP): $(APPS_ROOT)/gnulib/compile_gnulib.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/gnulib/compile_gnulib.sh'
 	touch '$@'
-	if [[ "$(LIND_DYLINK)" == "1" ]]; then \
-		'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' gnulib; \
-	fi
 
 gnulib: $(GNULIB_STAMP)
 
@@ -177,9 +171,6 @@ $(ZLIB_STAMP): $(APPS_ROOT)/zlib/compile_zlib.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/zlib/compile_zlib.sh'
 	touch '$@'
-	if [[ "$(LIND_DYLINK)" == "1" ]]; then \
-		'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' zlib; \
-	fi
 
 zlib: $(ZLIB_STAMP)
 
@@ -188,9 +179,6 @@ $(OPENSSL_STAMP): $(APPS_ROOT)/openssl/compile_openssl.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/openssl/compile_openssl.sh'
 	touch '$@'
-	if [[ "$(LIND_DYLINK)" == "1" ]]; then \
-		'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' openssl; \
-	fi
 
 openssl: $(OPENSSL_STAMP)
 
