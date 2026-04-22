@@ -43,7 +43,7 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils postgres clean clean-all rebuild-libs rebuild-sysroot test install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils postgres clean clean-all rebuild-libs rebuild-sysroot test install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-gnulib install-libtirpc install-openssl install-zlib install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -155,6 +155,9 @@ $(LIBTIRPC_STAMP): $(APPS_ROOT)/libtirpc/compile_libtirpc.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/libtirpc/compile_libtirpc.sh'
 	touch '$@'
+	if [[ "$(LIND_DYLINK)" == "1" ]]; then \
+		'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' libtirpc; \
+	fi
 
 libtirpc: $(LIBTIRPC_STAMP)
 
@@ -163,6 +166,9 @@ $(GNULIB_STAMP): $(APPS_ROOT)/gnulib/compile_gnulib.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/gnulib/compile_gnulib.sh'
 	touch '$@'
+	if [[ "$(LIND_DYLINK)" == "1" ]]; then \
+		'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' gnulib; \
+	fi
 
 gnulib: $(GNULIB_STAMP)
 
@@ -171,6 +177,9 @@ $(ZLIB_STAMP): $(APPS_ROOT)/zlib/compile_zlib.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/zlib/compile_zlib.sh'
 	touch '$@'
+	if [[ "$(LIND_DYLINK)" == "1" ]]; then \
+		'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' zlib; \
+	fi
 
 zlib: $(ZLIB_STAMP)
 
@@ -179,6 +188,9 @@ $(OPENSSL_STAMP): $(APPS_ROOT)/openssl/compile_openssl.sh | $(TOOL_ENV)
 	. '$(TOOL_ENV)'
 	JOBS='$(JOBS)' '$(APPS_ROOT)/openssl/compile_openssl.sh'
 	touch '$@'
+	if [[ "$(LIND_DYLINK)" == "1" ]]; then \
+		'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' openssl; \
+	fi
 
 openssl: $(OPENSSL_STAMP)
 
@@ -376,4 +388,16 @@ install-gcc:
 install-binutils:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' binutils
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils
+install-gnulib:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' gnulib
+
+install-libtirpc:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' libtirpc
+
+install-openssl:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' openssl
+
+install-zlib:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' zlib
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-gnulib install-libtirpc install-openssl install-zlib
