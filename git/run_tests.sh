@@ -26,7 +26,15 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
     LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
+LIND_DYLINK="${LIND_DYLINK:-0}"
+
+LIND_RUN=("$LIND_WASM_ROOT/scripts/lind_run")
+if [[ "$LIND_DYLINK" == "1" ]]; then
+    # Dynamic builds need shared libs preloaded into the wasm env namespace.
+    # These paths are relative to lindfs (installed by make install).
+    LIND_RUN+=(--preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so)
+fi
+
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 GIT_BIN="usr/local/bin/git"
 REPO_PATH="/tmp/git-test-repo"
@@ -92,12 +100,12 @@ run_test() {
 
 # Helper to run git inside the test repo
 run_git() {
-    $LIND_RUN "$GIT_BIN" -C "$REPO_PATH" "$@" 2>&1
+    "${LIND_RUN[@]}" "$GIT_BIN" -C "$REPO_PATH" "$@" 2>&1
 }
 
 # Helper to run git inside the cloned repo
 run_git_clone() {
-    $LIND_RUN "$GIT_BIN" -C "$CLONE_PATH" "$@" 2>&1
+    "${LIND_RUN[@]}" "$GIT_BIN" -C "$CLONE_PATH" "$@" 2>&1
 }
 
 # --- test cases --------------------------------------------------------------
@@ -110,21 +118,21 @@ test_binary_exists() {
 # 2. --version
 test_version() {
     local output
-    output=$($LIND_RUN "$GIT_BIN" --version 2>&1)
+    output=$("${LIND_RUN[@]}" "$GIT_BIN" --version 2>&1)
     [[ "$output" == *"git version"* ]]
 }
 
 # 3. --help
 test_help() {
     local output
-    output=$($LIND_RUN "$GIT_BIN" --help 2>&1)
+    output=$("${LIND_RUN[@]}" "$GIT_BIN" --help 2>&1)
     echo "$output" | grep -qi "usage"
 }
 
 # 4. git init
 test_init() {
     local output
-    output=$($LIND_RUN "$GIT_BIN" init "$REPO_PATH" 2>&1)
+    output=$("${LIND_RUN[@]}" "$GIT_BIN" init "$REPO_PATH" 2>&1)
     [[ "$output" == *"Initialized empty Git repository"* ]]
 }
 
@@ -374,7 +382,7 @@ test_clone_bare() {
 
     # Verify the bare repo is usable inside Lind
     local output
-    output=$($LIND_RUN "$GIT_BIN" -C "$REMOTE_PATH" log --oneline 2>&1)
+    output=$("${LIND_RUN[@]}" "$GIT_BIN" -C "$REMOTE_PATH" log --oneline 2>&1)
     [[ "$output" == *"first commit"* ]]
 }
 
@@ -383,7 +391,7 @@ test_clone() {
     # Transport (clone/fetch) forks and panics in Lind.  We init a fresh
     # repo, copy objects + refs from the bare remote on the host side, then
     # let git checkout the working tree inside Lind.
-    $LIND_RUN "$GIT_BIN" init "$CLONE_PATH" 2>&1 >/dev/null || true
+    "${LIND_RUN[@]}" "$GIT_BIN" init "$CLONE_PATH" 2>&1 >/dev/null || true
     run_git_clone remote add origin "$REMOTE_PATH"
 
     # Copy objects
@@ -439,7 +447,7 @@ test_push() {
 
     # Verify the bare remote now contains the pushed commit
     local output
-    output=$($LIND_RUN "$GIT_BIN" -C "$REMOTE_PATH" log --oneline 2>&1)
+    output=$("${LIND_RUN[@]}" "$GIT_BIN" -C "$REMOTE_PATH" log --oneline 2>&1)
     [[ "$output" == *"push test commit"* ]]
 }
 

@@ -233,12 +233,12 @@ if [[ -x "$WASM_OPT" ]]; then
   "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
     "$SED_WASM" -o "$SED_OPT_WASM" || true
 else
-  echo "[sed] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  echo "[sed] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.." >&2
   exit 1
 fi
 
 if [[ ! -f "$SED_OPT_WASM" ]]; then
-  echo "[sed] ERROR: Failed to generate "$SED_OPT_WASM"; Exiting.."
+  echo "[sed] ERROR: Failed to generate "$SED_OPT_WASM"; Exiting.." >&2
   exit 1
 fi
 
@@ -246,7 +246,7 @@ fi
 # 10) cwasm generation (best-effort) via lind-boot --precompile
 # ----------------------------------------------------------------------
 if [[ -x "$LIND_BOOT" ]]; then
-  echo "[git] generating cwasm via lind-boot --precompile..."
+  echo "[sed] generating cwasm via lind-boot --precompile..."
   if "$LIND_BOOT" --precompile "$SED_OPT_WASM"; then
     
     SED_OPT_CWASM="$SCRIPT_DIR/sed.opt.cwasm"
@@ -255,17 +255,17 @@ if [[ -x "$LIND_BOOT" ]]; then
       cp "$SED_OPT_CWASM" "$STAGE_DIR/sed"
       echo "[sed] sed staged as $STAGE_DIR/sed"
     else   
-      echo "[sed] ERROR : No cwasm binaries generated and none copied to the build folder. Exiting .."
+      echo "[sed] ERROR : No cwasm binaries generated and none copied to the build folder. Exiting .." >&2
       exit 1
     fi
   else
-    echo "[sed] ERROR: lind-boot --precompile failed; skipping cwasm generation."
-    echo "[sed] ERROR: No binaries copied to the build folder. Exiting.."
+    echo "[sed] ERROR: lind-boot --precompile failed; skipping cwasm generation." >&2
+    echo "[sed] ERROR: No binaries copied to the build folder. Exiting.." >&2
     exit 1
   fi
 else
-  echo "[sed] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-  echo "[sed] ERROR: No binaries copied to the build folder. Exiting.."
+  echo "[sed] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation." >&2
+  echo "[sed] ERROR: No binaries copied to the build folder. Exiting.." >&2
   exit 1
 fi
 

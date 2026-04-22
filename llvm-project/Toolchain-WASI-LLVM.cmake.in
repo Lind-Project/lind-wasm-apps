@@ -1,0 +1,56 @@
+# Auto-generated CMake toolchain for cross-compiling LLVM to wasm32-wasi
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR wasm32)
+
+# Compiler and tools
+set(CMAKE_C_COMPILER "@CLANG@")
+set(CMAKE_CXX_COMPILER "@CLANGXX@")
+set(CMAKE_AR "@AR@")
+set(CMAKE_NM "@NM@")
+set(CMAKE_RANLIB "@RANLIB@")
+set(CMAKE_SYSROOT "@BASE_SYSROOT@")
+set(CMAKE_LINKER "@LD@")
+
+# Target configuration
+set(CMAKE_C_COMPILER_TARGET wasm32-unknown-wasi)
+set(CMAKE_CXX_COMPILER_TARGET wasm32-unknown-wasi)
+
+# Force CMake to accept compilers without try-run (can't run wasm on host)
+set(CMAKE_C_COMPILER_WORKS TRUE)
+set(CMAKE_CXX_COMPILER_WORKS TRUE)
+set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
+
+# WASM C flags — use -Os to minimize binary size (clang is huge)
+# Use CACHE FORCE so nothing can override these (not even a stale CMakeCache)
+# WASI uses glibc headers — define __linux__ so LLVM uses <endian.h>,
+# Linux-style struct fields, etc.  (WASI is not Linux, but its glibc
+# sysroot matches the Linux ABI for these purposes.)
+set(CMAKE_C_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -D__linux__" CACHE STRING "" FORCE)
+
+# WASM C++ flags — use libc++, no exceptions/RTTI/unwind to reduce binary size
+set(CMAKE_CXX_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -D__linux__ -nostdinc++ -isystem $LIBCXX_INCLUDE -include $SCRIPT_DIR/fix_std_maxmin.h" CACHE STRING "" FORCE)
+
+# Linker flags
+set(CMAKE_EXE_LINKER_FLAGS "\
+  -L$MERGED_SYSROOT/lib/wasm32-wasi \
+  -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
+  -Wl,--export=__stack_pointer,--export=__stack_low \
+  -Wl,--import-memory,--export-memory \
+  -Wl,--max-memory=67108864 \
+  -lm " CACHE STRING "" FORCE)
+
+# Don't pass -rpath to the linker
+set(CMAKE_SKIP_RPATH TRUE)
+set(CMAKE_SKIP_INSTALL_RPATH TRUE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+
+# Prevent try-run errors
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+
+# Skip old toolchain warnings
+set(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN ON CACHE BOOL "" FORCE)
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
