@@ -224,7 +224,7 @@ run_wasm_opt_replace() {
         --enable-bulk-memory --enable-threads \
         --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
         --asyncify --pass-arg=asyncify-import-globals \
-        --debuginfo \
+        --fpcast-emu --debuginfo \
         "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else
@@ -625,6 +625,7 @@ for w in "${wasm_files[@]}"; do
       --enable-bulk-memory --enable-threads \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
       --asyncify --pass-arg=asyncify-import-globals \
+      --fpcast-emu \
       --debuginfo \
       "$w" -o "$opt_file"
   else
