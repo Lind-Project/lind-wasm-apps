@@ -25,9 +25,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-# CPython uses the base glibc sysroot (not the merged overlay sysroot) because
-# libm and other core libs live there, and the configure checks require them.
-SYSROOT="${SYSROOT:-$LIND_WASM_ROOT/build/sysroot}"
+SYSROOT="${SYSROOT:-$APPS_BUILD/sysroot_merged}"
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
@@ -80,8 +78,7 @@ echo
 ###############################################################################
 
 # These empty archives satisfy configure checks for WASI-unavailable libraries.
-# Written to sysroot_overlay so we don't pollute the base glibc sysroot.
-WASI_STUB_DIR="$APPS_BUILD/sysroot_overlay/usr/lib/wasm32-wasi"
+WASI_STUB_DIR="$SYSROOT/lib/wasm32-wasi"
 mkdir -p "$WASI_STUB_DIR"
 for lib in libwasi-emulated-getpid.a libwasi-emulated-signal.a libwasi-emulated-process-clocks.a; do
   if [[ ! -f "$WASI_STUB_DIR/$lib" ]]; then
