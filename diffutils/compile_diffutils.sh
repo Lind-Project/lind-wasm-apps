@@ -110,9 +110,6 @@ export LDFLAGS="${LDFLAGS:-} ${LDFLAGS_WASM[*]}"
 BUILD_TRIPLET="$("$DIFFUTILS_ROOT/build-aux/config.guess" 2>/dev/null || echo x86_64-unknown-linux-gnu)"
 HOST_TRIPLET="wasm32-unknown-linux-gnu"
 
-echo "[diffutils] cleaning any previous build..."
-make -C "$DIFFUTILS_ROOT" distclean >/dev/null 2>&1 || true
-
 echo "[diffutils] configuring..."
 (
   cd "$DIFFUTILS_ROOT"
