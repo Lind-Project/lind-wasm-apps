@@ -18,6 +18,7 @@ case "$LIB" in
   openssl)  SO_FILES=(libssl.so libcrypto.so) ;;
   gnulib)   SO_FILES=(libgnu.so) ;;
   zlib)     SO_FILES=(libz.so) ;;
+  libcxx)   SO_FILES=(libc++.so libc++abi.so) ;;
   *)
     echo "[install-lib] ERROR: unknown library '$LIB'" >&2
     exit 1
