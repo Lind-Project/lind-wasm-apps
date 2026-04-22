@@ -122,7 +122,8 @@ echo "[diffutils] configuring..."
     RANLIB="$RANLIB" \
     CFLAGS="${CFLAGS_WASM[*]}" \
     CPPFLAGS="$CPPFLAGS" \
-    LDFLAGS="${LDFLAGS_WASM[*]}"
+    LDFLAGS="${LDFLAGS_WASM[*]}" \
+    gl_cv_func_strcasecmp_works=yes
 )
 
 if [[ ! -f "$DIFFUTILS_ROOT/Makefile" ]]; then
