@@ -262,6 +262,7 @@ if [[ -x "$WASM_OPT" ]]; then
       --enable-bulk-memory --enable-threads \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
       --asyncify --pass-arg=asyncify-import-globals \
+      --fpcast-emu \
       -O2 --debuginfo \
       "$GREP_WASM" -o "$GREP_OPT_WASM"
   else

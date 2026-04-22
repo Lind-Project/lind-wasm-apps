@@ -43,7 +43,7 @@ assert() {
     
     # Evaluate the command
     local actual
-    actual=$(timeout ${TIMEOUT_SECS}s lind_run --env PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:.  bin/bash  "$testfile" 2>/dev/null)
+    actual=$(timeout ${TIMEOUT_SECS}s lind_run --enable-fpcast --env PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:.  bin/bash  "$testfile" 2>/dev/null)
     echo "--------- Test run Completed -------"
 
     exit_code=$?
