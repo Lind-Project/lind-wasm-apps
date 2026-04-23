@@ -29,7 +29,7 @@ PG_ROOT="$APPS_ROOT/postgres"
 
 APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-STAGE_DIR="$APPS_BUILD/bin/postgres/wasm32-wasi"
+STAGE_DIR="$APPS_BUILD/postgres/wasm32-wasi"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -208,24 +208,6 @@ echo "[postgres] [host] preserving generated file timestamps..."
 find src -name '*.c' -newer configure -print0 2>/dev/null | xargs -0 touch -r configure 2>/dev/null || true
 find src -name '*.h' -newer configure -print0 2>/dev/null | xargs -0 touch -r configure 2>/dev/null || true
 
-# Save a list of generated .c and .h files before cleaning
-GENERATED_FILES=$(mktemp)
-{
-  # Parser-generated sources
-  find src/backend/parser -name 'gram.c' -o -name 'gram.h' -o -name 'scan.c' 2>/dev/null
-  find src/backend/bootstrap -name 'bootparse.c' -o -name 'bootparse.h' -o -name 'bootscanner.c' 2>/dev/null
-  find src/backend/replication -name 'repl_gram.c' -o -name 'repl_gram.h' -o -name 'repl_scanner.c' \
-       -o -name 'syncrep_gram.c' -o -name 'syncrep_gram.h' -o -name 'syncrep_scanner.c' 2>/dev/null
-  find src/backend/utils/adt -name 'jsonpath_gram.c' -o -name 'jsonpath_gram.h' -o -name 'jsonpath_scan.c' 2>/dev/null
-  find src/backend/utils/misc -name 'guc-file.c' 2>/dev/null
-  # Catalog and node generated headers
-  find src/include/catalog -name '*.h' 2>/dev/null
-  find src/backend/nodes -name '*.h' -o -name '*.funcs' 2>/dev/null
-  find src/backend/utils -name '*.h' 2>/dev/null
-  find src/include/storage -name 'lwlocknames.h' 2>/dev/null
-  find src/backend/storage/lmgr -name 'lwlocknames.h' -o -name 'lwlocknames.c' 2>/dev/null
-} > "$GENERATED_FILES" 2>/dev/null || true
-
 ###############################################################################
 # Clean .o files but keep generated .c/.h and Makefiles
 ###############################################################################
@@ -243,8 +225,6 @@ for f in src/backend/parser/gram.c src/backend/parser/gram.h; do
   fi
 done
 echo "[postgres] [wasm] generated files preserved OK"
-
-rm -f "$GENERATED_FILES"
 
 ###############################################################################
 # Pass 2: Cross-compile for wasm32-wasi
@@ -585,17 +565,10 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
         continue
       }
 
-    echo "[postgres] [dylink] adding exports to lib${lib_name}.wasm..."
-    "$ADD_EXPORT_TOOL" "$SHARED_WASM" "$SHARED_WASM" \
-      __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional || true
-    "$ADD_EXPORT_TOOL" "$SHARED_WASM" "$SHARED_WASM" \
-      __wasm_apply_global_relocs func __wasm_apply_global_relocs optional || true
-    "$ADD_EXPORT_TOOL" "$SHARED_WASM" "$SHARED_WASM" \
-      __stack_pointer global __stack_pointer optional || true
-
     echo "[postgres] [dylink] running wasm-opt on lib${lib_name}.wasm..."
     "$WASM_OPT" \
       --enable-bulk-memory --enable-threads \
+      --fpcast-emu \
       --epoch-injection --pass-arg=epoch-import \
       --asyncify --pass-arg=asyncify-import-globals \
       -O2 --debuginfo \
@@ -603,6 +576,14 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
         echo "[postgres] [dylink] WARNING: wasm-opt failed for lib${lib_name}"
         continue
       }
+
+    echo "[postgres] [dylink] adding exports to lib${lib_name}.opt.wasm..."
+    "$ADD_EXPORT_TOOL" "$SHARED_OPT" "$SHARED_OPT" \
+      __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+    "$ADD_EXPORT_TOOL" "$SHARED_OPT" "$SHARED_OPT" \
+      __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+    "$ADD_EXPORT_TOOL" "$SHARED_OPT" "$SHARED_OPT" \
+      __stack_pointer global __stack_pointer optional
 
     echo "[postgres] [dylink] precompiling lib${lib_name}.opt.wasm..."
     "$LIND_BOOT" --precompile "$SHARED_OPT" || {
@@ -692,6 +673,7 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
       # -O2 before asyncify helps reduce locals in large binaries like postgres
       "$WASM_OPT" \
         --enable-bulk-memory --enable-threads \
+        --fpcast-emu \
         -O2 \
         --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
         --asyncify --pass-arg=asyncify-import-globals \
@@ -704,6 +686,7 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
     else
       # Static wasm-opt flags
       "$WASM_OPT" \
+        --fpcast-emu \
         --epoch-injection \
         --asyncify \
         --debuginfo \
