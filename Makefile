@@ -5,6 +5,12 @@ SHELL := /bin/bash
 .ONESHELL:
 .SHELLFLAGS := -eu -o pipefail -c
 
+# -------- Build mode ----------------------------------------------------------
+# Set LIND_DYLINK=1 for dynamic/PIE builds, 0 for static.
+# Exported so all compile scripts inherit it.
+LIND_DYLINK    ?= 1
+export LIND_DYLINK
+
 # -------- Paths ---------------------------------------------------------------
 LIND_WASM_ROOT ?= $(HOME)/lind-wasm
 BASE_SYSROOT   ?= $(LIND_WASM_ROOT)/src/glibc/sysroot
@@ -39,11 +45,11 @@ LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 #   make check-build                # runs the full TESTABLE_APPS list
 #   make check-build APP=nginx      # runs a single app on demand
 #   make check-build APP="nginx grep sed"  # runs multiple apps on demand
-TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc
+TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-postgres install-clang install-tinycc install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -341,9 +347,10 @@ rebuild-sysroot:
 	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
 
 # ---------------- cpython (WASM build) ----------------------------------------
-# Placeholder target to preserve the per-app staging/layering pattern.
-cpython: merge-sysroot
-	mkdir -p '$(APPS_BIN_DIR)/cpython/wasm32-wasi'
+# Uses cpython/compile_cpython.sh to cross-compile CPython for wasm32-wasi.
+# Supports both static (default) and dynamic (LIND_DYLINK=1) builds.
+cpython: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
+	'$(APPS_ROOT)/cpython/compile_cpython.sh'
 
 # ---------------- postgres (WASM build) ---------------------------------------
 # Uses postgres/compile_postgres.sh to build the PostgreSQL backend as a
@@ -357,16 +364,22 @@ postgres: merge-sysroot
 tinycc: merge-sysroot
 	'$(APPS_ROOT)/tinycc/compile_tinycc.sh'
 
+# ---------------- diffutils (WASM build) --------------------------------------
+# Cross-compiles GNU diffutils (cmp, diff, diff3, sdiff) to wasm32-wasi.
+# Stages to build/diffutils/usr/local/bin.
+diffutils: $(MERGE_BASE_STAMP)
+	'$(APPS_ROOT)/diffutils/compile_diffutils.sh'
+
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
 
 install-nginx:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' nginx
 
-install-git:
+install-git: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' git
 
-install-curl:
+install-curl: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' curl
 
 install-grep:
@@ -375,25 +388,46 @@ install-grep:
 install-sed:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' sed
 
-install-lmbench:
+install-lmbench: install-libtirpc
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' lmbench
 
 install-coreutils:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' coreutils
 
-install-postgres:
-	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' postgres
-
-install-gcc:
+install-gcc: install-libcxx
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' gcc
 
-install-binutils:
+install-binutils: install-zlib
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' binutils
 
-install-clang:
+install-clang: install-libcxx
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' clang
 
 install-tinycc:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' tinycc
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-postgres install-clang install-tinycc
+install-cpython: install-zlib install-openssl
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' cpython
+
+install-postgres:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' postgres
+
+install-diffutils:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' diffutils
+
+install-gnulib:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' gnulib
+
+install-libtirpc:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' libtirpc
+
+install-openssl:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' openssl
+
+install-zlib:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' zlib
+
+install-libcxx:
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' libcxx
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx

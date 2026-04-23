@@ -262,6 +262,7 @@ if [[ -x "$WASM_OPT" ]]; then
       --enable-bulk-memory --enable-threads \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
       --asyncify --pass-arg=asyncify-import-globals \
+      --fpcast-emu \
       -O2 --debuginfo \
       "$GREP_WASM" -o "$GREP_OPT_WASM"
   else
@@ -272,12 +273,12 @@ if [[ -x "$WASM_OPT" ]]; then
       "$GREP_WASM" -o "$GREP_OPT_WASM"
   fi
 else
-  echo "[grep] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  echo "[grep] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.." >&2
   exit 1
 fi
 
 if [[ ! -f "$GREP_OPT_WASM" ]]; then
-  echo "[grep] ERROR: Failed to generate $GREP_OPT_WASM; Exiting.."
+  echo "[grep] ERROR: Failed to generate $GREP_OPT_WASM; Exiting.." >&2
   exit 1
 fi
 
@@ -302,17 +303,17 @@ if [[ -x "$LIND_BOOT" ]]; then
       cp "$GREP_OPT_CWASM" "$STAGE_DIR/grep"
       echo "[grep] grep staged as $STAGE_DIR/grep"
     else
-      echo "[grep] ERROR: No .cwasm binaries generated and no binaries copied to the build folder. Exiting.."
+      echo "[grep] ERROR: No .cwasm binaries generated and no binaries copied to the build folder. Exiting.." >&2
       exit 1
     fi
   else
-    echo "[grep] ERROR: lind-boot --precompile failed; skipping cwasm generation."
-    echo "[grep] ERROR: No binaries copied to the build folder. Exiting.."
+    echo "[grep] ERROR: lind-boot --precompile failed; skipping cwasm generation." >&2
+    echo "[grep] ERROR: No binaries copied to the build folder. Exiting.." >&2
     exit 1
   fi
 else
-  echo "[grep] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation."
-  echo "[grep] ERROR: No binaries copied to the build folder. Exiting.."
+  echo "[grep] ERROR: lind-boot not found at '$LIND_BOOT'; skipping cwasm generation." >&2
+  echo "[grep] ERROR: No binaries copied to the build folder. Exiting.." >&2
   exit 1
 fi
 
