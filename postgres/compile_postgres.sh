@@ -73,6 +73,16 @@ fi
 
 mkdir -p "$STAGE_DIR"
 
+# --- WASM-specific source patches -------------------------------------------
+
+echo "[postgres] applying WASM-specific source patches..."
+
+# Disable plpgsql extension loading (shared library extensions not supported)
+if grep -q "load_plpgsql(cmdfd);" "$PG_ROOT/src/bin/initdb/initdb.c"; then
+  sed -i 's/load_plpgsql(cmdfd);/\/\/ load_plpgsql(cmdfd); \/\/ Disabled for WASM - no shared library extensions/' "$PG_ROOT/src/bin/initdb/initdb.c"
+  echo "[postgres] patched initdb.c: disabled plpgsql extension"
+fi
+
 # --- wasm_compat header (committed in the repo) -----------------------------
 
 WASM_COMPAT_H="$PG_ROOT/wasm_compat.h"
@@ -731,3 +741,44 @@ echo
 echo "[postgres] build complete. Outputs under:"
 echo "  $STAGE_DIR"
 ls -lh "$STAGE_DIR" || true
+
+# ============================================================================
+# Stage share files required by initdb/postgres
+# ============================================================================
+echo
+echo "[postgres] staging share files..."
+
+SHARE_DIR="$STAGE_DIR/share"
+mkdir -p "$SHARE_DIR"
+mkdir -p "$SHARE_DIR/timezonesets"
+
+# Core catalog files
+cp "$PG_ROOT/src/include/catalog/postgres.bki" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: postgres.bki not found"
+cp "$PG_ROOT/src/include/catalog/system_constraints.sql" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: system_constraints.sql not found"
+cp "$PG_ROOT/src/backend/catalog/system_functions.sql" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: system_functions.sql not found"
+cp "$PG_ROOT/src/backend/catalog/information_schema.sql" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: information_schema.sql not found"
+cp "$PG_ROOT/src/backend/catalog/sql_features.txt" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: sql_features.txt not found"
+cp "$PG_ROOT/src/backend/catalog/system_views.sql" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: system_views.sql not found"
+
+# Stub snowball (text search extension not supported in WASM)
+echo "-- Snowball text search disabled for WASM" > "$SHARE_DIR/snowball_create.sql"
+echo "[postgres] created stub snowball_create.sql"
+
+# Config samples
+cp "$PG_ROOT/src/backend/utils/misc/postgresql.conf.sample" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: postgresql.conf.sample not found"
+cp "$PG_ROOT/src/backend/libpq/pg_hba.conf.sample" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: pg_hba.conf.sample not found"
+cp "$PG_ROOT/src/backend/libpq/pg_ident.conf.sample" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: pg_ident.conf.sample not found"
+
+# Timezone sets
+if [[ -d "$PG_ROOT/src/timezone/tznames" ]]; then
+  cp "$PG_ROOT/src/timezone/tznames"/*.txt "$SHARE_DIR/timezonesets/" 2>/dev/null || true
+  cp -r "$PG_ROOT/src/timezone/tznames/Australia" "$SHARE_DIR/timezonesets/" 2>/dev/null || true
+  cp -r "$PG_ROOT/src/timezone/tznames/India" "$SHARE_DIR/timezonesets/" 2>/dev/null || true
+  cp "$PG_ROOT/src/timezone/tznames/Default" "$SHARE_DIR/timezonesets/" 2>/dev/null || true
+  echo "[postgres] copied timezone sets"
+else
+  echo "[postgres] WARNING: timezone tznames directory not found"
+fi
+
+echo "[postgres] share files staged at: $SHARE_DIR"
+ls -la "$SHARE_DIR" || true
