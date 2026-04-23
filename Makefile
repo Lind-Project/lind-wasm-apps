@@ -353,9 +353,12 @@ cpython: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 	'$(APPS_ROOT)/cpython/compile_cpython.sh'
 
 # ---------------- postgres (WASM build) ---------------------------------------
-# Placeholder target to preserve the per-app staging/layering pattern.
+# Uses postgres/compile_postgres.sh to build the PostgreSQL backend as a
+# wasm32-wasi binary using the merged sysroot and toolchain detected by
+# preflight, and stages artifacts under build/bin/postgres/wasm32-wasi/.
 postgres: merge-sysroot
-	mkdir -p '$(APPS_BIN_DIR)/postgres/wasm32-wasi'
+	. '$(TOOL_ENV)'
+	'$(APPS_ROOT)/postgres/compile_postgres.sh'
 
 # ---------------- tinycc (WASM build) --------------------------------------
 tinycc: merge-sysroot

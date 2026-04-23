@@ -816,7 +816,7 @@ get_id(void)
 {
 	const char *username;
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__wasi__)
 	if (geteuid() == 0)			/* 0 is root's uid */
 	{
 		pg_log_error("cannot be run as root");
@@ -1119,6 +1119,35 @@ choose_dsm_implementation(void)
 static void
 test_config_settings(void)
 {
+#ifdef __wasi__
+	/*
+	 * Under WASI/lind-wasm, skip spawning "postgres --check" children.
+	 * The double fork+exec path (initdb -> sh -> postgres) triggers a
+	 * shared memory mapping fault in the runtime.  Use conservative
+	 * defaults instead — these end up in postgresql.conf and can be
+	 * tuned later.
+	 */
+	printf(_("selecting dynamic shared memory implementation ... "));
+	fflush(stdout);
+	dynamic_shared_memory_type = "mmap";
+	printf("%s\n", dynamic_shared_memory_type);
+
+	printf(_("selecting default \"max_connections\" ... "));
+	fflush(stdout);
+	n_connections = 20;
+	n_av_slots = 3;
+	printf("%d\n", n_connections);
+
+	printf(_("selecting default \"shared_buffers\" ... "));
+	fflush(stdout);
+	n_buffers = 200;
+	printf("%dkB\n", n_buffers * (BLCKSZ / 1024));
+
+	printf(_("selecting default time zone ... "));
+	fflush(stdout);
+	default_timezone = select_default_timezone(share_path);
+	printf("%s\n", default_timezone ? default_timezone : "GMT");
+#else
 	/*
 	 * This macro defines the minimum shared_buffers we want for a given
 	 * max_connections value. The arrays show the settings to try.
@@ -1214,6 +1243,7 @@ test_config_settings(void)
 	fflush(stdout);
 	default_timezone = select_default_timezone(share_path);
 	printf("%s\n", default_timezone ? default_timezone : "GMT");
+#endif /* __wasi__ */
 }
 
 /*
@@ -2872,7 +2902,7 @@ setup_signals(void)
 	pqsignal(SIGTERM, trapsig);
 
 	/* the following are not valid on Windows */
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__wasi__)
 	pqsignal(SIGHUP, trapsig);
 	pqsignal(SIGQUIT, trapsig);
 
