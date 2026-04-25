@@ -125,9 +125,9 @@ echo "[perl] ============================================"
 
 pushd "$PERL_ROOT" >/dev/null
 
-# Clean native objects but keep generated files
-echo "[perl] [wasm] cleaning native objects..."
-make clean >/dev/null 2>&1 || true
+# Full distclean to remove stale config (ensure new config.sh overrides take effect)
+echo "[perl] [wasm] cleaning previous build..."
+make distclean >/dev/null 2>&1 || true
 
 # Restore generated headers from native build so generate_uudmap doesn't
 # need to run during the wasm build
@@ -135,9 +135,15 @@ echo "[perl] [wasm] restoring native-generated headers..."
 for f in bitcount.h mg_data.h uudmap.h; do
   if [[ -f "$NATIVE_BUILD_DIR/$f" ]]; then
     cp "$NATIVE_BUILD_DIR/$f" .
-    touch "$f"  # ensure timestamp is newer than dependencies
   fi
 done
+# Create a dummy generate_uudmap so the Makefile rule is satisfied
+# without trying to compile/run it for wasm
+touch generate_uudmap
+chmod +x generate_uudmap
+# Touch headers to be newer than the dummy so make skips the rule
+sleep 1
+touch bitcount.h mg_data.h uudmap.h
 
 # --- Generate config.sh for wasm32-wasi ------------------------------------
 
