@@ -49,7 +49,7 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils perl clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-perl install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -370,6 +370,12 @@ tinycc: merge-sysroot
 diffutils: $(MERGE_BASE_STAMP)
 	'$(APPS_ROOT)/diffutils/compile_diffutils.sh'
 
+# ---------------- perl (WASM build) -------------------------------------------
+# Cross-compiles Perl for wasm32-wasi via two-pass build (native miniperl
+# first, then cross-compile). Stages to build/perl/usr/local/bin.
+perl: $(MERGE_BASE_STAMP)
+	'$(APPS_ROOT)/perl/compile_perl.sh'
+
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
 
@@ -430,4 +436,7 @@ install-zlib:
 install-libcxx:
 	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' libcxx
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx
+install-perl:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' perl
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-perl install-gnulib install-libtirpc install-openssl install-zlib install-libcxx
