@@ -118,7 +118,7 @@ RANLIB="$RANLIB" \
   -Uusethreads \
   -Uuseithreads \
   -Uusemultiplicity \
-  -Ud_fork \
+  -Dd_fork=define \
   -Ud_vfork \
   -Ud_sigaction \
   -Ud_sigprocmask \
@@ -144,11 +144,10 @@ RANLIB="$RANLIB" \
 
 # Fix malformed config.h lines — when a config variable is empty, config_h.SH
 # emits "# FOO /**/}" instead of "#define FOO" or "/*#undef FOO*/".
-# Treat these as undefined (safe default — better to miss a feature than
-# to incorrectly enable one).
+# Treat these as undefined. Use simple comment format to avoid nested /* issues.
 if [[ -f config.h ]]; then
   echo "[perl] [wasm] fixing malformed config.h directives..."
-  sed -i -E 's|^# ([A-Z_]+[[:space:]]+/\*\*/)$|/*#undef \1*/|' config.h
+  sed -i -E 's|^# ([A-Z_][A-Z_0-9]*)[[:space:]]*/\*\*/$|/* #undef \1 */|' config.h
 fi
 
 ###############################################################################
