@@ -120,7 +120,21 @@ echo "[perl] configuring with perl-cross for wasm32-wasi..."
   -Ud_alarm \
   -Ud_crypt \
   -Ud_spawn \
-  -Ud_aspawn
+  -Ud_aspawn \
+  -Dcharsize=1 \
+  -Dshortsize=2 \
+  -Dintsize=4 \
+  -Dlongsize=4 \
+  -Ddoublesize=8 \
+  -Dptrsize=4 \
+  -Dlongdblsize=16 \
+  -Dlonglongsize=8 \
+  -Dsizesize=4 \
+  -Dfpossize=16 \
+  -Dlseeksize=8 \
+  -Duidsize=4 \
+  -Dgidsize=4 \
+  -Dtimesize=4
 
 ###############################################################################
 # Build
