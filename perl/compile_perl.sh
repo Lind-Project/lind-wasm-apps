@@ -210,15 +210,22 @@ sh makedepend.SH
 sh makedepend_file.SH
 sh Makefile.SH
 
-# Restore native-generated headers AFTER Makefile generation so they're
-# newer than any Makefile dependency and make won't try to rebuild them.
-echo "[perl] [wasm] restoring native-generated headers..."
+# Prevent make from rebuilding generate_uudmap with the wasm compiler.
+# The dependency chain is: generate_uudmap.o → generate_uudmap → bitcount.h
+# We need ALL three to exist with headers newest so make skips the entire chain.
+echo "[perl] [wasm] placing native generate_uudmap and generated headers..."
+cp "$NATIVE_BUILD_DIR/generate_uudmap" ./generate_uudmap
+chmod +x ./generate_uudmap
+# Create a dummy .o so make doesn't recompile it (which would trigger relink)
+touch generate_uudmap.o
 for f in bitcount.h mg_data.h uudmap.h; do
   if [[ -f "$NATIVE_BUILD_DIR/$f" ]]; then
     cp "$NATIVE_BUILD_DIR/$f" .
   fi
 done
-# Touch them to be newer than everything so make skips generate_uudmap
+# Ensure timestamps: .o oldest, then binary, then headers newest
+touch -t 202001010000 generate_uudmap.o
+touch -t 202001010001 generate_uudmap
 touch bitcount.h mg_data.h uudmap.h
 
 # --- Build perl for WASM ---------------------------------------------------
