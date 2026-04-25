@@ -129,22 +129,6 @@ pushd "$PERL_ROOT" >/dev/null
 echo "[perl] [wasm] cleaning previous build..."
 make distclean >/dev/null 2>&1 || true
 
-# Restore generated headers from native build so generate_uudmap doesn't
-# need to run during the wasm build
-echo "[perl] [wasm] restoring native-generated headers..."
-for f in bitcount.h mg_data.h uudmap.h; do
-  if [[ -f "$NATIVE_BUILD_DIR/$f" ]]; then
-    cp "$NATIVE_BUILD_DIR/$f" .
-  fi
-done
-# Create a dummy generate_uudmap so the Makefile rule is satisfied
-# without trying to compile/run it for wasm
-touch generate_uudmap
-chmod +x generate_uudmap
-# Touch headers to be newer than the dummy so make skips the rule
-sleep 1
-touch bitcount.h mg_data.h uudmap.h
-
 # --- Generate config.sh for wasm32-wasi ------------------------------------
 
 # Perl's Configure is interactive and tries to run test programs, which
@@ -206,8 +190,8 @@ sed -i \
   -e "s|^d_socket=.*|d_socket='define'|" \
   -e "s|^d_select=.*|d_select='define'|" \
   -e "s|^d_poll=.*|d_poll='define'|" \
-  -e "s|^exe_ext=.*|exe_ext='.wasm'|" \
-  -e "s|^_exe=.*|_exe='.wasm'|" \
+  -e "s|^exe_ext=.*|exe_ext=''|" \
+  -e "s|^_exe=.*|_exe=''|" \
   -e "s|^libs=.*|libs='-lpthread -lm'|" \
   -e "s|^perllibs=.*|perllibs='-lpthread -lm'|" \
   -e "s|^d_crypt=.*|d_crypt='undef'|" \
@@ -225,6 +209,17 @@ sh cflags.SH
 sh makedepend.SH
 sh makedepend_file.SH
 sh Makefile.SH
+
+# Restore native-generated headers AFTER Makefile generation so they're
+# newer than any Makefile dependency and make won't try to rebuild them.
+echo "[perl] [wasm] restoring native-generated headers..."
+for f in bitcount.h mg_data.h uudmap.h; do
+  if [[ -f "$NATIVE_BUILD_DIR/$f" ]]; then
+    cp "$NATIVE_BUILD_DIR/$f" .
+  fi
+done
+# Touch them to be newer than everything so make skips generate_uudmap
+touch bitcount.h mg_data.h uudmap.h
 
 # --- Build perl for WASM ---------------------------------------------------
 
