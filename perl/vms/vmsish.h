@@ -48,6 +48,10 @@
 #include <file.h>  /* it's not <sys/file.h>, so don't use I_SYS_FILE */
 #include <unistd.h>
 
+#ifdef NO_PERL_TYPEDEFS /* a2p; we don't want Perl's special routines */
+#  define DONT_MASK_RTL_CALLS
+#endif
+
 #include <namdef.h>
 
 /* Set the maximum filespec size here as it is larger for EFS file
@@ -75,6 +79,8 @@
 #define HAS_GETENV_SV
 #define HAS_GETENV_LEN
 
+
+#ifndef PERL_FOR_X2P
 
 #ifndef DONT_MASK_RTL_CALLS
 #  ifdef getenv
@@ -210,6 +216,7 @@
  */
 #ifndef DONT_MASK_RTL_CALLS
 #  define tmpfile Perl_my_tmpfile
+#endif
 #endif
 
 
@@ -627,6 +634,7 @@ struct mystat
 #define S_IDOTH (S_IWOTH | S_IXOTH)
 
 
+#ifndef PERL_FOR_X2P
 /* Prototypes for functions unique to vms.c.  Don't include replacements
  * for routines in the mainline source files excluded by #ifndef VMS;
  * their prototypes are already in proto.h.
@@ -776,6 +784,8 @@ long int lroundl(long double __x);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #ifndef VMS_DO_SOCKETS

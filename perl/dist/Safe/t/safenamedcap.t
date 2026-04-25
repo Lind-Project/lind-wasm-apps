@@ -1,10 +1,20 @@
+BEGIN {
+    if ($] < 5.010) {
+	print "1..0\n";
+	exit 0;
+    }
+    require Config;
+    import Config;
+    if ($Config{'extensions'} !~ /\bOpcode\b/) {
+	print "1..0\n";
+	exit 0;
+    }
+}
+
 use strict;
-use Config;
-use Test::More
-    $] >= 5.010 && $Config{'extensions'} =~ /\bOpcode\b/
-        ? (tests => 1)
-        : (skip_all => "pre-5.10 perl or no Opcode extension");
+use Test::More;
 use Safe;
+plan(tests => 1);
 
 BEGIN { Safe->new }
 "foo" =~ /(?<foo>fo*)/;

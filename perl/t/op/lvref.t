@@ -5,7 +5,7 @@ BEGIN {
     set_up_inc("../lib");
 }
 
-plan 203;
+plan 201;
 
 eval '\$x = \$y';
 like $@, qr/^Experimental aliasing via reference not enabled/,
@@ -223,17 +223,6 @@ package ArrayTest {
     is \@i, \@ThatArray, '(\local @a)';
   }
   is \@i, $old, '(\local @a) unwound';
-}
-
-# scalar assignment in scalar context
-# GH #22710
-
-{
-    my @a;
-    my $ra = ["a", "b"];
-    my $x = (\@a = $ra);
-    is \@a, $ra, 'scalar cxt same array';
-    is $x,  $ra, 'scalar cxt return value same array';
 }
 
 # Test list assignments in both lval and rval list context

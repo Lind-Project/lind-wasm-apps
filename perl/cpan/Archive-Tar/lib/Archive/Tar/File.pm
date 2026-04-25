@@ -11,7 +11,7 @@ use Archive::Tar::Constant;
 
 use vars qw[@ISA $VERSION];
 #@ISA        = qw[Archive::Tar];
-$VERSION    = '3.04';
+$VERSION    = '3.02_001';
 
 ### set value to 1 to oct() it during the unpack ###
 
@@ -259,7 +259,7 @@ sub _new_from_file {
         unless ($type == DIR ) {
             my $fh = IO::File->new;
 
-            unless( $fh->open($path, 'r') ) {
+            unless( $fh->open($path) ) {
                 ### dangling symlinks are fine, stop reading but continue
                 ### creating the object
                 last READ if $type == SYMLINK;

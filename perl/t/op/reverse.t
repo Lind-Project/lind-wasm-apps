@@ -6,9 +6,7 @@ BEGIN {
     set_up_inc('../lib');
 }
 
-plan tests => 26;
-
-is(reverse("a"), "a", 'single char reverse');
+plan tests => 25;
 
 is(reverse("abc"), "cba", 'simple reverse');
 

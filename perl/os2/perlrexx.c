@@ -135,7 +135,7 @@ ULONG PERL (PCSZ name, LONG rargc, const RXSTRING *rargv,
         ret = 1;
     else {
         ret = 0;
-        strcpy(retstr->strptr, "ok");
+        sprintf(retstr->strptr, "%s", "ok");
         retstr->strlength = strlen (retstr->strptr);
     }
     PERL_SYS_TERM1(0);
@@ -162,7 +162,7 @@ ULONG PERLTERM (PCSZ name, LONG rargc, const RXSTRING *rargv,
     perl_free(my_perl);
     my_perl = 0;
 
-    strcpy(retstr->strptr, "ok");
+    sprintf(retstr->strptr, "%s", "ok");
     retstr->strlength = strlen (retstr->strptr);
     return 0;
 }
@@ -176,7 +176,7 @@ ULONG PERLINIT (PCSZ name, LONG rargc, const RXSTRING *rargv,
     if (!init_perl(1))
         return 1;
 
-    strcpy(retstr->strptr, "ok");
+    sprintf(retstr->strptr, "%s", "ok");
     retstr->strlength = strlen (retstr->strptr);
     return 0;
 }

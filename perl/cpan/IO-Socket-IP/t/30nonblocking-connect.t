@@ -3,7 +3,7 @@
 use v5.14;
 use warnings;
 
-use Test2::V0;
+use Test::More;
 
 use IO::Socket::IP;
 
@@ -55,9 +55,9 @@ ok( !$!, 'Repeated ->connect eventually succeeds' );
 is( $socket->sockdomain, AF_INET,     '$socket->sockdomain' );
 is( $socket->socktype,   SOCK_STREAM, '$socket->socktype' );
 
-is( [ unpack_sockaddr_in $socket->peername ],
-    [ unpack_sockaddr_in $testserver->sockname ],
-    '$socket->peername' );
+is_deeply( [ unpack_sockaddr_in $socket->peername ],
+           [ unpack_sockaddr_in $testserver->sockname ],
+           '$socket->peername' );
 
 is( $socket->peerhost, $INADDR_LOOPBACK_HOST, '$socket->peerhost' );
 is( $socket->peerport, $testserver->sockport, '$socket->peerport' );

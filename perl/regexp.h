@@ -113,23 +113,21 @@ struct reg_code_block {
 
 struct reg_code_blocks {
     int refcnt; /* we may be pointed to from a regex and from the savestack */
-    int  count; /* how many code block slots currently in use */
-    int  size;  /* how many slots allocated in code_block[]  */
+    int  count;    /* how many code blocks */
     struct reg_code_block *cb; /* array of reg_code_block's */
 };
 
 
 /*
-=for apidoc AyT||regexp
-The regexp/REGEXP struct, see L<perlreapi> for further documentation
-on the individual fields. The struct is ordered so that the most
-commonly used fields are placed at the start.
+= for apidoc AyT||regexp
+  The regexp/REGEXP struct, see L<perlreapi> for further documentation
+  on the individual fields. The struct is ordered so that the most
+  commonly used fields are placed at the start.
 
-Any patch that adds items to this struct will need to include
-changes to F<sv.c> (C<Perl_re_dup()>) and F<regcomp.c>
-(C<pregfree()>). This involves freeing or cloning items in the
-regexp's data array based on the data item's type.
-=cut
+  Any patch that adds items to this struct will need to include
+  changes to F<sv.c> (C<Perl_re_dup()>) and F<regcomp.c>
+  (C<pregfree()>). This involves freeing or cloning items in the
+  regexp's data array based on the data item's type.
 */
 
 /* NOTE: There is a copy of this struct in the documentation in perlreapi.pod
@@ -157,7 +155,7 @@ typedef struct regexp {
        the distinction between physical and logical capture buffers */
     U32 nparens;                    /* physical number of capture buffers */
     U32 logical_nparens;            /* logical_number of capture buffers */
-    I32 *logical_to_parno;          /* map logical parno to first physical */
+    I32 *logical_to_parno;          /* map logical parno to first physcial */
     I32 *parno_to_logical;          /* map every physical parno to logical */
     I32 *parno_to_logical_next;     /* map every physical parno to the next
                                        physical with the same logical id */
@@ -680,8 +678,6 @@ and check for NULL.
 
 /* Stuff that needs to be included in the pluggable extension goes below here */
 
-#include "regexp_constants.h"
-
 #ifdef PERL_ANY_COW
 #  define RXp_MATCH_COPY_FREE(prog)                                 \
     STMT_START {                                                    \
@@ -776,10 +772,7 @@ struct regmatch_slab;
  * regmatch_state stack at the start of execution */
 
 typedef struct {
-    REGEXP *rx;
-    PMOP   *old_op;           /* saved value of PL_op and ... */
-    REGEXP *old_op_val;       /* ... saved value of PM_GETRE(PL_op) if any */
-    REGEXP *old_regcurpm_val; /* saved value of PM_GETRE(PL_reg_curpm) */
+    regexp *rex;
     PMOP    *curpm;     /* saved PL_curpm */
 #ifdef PERL_ANY_COW
     SV      *saved_copy; /* saved saved_copy field from rex */

@@ -1,7 +1,7 @@
 BEGIN {
     chdir 't' if -d 't/lib';
     @INC = '../lib' if -d 'lib';
-    require Config; Config->import;
+    require Config; import Config;
     if (-d 'lib' and $Config{'extensions'} !~ /\bOS2(::|\/)PrfDB\b/) {
 	print "1..0\n";
 	exit 0;

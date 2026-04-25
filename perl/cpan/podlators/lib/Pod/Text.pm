@@ -12,15 +12,20 @@
 # Modules and declarations
 ##############################################################################
 
-package Pod::Text v6.0.2;
+package Pod::Text;
 
-use 5.012;
-use parent qw(Pod::Simple);
+use 5.010;
+use strict;
 use warnings;
 
 use Carp qw(carp croak);
 use Encode qw(encode);
-use Exporter qw(import);
+use Exporter ();
+use Pod::Simple ();
+
+our @ISA = qw(Pod::Simple Exporter);
+our $VERSION = '5.01_02';
+$VERSION =~ tr/_//d;
 
 # We have to export pod2text for backward compatibility.
 our @EXPORT = qw(pod2text);
@@ -1203,18 +1208,12 @@ Pod::Text 4.09, included in Perl 5.25.7, fixed a serious bug on EBCDIC
 systems, present in all versions back to 3.00, that would cause opening
 brackets to disappear.
 
-Pod::Text 5.00 and later, included in Perl 5.37.7, default, on non-EBCDIC
-systems, to UTF-8 encoding if it sees a non-ASCII character in the input and
-the input encoding is not specified.  They also commit to an encoding with the
-first non-ASCII character and does not change the output encoding if the input
-encoding changes.  The L<Encode> module is now used for all output encoding
-rather than PerlIO layers, which fixes earlier problems with output to
-scalars.
-
-=head1 CAVEATS
-
-Line wrapping is done only at ASCII spaces and tabs, rather than using a
-correct Unicode-aware line wrapping algorithm.
+Pod::Text 5.00 now defaults, on non-EBCDIC systems, to UTF-8 encoding if it
+sees a non-ASCII character in the input and the input encoding is not
+specified.  It also commits to an encoding with the first non-ASCII character
+and does not change the output encoding if the input encoding changes.  The
+L<Encode> module is now used for all output encoding rather than PerlIO
+layers, which fixes earlier problems with output to scalars.
 
 =head1 AUTHOR
 

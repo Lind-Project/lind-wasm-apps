@@ -1,7 +1,13 @@
 #!perl -w
 use strict;
 
-use Config;
+BEGIN { warn "Running ".__FILE__."\n" };
+BEGIN 
+ {
+  require "Config.pm";
+  die "Config.pm:$@" if $@;
+  Config->import;
+ }
 use File::Compare qw(compare);
 use File::Copy qw(copy);
 use File::Basename qw(fileparse);
@@ -18,6 +24,8 @@ while (@ARGV && $ARGV[0] =~ /^([\w_]+)=(.*)$/)
 $opt{CONFIG_H} ||= 'config.h';
 $opt{CORE_DIR} ||= '../lib/CORE';
 $opt{CORE_CONFIG_H} ||= $opt{CORE_DIR} . '/config.h';
+
+warn "Writing $opt{CONFIG_H}\n";
 
 open(SH, "<", $name) || die "Cannot open $name:$!";
 while (<SH>)

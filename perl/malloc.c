@@ -25,7 +25,9 @@
   returns it to the state as of Perl 5.000.
 
   Note that some of the settings below may be ignored in the code based
-  on values of other macros.
+  on values of other macros.  The PERL_CORE symbol is only defined when
+  perl itself is being compiled (so malloc can make some assumptions
+  about perl's facilities being available to it).
 
   Each config option has a short description, followed by its name,
   default value, and a comment about the default (if applicable).  Some
@@ -236,6 +238,11 @@
 #include "EXTERN.h"
 #define PERL_IN_MALLOC_C
 #include "perl.h"
+#if defined(MULTIPLICITY)
+#    define croak2	Perl_croak_nocontext
+#else
+#    define croak2	croak
+#endif
 #ifdef USE_ITHREADS
 #     define PERL_MAYBE_ALIVE	PL_thr_key
 #else
@@ -262,9 +269,9 @@
 #  define MALLOC_UNLOCK		MUTEX_UNLOCK(&PL_malloc_mutex)
 #endif 
 
-#ifndef fatalcroak
-#  define fatalcroak(mess)      STMT_START { PERL_UNUSED_RESULT(write(2, (mess), strlen(mess))); exit(2); } STMT_END
-#endif
+#  ifndef fatalcroak				/* make depend */
+#    define fatalcroak(mess)	(write(2, (mess), strlen(mess)), exit(2))
+#  endif 
 
 #ifdef DEBUGGING
 #  undef DEBUG_m
@@ -924,7 +931,7 @@ static char *emergency_buffer_prepared;
 #  endif
 
 #  ifndef emergency_sbrk_croak
-#    define emergency_sbrk_croak  Perl_croak_nocontext
+#    define emergency_sbrk_croak	croak2
 #  endif
 
 static char *
@@ -1244,7 +1251,7 @@ Perl_malloc(size_t nbytes)
         BARK_64K_LIMIT("Allocation",nbytes,nbytes);
 #ifdef DEBUGGING
         if ((long)nbytes < 0)
-            Perl_croak_nocontext("panic: malloc");
+            croak("%s", "panic: malloc");
 #endif
 
         bucket = adjust_size_and_find_bucket(&nbytes);
@@ -1697,7 +1704,7 @@ morecore(int bucket)
 #endif
         if (bucket == sizeof(MEM_SIZE)*8*BUCKETS_PER_POW2) {
             MALLOC_UNLOCK;
-            Perl_croak_nocontext("Out of memory during ridiculously large request");
+            croak2("%s", "Out of memory during ridiculously large request");
         }
         if (bucket > max_bucket)
             max_bucket = bucket;
@@ -1810,7 +1817,7 @@ Perl_mfree(Malloc_t where)
                 return;
 #ifdef DEBUGGING
         if (PTR2UV(cp) & (MEM_ALIGNBYTES - 1))
-            Perl_croak_nocontext("wrong alignment in free()");
+            croak("%s", "wrong alignment in free()");
 #endif
         ovp = (union overhead *)((caddr_t)cp 
                                 - sizeof (union overhead) * CHUNK_SHIFT);
@@ -1832,19 +1839,22 @@ Perl_mfree(Malloc_t where)
                 }
                 if (!bad_free_warn)
                     return;
+#ifdef RCHECK
                 {
                     dTHX;
-                    if (!PERL_IS_ALIVE || !PL_curcop) {
-#ifdef RCHECK
-                        if (ovp->ov_rmagic == RMAGIC - 1) {
-                            ck_warner_d(packWARN(WARN_MALLOC), "Duplicate free() ignored");
-                            return;
-                        }
-#endif
-                        ck_warner_d(packWARN(WARN_MALLOC), "Bad free() ignored");
-                    }
+                    if (!PERL_IS_ALIVE || !PL_curcop)
+                        Perl_ck_warner_d(aTHX_ packWARN(WARN_MALLOC), "%s free() ignored (RMAGIC, PERL_CORE)",
+                                         ovp->ov_rmagic == RMAGIC - 1 ?
+                                         "Duplicate" : "Bad");
                 }
-                return;  /* sanity */
+#else
+                {
+                    dTHX;
+                    if (!PERL_IS_ALIVE || !PL_curcop)
+                        Perl_ck_warner_d(aTHX_ packWARN(WARN_MALLOC), "%s", "Bad free() ignored (PERL_CORE)");
+                }
+#endif
+                return;				/* sanity */
             }
 #ifdef RCHECK
         ASSERT(ovp->ov_rmagic == RMAGIC, "chunk's head overwrite");
@@ -1908,7 +1918,7 @@ Perl_realloc(void *mp, size_t nbytes)
         MEM_SIZE size = nbytes;
 
         if ((long)nbytes < 0)
-            Perl_croak_nocontext("panic: realloc");
+            croak("%s", "panic: realloc");
 #endif
 
         BARK_64K_LIMIT("Reallocation",nbytes,size);
@@ -1934,19 +1944,24 @@ Perl_realloc(void *mp, size_t nbytes)
                 }
                 if (!bad_free_warn)
                     return NULL;
+#ifdef RCHECK
                 {
                     dTHX;
-                    if (!PERL_IS_ALIVE || !PL_curcop) {
-#ifdef RCHECK
-                        if (ovp->ov_rmagic == RMAGIC - 1) {
-                            ck_warner_d(packWARN(WARN_MALLOC), "realloc() of freed memory ignored");
-                            return NULL;
-                        }
-#endif
-                        ck_warner_d(packWARN(WARN_MALLOC), "Bad realloc() ignored");
-                    }
+                    if (!PERL_IS_ALIVE || !PL_curcop)
+                        Perl_ck_warner_d(aTHX_ packWARN(WARN_MALLOC), "%srealloc() %signored",
+                                         (ovp->ov_rmagic == RMAGIC - 1 ? "" : "Bad "),
+                                         ovp->ov_rmagic == RMAGIC - 1
+                                         ? "of freed memory " : "");
                 }
-                return NULL;  /* sanity */
+#else
+                {
+                    dTHX;
+                    if (!PERL_IS_ALIVE || !PL_curcop)
+                        Perl_ck_warner_d(aTHX_ packWARN(WARN_MALLOC), "%s",
+                                         "Bad realloc() ignored");
+                }
+#endif
+                return NULL;			/* sanity */
             }
 
         onb = BUCKET_SIZE_REAL(bucket);

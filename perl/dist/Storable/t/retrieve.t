@@ -2,16 +2,24 @@
 #
 #  Copyright (c) 1995-2000, Raphael Manfredi
 #  Copyright (c) 2017, cPanel Inc
-#
+#  
 #  You may redistribute only under the same terms as Perl 5, as specified
 #  in the README file that comes with the distribution.
 #
 
 sub BEGIN {
-    unshift @INC, 't/lib';
+    unshift @INC, 'dist/Storable/t' if $ENV{PERL_CORE} and -d 'dist/Storable/t';
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
+    require Config; import Config;
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+        print "1..0 # Skip: Storable was not built\n";
+        exit 0;
+    }
+    require 'st-dump.pl';
 }
 
-use STDump;
+
 use Storable qw(store retrieve nstore);
 use Test::More tests => 20;
 
@@ -21,7 +29,7 @@ $c = bless {}, CLASS;
 $c->{attribute} = 'attrval';
 %a = ('key', 'value', 1, 0, $a, $b, 'cvar', \$c);
 @a = ('first', '', undef, 3, -4, -3.14159, 456, 4.5,
-    $b, \$a, $a, $c, \$c, \%a);
+	$b, \$a, $a, $c, \$c, \%a);
 
 isnt(store(\@a, "store$$"), undef);
 is(Storable::last_op_in_netorder(), '');
@@ -37,9 +45,9 @@ $nroot = retrieve('nstore');
 isnt($root, undef);
 is(Storable::last_op_in_netorder(), 1);
 
-$d1 = stdump($root);
+$d1 = &dump($root);
 isnt($d1, undef);
-$d2 = stdump($nroot);
+$d2 = &dump($nroot);
 isnt($d2, undef);
 
 is($d1, $d2);
@@ -73,7 +81,7 @@ SKIP:
     # the test allocates 2GB, but other memory is allocated too, so we want
     # at least 3
     $ENV{PERL_TEST_MEMORY} && $ENV{PERL_TEST_MEMORY} >= 3
-        or skip "over 2GB memory needed for this test", 2;
+      or skip "over 2GB memory needed for this test", 2;
     # len<I32, len>127: stack overflow
     my $retrieve_hook = "\x04\x0a\x08\x31\x32\x33\x34\x35\x36\x37\x38\x04\x08\x08\x08\x13\x04\x49\xfe\xf4\x7f\x72\x6e\x61\x6c\x73\x02\x00\x00\x00\x00";
     my $x = eval { Storable::mretrieve($retrieve_hook); };

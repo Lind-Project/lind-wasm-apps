@@ -1,16 +1,22 @@
 #!perl -w
 
-use strict;
-use warnings;
-
-use Config;
 BEGIN {
-    if ($Config{byteorder} ne "1234") {
-        print "1..0 # Skip: Test only works for 32 bit little-ending machines\n";
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
+    require Config; import Config;
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+        print "1..0 # Skip: Storable was not built\n";
         exit 0;
+    }
+
+    use Config;
+    if ($Config{byteorder} ne "1234") {
+	print "1..0 # Skip: Test only works for 32 bit little-ending machines\n";
+	exit 0;
     }
 }
 
+use strict;
 use Storable qw(retrieve);
 use Test::More;
 

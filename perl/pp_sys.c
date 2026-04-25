@@ -232,7 +232,7 @@ S_emulate_eaccess(pTHX_ const char* path, Mode_t mode)
     int res;
 
 #if !defined(HAS_SETREUID) && !defined(HAS_SETRESUID)
-    croak("switching effective uid is not implemented");
+    Perl_croak(aTHX_ "switching effective uid is not implemented");
 #else
 #  ifdef HAS_SETREUID
     if (setreuid(euid, ruid))
@@ -240,11 +240,11 @@ S_emulate_eaccess(pTHX_ const char* path, Mode_t mode)
     if (setresuid(euid, ruid, (Uid_t)-1))
 #  endif
         /* diag_listed_as: entering effective %s failed */
-        croak("entering effective uid failed");
+        Perl_croak(aTHX_ "entering effective uid failed");
 #endif
 
 #if !defined(HAS_SETREGID) && !defined(HAS_SETRESGID)
-    croak("switching effective gid is not implemented");
+    Perl_croak(aTHX_ "switching effective gid is not implemented");
 #else
 #  ifdef HAS_SETREGID
     if (setregid(egid, rgid))
@@ -252,7 +252,7 @@ S_emulate_eaccess(pTHX_ const char* path, Mode_t mode)
     if (setresgid(egid, rgid, (Gid_t)-1))
 #  endif
         /* diag_listed_as: entering effective %s failed */
-        croak("entering effective gid failed");
+        Perl_croak(aTHX_ "entering effective gid failed");
 #endif
 
     res = access(path, mode);
@@ -263,7 +263,7 @@ S_emulate_eaccess(pTHX_ const char* path, Mode_t mode)
     if (setresuid(ruid, euid, (Uid_t)-1))
 #endif
         /* diag_listed_as: leaving effective %s failed */
-        croak("leaving effective uid failed");
+        Perl_croak(aTHX_ "leaving effective uid failed");
 
 #ifdef HAS_SETREGID
     if (setregid(rgid, egid))
@@ -271,7 +271,7 @@ S_emulate_eaccess(pTHX_ const char* path, Mode_t mode)
     if (setresgid(rgid, egid, (Gid_t)-1))
 #endif
         /* diag_listed_as: leaving effective %s failed */
-        croak("leaving effective gid failed");
+        Perl_croak(aTHX_ "leaving effective gid failed");
 
     return res;
 }
@@ -563,12 +563,14 @@ PP_wrapped(pp_warn, 0, 1)
       SvGETMAGIC(errsv);
       if (SvROK(errsv)) {
         if (SvGMAGICAL(errsv)) {
-            exsv = sv_mortalcopy_flags(errsv, SV_DO_COW_SVSETSV);
+            exsv = sv_newmortal();
+            sv_setsv_nomg(exsv, errsv);
         }
         else exsv = errsv;
       }
       else if (SvPOKp(errsv) ? SvCUR(errsv) : SvNIOKp(errsv)) {
-        exsv = sv_mortalcopy_flags(errsv, SV_DO_COW_SVSETSV);
+        exsv = sv_newmortal();
+        sv_setsv_nomg(exsv, errsv);
         sv_catpvs(exsv, "\t...caught");
       }
       else {
@@ -576,7 +578,7 @@ PP_wrapped(pp_warn, 0, 1)
       }
     }
     if (SvROK(exsv) && !PL_warnhook)
-         warn("%" SVf, SVfARG(exsv));
+         Perl_warn(aTHX_ "%" SVf, SVfARG(exsv));
     else warn_sv(exsv);
     RETSETYES;
 }
@@ -827,7 +829,7 @@ PP_wrapped(pp_open, 0, 1)
         IoFLAGS(GvIOp(gv)) &= ~IOf_UNTAINT;
 
         if (IoDIRP(io))
-            croak("Cannot open %" HEKf " as a filehandle: it is already open as a dirhandle",
+            Perl_croak(aTHX_ "Cannot open %" HEKf " as a filehandle: it is already open as a dirhandle",
                              HEKfARG(GvENAME_HEK(gv)));
 
         mg = SvTIED_mg((const SV *)io, PERL_MAGIC_tiedscalar);
@@ -1100,7 +1102,7 @@ PP_wrapped(pp_tie, 0, 1)
             methname = "TIEARRAY";
             if (!AvREAL(varsv)) {
                 if (!AvREIFY(varsv))
-                    croak("Cannot tie unreifiable array");
+                    Perl_croak(aTHX_ "Cannot tie unreifiable array");
                 av_clear((AV *)varsv);
                 AvREIFY_off(varsv);
                 AvREAL_on(varsv);
@@ -1199,7 +1201,7 @@ PP_wrapped(pp_tie, 0, 1)
         if (varsv == SvRV(sv) &&
             (SvTYPE(varsv) == SVt_PVAV ||
              SvTYPE(varsv) == SVt_PVHV))
-            croak(
+            Perl_croak(aTHX_
                        "Self-ties of arrays and hashes are not supported");
         sv_magic(varsv, (SvRV(sv) == varsv ? NULL : sv), how, NULL, 0);
     }
@@ -1242,9 +1244,9 @@ PP_wrapped(pp_untie, 1, 0)
                SPAGAIN;
             }
             else if (mg && SvREFCNT(obj) > 1) {
-                ck_warner(packWARN(WARN_UNTIE),
-                          "untie attempted while %" UVuf " inner references still exist",
-                          (UV)SvREFCNT(obj) - 1 ) ;
+                Perl_ck_warner(aTHX_ packWARN(WARN_UNTIE),
+                               "untie attempted while %" UVuf " inner references still exist",
+                               (UV)SvREFCNT(obj) - 1 ) ;
             }
         }
     }
@@ -1382,7 +1384,7 @@ PP_wrapped(pp_sselect, 4, 0)
             continue;
         if (SvREADONLY(sv)) {
             if (!(SvPOK(sv) && SvCUR(sv) == 0))
-                croak_no_modify();
+                Perl_croak_no_modify();
         }
         else if (SvIsCOW(sv)) sv_force_normal_flags(sv, 0);
         if (SvPOK(sv)) {
@@ -1390,8 +1392,8 @@ PP_wrapped(pp_sselect, 4, 0)
         }
         else {
             if (!SvPOKp(sv))
-                ck_warner(packWARN(WARN_MISC),
-                          "Non-string passed as bitmask");
+                Perl_ck_warner(aTHX_ packWARN(WARN_MISC),
+                                    "Non-string passed as bitmask");
             if (SvGAMAGIC(sv)) {
                 svs[i] = sv_newmortal();
                 sv_copypv_nomg(svs[i], sv);
@@ -1810,7 +1812,7 @@ PP(pp_leavewrite)
     }
     else {
         if ((IoLINES_LEFT(io) -= FmLINES(PL_formtarget)) < 0) {
-            ck_warner(packWARN(WARN_IO), "page overflow");
+            Perl_ck_warner(aTHX_ packWARN(WARN_IO), "page overflow");
         }
         if (!do_print(PL_formtarget, fp))
             rpp_push_IMM(&PL_sv_no);
@@ -1975,7 +1977,7 @@ PP_wrapped(pp_sysread, 0, 1)
 
     if ((fp_utf8 = PerlIO_isutf8(IoIFP(io))) && !IN_BYTES) {
         if (PL_op->op_type == OP_SYSREAD || PL_op->op_type == OP_RECV) {
-            croak(
+            Perl_croak(aTHX_
                        "%s() isn't allowed on :utf8 handles",
                        OP_DESC(PL_op));
         }
@@ -2189,6 +2191,7 @@ PP_wrapped(pp_syswrite, 0, 1)
     STRLEN blen;
     const int op_type = PL_op->op_type;
     bool doing_utf8;
+    U8 *tmpbuf = NULL;
     GV *const gv = MUTABLE_GV(*++MARK);
     IO *const io = GvIO(gv);
     int fd;
@@ -2234,16 +2237,21 @@ PP_wrapped(pp_syswrite, 0, 1)
     doing_utf8 = DO_UTF8(bufsv);
 
     if (PerlIO_isutf8(IoIFP(io))) {
-        croak(
+        Perl_croak(aTHX_
                    "%s() isn't allowed on :utf8 handles",
                    OP_DESC(PL_op));
     }
     else if (doing_utf8) {
-        if (utf8_to_bytes_temp_pv((const U8**)&buffer, &blen)) {
-            doing_utf8 = false;
+        STRLEN tmplen = blen;
+        U8 * const result = bytes_from_utf8((const U8*) buffer, &tmplen, &doing_utf8);
+        if (!doing_utf8) {
+            tmpbuf = result;
+            buffer = (char *) tmpbuf;
+            blen = tmplen;
         }
         else {
-            croak("Wide character in %s", OP_DESC(PL_op));
+            assert((char *)result == buffer);
+            Perl_croak(aTHX_ "Wide character in %s", OP_DESC(PL_op));
         }
     }
 
@@ -2275,6 +2283,7 @@ PP_wrapped(pp_syswrite, 0, 1)
             length = (Size_t)SvIVx(*++MARK);
 #endif
             if ((SSize_t)length < 0) {
+                Safefree(tmpbuf);
                 DIE(aTHX_ "Negative length");
             }
         }
@@ -2283,10 +2292,12 @@ PP_wrapped(pp_syswrite, 0, 1)
             offset = SvIVx(*++MARK);
             if (offset < 0) {
                 if (-offset > (IV)blen) {
+                    Safefree(tmpbuf);
                     DIE(aTHX_ "Offset outside string");
                 }
                 offset += blen;
             } else if (offset > (IV)blen) {
+                Safefree(tmpbuf);
                 DIE(aTHX_ "Offset outside string");
             }
         } else
@@ -2311,6 +2322,7 @@ PP_wrapped(pp_syswrite, 0, 1)
         goto say_undef;
     SP = ORIGMARK;
 
+    Safefree(tmpbuf);
 #if Size_t_size > IVSIZE
     PUSHn(retval);
 #else
@@ -2319,6 +2331,7 @@ PP_wrapped(pp_syswrite, 0, 1)
     RETURN;
 
   say_undef:
+    Safefree(tmpbuf);
     SP = ORIGMARK;
     RETPUSHUNDEF;
 }
@@ -3065,15 +3078,15 @@ PP_wrapped(pp_stat, !(PL_op->op_flags & OPf_REF), 0)
         if (PL_op->op_type == OP_LSTAT) {
             if (gv != PL_defgv) {
             do_fstat_warning_check:
-                ck_warner(packWARN(WARN_IO),
-                          "lstat() on filehandle%s%" SVf,
-                          gv ? " " : "",
-                          SVfARG(gv
-                                 ? newSVhek_mortal(GvENAME_HEK(gv))
-                                 : &PL_sv_no));
+                Perl_ck_warner(aTHX_ packWARN(WARN_IO),
+                               "lstat() on filehandle%s%" SVf,
+                                gv ? " " : "",
+                                SVfARG(gv
+                                        ? newSVhek_mortal(GvENAME_HEK(gv))
+                                        : &PL_sv_no));
             } else if (PL_laststype != OP_LSTAT)
                 /* diag_listed_as: The stat preceding %s wasn't an lstat */
-                croak("The stat preceding lstat() wasn't an lstat");
+                Perl_croak(aTHX_ "The stat preceding lstat() wasn't an lstat");
         }
 
         if (gv == PL_defgv) {
@@ -3143,7 +3156,7 @@ PP_wrapped(pp_stat, !(PL_op->op_flags & OPf_REF), 0)
             if (ckWARN(WARN_NEWLINE) && should_warn_nl(file)) {
                 /* PL_warn_nl is constant */
                 GCC_DIAG_IGNORE_STMT(-Wformat-nonliteral);
-                warner(packWARN(WARN_NEWLINE), PL_warn_nl, "stat");
+                Perl_warner(aTHX_ packWARN(WARN_NEWLINE), PL_warn_nl, "stat");
                 GCC_DIAG_RESTORE_STMT;
             }
             max = 0;
@@ -3793,7 +3806,7 @@ PP(pp_fttext)
             if (ckWARN(WARN_NEWLINE) && should_warn_nl(file)) {
                 /* PL_warn_nl is constant */
                 GCC_DIAG_IGNORE_STMT(-Wformat-nonliteral);
-                warner(packWARN(WARN_NEWLINE), PL_warn_nl, "open");
+                Perl_warner(aTHX_ packWARN(WARN_NEWLINE), PL_warn_nl, "open");
                 GCC_DIAG_RESTORE_STMT;
             }
             FT_RETURNUNDEF;
@@ -3889,22 +3902,23 @@ PP(pp_fttext)
 
 PP_wrapped(pp_chdir, MAXARG, 0)
 {
-    dSP;
+    dSP; dTARGET;
     const char *tmps = NULL;
     GV *gv = NULL;
-    /* pp_coreargs pushes a NULL to indicate no args passed to
-     * CORE::chdir() */
-    SV * const sv = MAXARG == 1 ? POPs : NULL;
 
-    if (sv) {
+    if( MAXARG == 1 ) {
+        SV * const sv = POPs;
         if (PL_op->op_flags & OPf_SPECIAL) {
             gv = gv_fetchsv(sv, 0, SVt_PVIO);
             if (!gv) {
-                ck_warner(packWARN(WARN_UNOPENED),
-                          "chdir() on unopened filehandle %" SVf, sv);
+                if (ckWARN(WARN_UNOPENED)) {
+                    Perl_warner(aTHX_ packWARN(WARN_UNOPENED),
+                                "chdir() on unopened filehandle %" SVf, sv);
+                }
                 SETERRNO(EBADF,RMS_IFI);
+                PUSHs(&PL_sv_zero);
                 TAINT_PROPER("chdir");
-                RETPUSHNO;
+                RETURN;
             }
         }
         else if (!(gv = MAYBE_DEREF_GV(sv)))
@@ -3925,9 +3939,10 @@ PP_wrapped(pp_chdir, MAXARG, 0)
             tmps = SvPV_nolen_const(*svp);
         }
         else {
+            PUSHs(&PL_sv_zero);
             SETERRNO(EINVAL, LIB_INVARG);
             TAINT_PROPER("chdir");
-            RETPUSHNO;
+            RETURN;
         }
     }
 
@@ -3935,29 +3950,43 @@ PP_wrapped(pp_chdir, MAXARG, 0)
     if (gv) {
 #ifdef HAS_FCHDIR
         IO* const io = GvIO(gv);
-        const int fd =
-            !io        ? -1 :
-            IoDIRP(io) ? my_dirfd(IoDIRP(io)) :
-            IoIFP(io)  ? PerlIO_fileno(IoIFP(io)) :
-                         -1;
-        if (fd < 0) {
-            report_evil_fh(gv);
-            SETERRNO(EBADF,RMS_IFI);
-            RETPUSHNO;
+        if (io) {
+            if (IoDIRP(io)) {
+                PUSHi(fchdir(my_dirfd(IoDIRP(io))) >= 0);
+            } else if (IoIFP(io)) {
+                int fd = PerlIO_fileno(IoIFP(io));
+                if (fd < 0) {
+                    goto nuts;
+                }
+                PUSHi(fchdir(fd) >= 0);
+            }
+            else {
+                goto nuts;
+            }
+        } else {
+            goto nuts;
         }
-        PUSHs(boolSV(fchdir(fd) >= 0));
+
 #else
         DIE(aTHX_ PL_no_func, "fchdir");
 #endif
     }
     else 
-        PUSHs(boolSV( PerlDir_chdir(tmps) >= 0 ));
+        PUSHi( PerlDir_chdir(tmps) >= 0 );
 #ifdef VMS
     /* Clear the DEFAULT element of ENV so we'll get the new value
      * in the future. */
     hv_delete(GvHVn(PL_envgv),"DEFAULT",7,G_DISCARD);
 #endif
     RETURN;
+
+#ifdef HAS_FCHDIR
+ nuts:
+    report_evil_fh(gv);
+    SETERRNO(EBADF,RMS_IFI);
+    PUSHs(&PL_sv_zero);
+    RETURN;
+#endif
 }
 
 
@@ -4253,7 +4282,7 @@ PP_wrapped(pp_open_dir, 2, 0)
     IO * const io = GvIOn(gv);
 
     if ((IoIFP(io) || IoOFP(io)))
-        croak("Cannot open %" HEKf " as a dirhandle: it is already open as a filehandle",
+        Perl_croak(aTHX_ "Cannot open %" HEKf " as a dirhandle: it is already open as a filehandle",
                          HEKfARG(GvENAME_HEK(gv)));
     if (IoDIRP(io))
         PerlDir_close(IoDIRP(io));
@@ -4268,23 +4297,6 @@ PP_wrapped(pp_open_dir, 2, 0)
 #else
     DIE(aTHX_ PL_no_dir_func, "opendir");
 #endif
-}
-
-static void
-S_warn_not_dirhandle(pTHX_ GV *gv) {
-    IO *io = GvIOn(gv);
-
-    if (IoIFP(io)) {
-        ck_warner(packWARN(WARN_IO),
-                  "%s() attempted on handle %" HEKf
-                  " opened with open()",
-                  OP_DESC(PL_op), HEKfARG(GvENAME_HEK(gv)));
-    }
-    else {
-        ck_warner(packWARN(WARN_IO),
-                  "%s() attempted on invalid dirhandle %" HEKf,
-                  OP_DESC(PL_op), HEKfARG(GvENAME_HEK(gv)));
-    }
 }
 
 PP_wrapped(pp_readdir, 1, 0)
@@ -4304,7 +4316,9 @@ PP_wrapped(pp_readdir, 1, 0)
     IO * const io = GvIOn(gv);
 
     if (!IoDIRP(io)) {
-        warn_not_dirhandle(gv);
+        Perl_ck_warner(aTHX_ packWARN(WARN_IO),
+                       "readdir() attempted on invalid dirhandle %" HEKf,
+                            HEKfARG(GvENAME_HEK(gv)));
         goto nope;
     }
 
@@ -4352,7 +4366,9 @@ PP_wrapped(pp_telldir, 1, 0)
     IO * const io = GvIOn(gv);
 
     if (!IoDIRP(io)) {
-        warn_not_dirhandle(gv);
+        Perl_ck_warner(aTHX_ packWARN(WARN_IO),
+                       "telldir() attempted on invalid dirhandle %" HEKf,
+                            HEKfARG(GvENAME_HEK(gv)));
         goto nope;
     }
 
@@ -4376,7 +4392,9 @@ PP_wrapped(pp_seekdir, 2, 0)
     IO * const io = GvIOn(gv);
 
     if (!IoDIRP(io)) {
-        warn_not_dirhandle(gv);
+        Perl_ck_warner(aTHX_ packWARN(WARN_IO),
+                       "seekdir() attempted on invalid dirhandle %" HEKf,
+                                HEKfARG(GvENAME_HEK(gv)));
         goto nope;
     }
     (void)PerlDir_seek(IoDIRP(io), along);
@@ -4399,7 +4417,9 @@ PP_wrapped(pp_rewinddir, 1, 0)
     IO * const io = GvIOn(gv);
 
     if (!IoDIRP(io)) {
-        warn_not_dirhandle(gv);
+        Perl_ck_warner(aTHX_ packWARN(WARN_IO),
+                       "rewinddir() attempted on invalid dirhandle %" HEKf,
+                                HEKfARG(GvENAME_HEK(gv)));
         goto nope;
     }
     (void)PerlDir_rewind(IoDIRP(io));
@@ -4421,7 +4441,9 @@ PP_wrapped(pp_closedir, 1, 0)
     IO * const io = GvIOn(gv);
 
     if (!IoDIRP(io)) {
-        warn_not_dirhandle(gv);
+        Perl_ck_warner(aTHX_ packWARN(WARN_IO),
+                       "closedir() attempted on invalid dirhandle %" HEKf,
+                                HEKfARG(GvENAME_HEK(gv)));
         goto nope;
     }
 #ifdef VOID_CLOSEDIR
@@ -4610,7 +4632,8 @@ PP_wrapped(pp_system, 0, 1)
          * as numeric, not just retain the string value.
          */
         if (SvNIOK(origsv) || SvNIOKp(origsv)) {
-            copysv = newSV_type_mortal(SVt_PVNV);
+            copysv = newSV_type(SVt_PVNV);
+            sv_2mortal(copysv);
             if (SvPOK(origsv) || SvPOKp(origsv)) {
                 pv = SvPV_nomg(origsv, len);
                 sv_setpvn_fresh(copysv, pv, len);
@@ -5008,8 +5031,8 @@ PP_wrapped(pp_gmtime, MAXARG, 0)
         when = (Time64_T)input;
         if (UNLIKELY(pl_isnan || when != input)) {
             /* diag_listed_as: gmtime(%f) too large */
-            ck_warner(packWARN(WARN_OVERFLOW),
-                      "%s(%.0" NVff ") too large", opname, input);
+            Perl_ck_warner(aTHX_ packWARN(WARN_OVERFLOW),
+                           "%s(%.0" NVff ") too large", opname, input);
             if (pl_isnan) {
                 err = NULL;
                 goto failed;
@@ -5019,14 +5042,14 @@ PP_wrapped(pp_gmtime, MAXARG, 0)
 
     if ( TIME_LOWER_BOUND > when ) {
         /* diag_listed_as: gmtime(%f) too small */
-        ck_warner(packWARN(WARN_OVERFLOW),
-                  "%s(%.0" NVff ") too small", opname, when);
+        Perl_ck_warner(aTHX_ packWARN(WARN_OVERFLOW),
+                       "%s(%.0" NVff ") too small", opname, when);
         err = NULL;
     }
     else if( when > TIME_UPPER_BOUND ) {
         /* diag_listed_as: gmtime(%f) too small */
-        ck_warner(packWARN(WARN_OVERFLOW),
-                  "%s(%.0" NVff ") too large", opname, when);
+        Perl_ck_warner(aTHX_ packWARN(WARN_OVERFLOW),
+                       "%s(%.0" NVff ") too large", opname, when);
         err = NULL;
     }
     else {
@@ -5040,8 +5063,8 @@ PP_wrapped(pp_gmtime, MAXARG, 0)
         /* diag_listed_as: gmtime(%f) failed */
         /* XXX %lld broken for quads */
       failed:
-        ck_warner(packWARN(WARN_OVERFLOW),
-                  "%s(%.0" NVff ") failed", opname, when);
+        Perl_ck_warner(aTHX_ packWARN(WARN_OVERFLOW),
+                       "%s(%.0" NVff ") failed", opname, when);
     }
 
     if (GIMME_V != G_LIST) {	/* scalar context */
@@ -5096,8 +5119,8 @@ PP_wrapped(pp_alarm, 1, 0)
          * setitimer() and often being implemented in terms of
          * setitimer(), can fail. */
         /* diag_listed_as: %s() with negative argument */
-        ck_warner_d(packWARN(WARN_MISC),
-                    "alarm() with negative argument");
+        Perl_ck_warner_d(aTHX_ packWARN(WARN_MISC),
+                         "alarm() with negative argument");
         SETERRNO(EINVAL, LIB_INVARG);
         RETPUSHUNDEF;
     }
@@ -5126,8 +5149,8 @@ PP_wrapped(pp_sleep, MAXARG, 0)
         const I32 duration = POPi;
         if (duration < 0) {
           /* diag_listed_as: %s() with negative argument */
-          ck_warner_d(packWARN(WARN_MISC),
-                      "sleep() with negative argument");
+          Perl_ck_warner_d(aTHX_ packWARN(WARN_MISC),
+                           "sleep() with negative argument");
           SETERRNO(EINVAL, LIB_INVARG);
           XPUSHs(&PL_sv_zero);
           RETURN;

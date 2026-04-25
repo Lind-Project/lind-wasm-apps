@@ -9,7 +9,7 @@ use Fcntl 'O_CREAT', 'O_RDWR', 'LOCK_EX', 'LOCK_SH', 'O_WRONLY', 'O_RDONLY';
 use constant O_ACCMODE => O_RDONLY | O_RDWR | O_WRONLY;
 
 
-our $VERSION = "1.10";
+our $VERSION = "1.09";
 my $DEFAULT_MEMORY_SIZE = 1<<21;    # 2 megabytes
 my $DEFAULT_AUTODEFER_THRESHHOLD = 3; # 3 records
 my $DEFAULT_AUTODEFER_FILELEN_THRESHHOLD = 65536; # 16 disk blocksful
@@ -2556,7 +2556,8 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this library program; it should be in the file C<COPYING>.
-If not, see <https://www.gnu.org/licenses/>.
+If not, write to the Free Software Foundation, Inc., 51 Franklin Street,
+Fifth Floor, Boston, MA  02110-1301, USA
 
 For licensing inquiries, contact the author at:
 

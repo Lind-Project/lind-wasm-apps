@@ -92,8 +92,7 @@ sub testit {
         else {
             package test;
             use subs ();
-            no warnings qw( experimental::keyword_any experimental::keyword_all );
-            subs->import($keyword);
+            import subs $keyword;
             $code = "no warnings 'syntax'; no strict 'vars'; sub { ${vars}() = $expr }";
             $code = "use feature 'isa';\n$code" if $keyword eq "isa";
             $code = "use feature 'switch';\n$code" if $keyword eq "break";
@@ -124,7 +123,7 @@ sub testit {
 
 
 # Deparse can't distinguish 'and' from '&&' etc
-my %infix_map = (and => '&&', or => '||', xor => '^^');
+my %infix_map = qw(and && or ||);
 
 # Test a keyword that is a binary infix operator, like 'cmp'.
 # $parens - "$a op $b" is deparsed as "($a op $b)"
@@ -234,9 +233,6 @@ while (<DATA>) {
 
 
 # Special cases
-
-testit any      => 'CORE::any { $a } $b, $c',    'CORE::any({$a;} $b, $c);';
-testit all      => 'CORE::all { $a } $b, $c',    'CORE::all({$a;} $b, $c);';
 
 testit dbmopen  => 'CORE::dbmopen(%foo, $bar, $baz);';
 testit dbmclose => 'CORE::dbmclose %foo;';
@@ -610,7 +606,7 @@ recv             4     p
 ref              01    $
 rename           2     p
 # XXX This code prints 'Undefined subroutine &main::require called':
-#   use subs (); subs->import('require');
+#   use subs (); import subs 'require';
 #   eval q[no strict 'vars'; sub { () = require; }]; print $@;
 # so disable for now
 #require          01    $+
@@ -690,4 +686,4 @@ wantarray        0     -
 warn             @     p1
 write            01    -
 x                B     -
-xor              B     -
+xor              B     p

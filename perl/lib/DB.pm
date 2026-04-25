@@ -41,7 +41,7 @@ BEGIN {
   $DB::subname = '';    # currently executing sub (fully qualified name)
   $DB::lineno = '';     # current line number
 
-  $DB::VERSION = $DB::VERSION = '1.09';
+  $DB::VERSION = $DB::VERSION = '1.08';
 
   # initialize private globals to avoid warnings
 
@@ -560,7 +560,7 @@ DB - programmatic interface to the Perl debugging API
     CLIENT->done()          # de-register from the debugging API
     CLIENT->skippkg('hide::hide')  # ask DB not to stop in this package
     CLIENT->cont([WHERE])       # run some more (until BREAK or 
-                                # another breakpoint)
+                                # another breakpointt)
     CLIENT->step()              # single step
     CLIENT->next()              # step over
     CLIENT->ret()               # return from current subroutine

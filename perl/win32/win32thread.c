@@ -17,8 +17,6 @@ Perl_set_context(void *t)
     TlsSetValue(PL_thr_key,t);
     SetLastError(err);
 #  endif
-    dTHXa(t);
-    PL_sys_intern.cur_tid = GetCurrentThreadId();
 #endif
 }
 

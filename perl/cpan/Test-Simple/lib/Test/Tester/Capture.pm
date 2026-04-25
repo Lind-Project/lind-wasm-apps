@@ -2,12 +2,13 @@ use strict;
 
 package Test::Tester::Capture;
 
-our $VERSION = '1.302210';
+our $VERSION = '1.302199';
 
 
 use Test::Builder;
 
-our @ISA = qw( Test::Builder );
+use vars qw( @ISA );
+@ISA = qw( Test::Builder );
 
 # Make Test::Tester::Capture thread-safe for ithreads.
 BEGIN {

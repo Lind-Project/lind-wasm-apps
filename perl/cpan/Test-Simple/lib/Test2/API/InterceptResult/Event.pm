@@ -2,7 +2,7 @@ package Test2::API::InterceptResult::Event;
 use strict;
 use warnings;
 
-our $VERSION = '1.302210';
+our $VERSION = '1.302199';
 
 use List::Util   qw/first/;
 use Test2::Util  qw/pkg_to_file/;
@@ -591,7 +591,7 @@ that subtest results can be turned into instances of it on demand.
 
 =item $copy = $event->clone
 
-Create a deep copy of the event. Modifying either event will not affect the
+Create a deep copy of the event. Modifying either event will not effect the
 other.
 
 =back
@@ -650,7 +650,7 @@ Possible briefs:
     "SKIP ALL"
     "SKIP ALL: $why"
 
-Note that only the first applicable brief is returned. This is essentially a
+Note that only the first applicable brief is returned. This is essnetially a
 poor-mans TAP that only includes facets that could (but not necessarily do)
 cause a failure.
 
@@ -944,7 +944,7 @@ bail-out was requested.
 
 =item EMPTY_LIST_OR_STRING = $event->bailout_brief
 
-Get the brief of the bailout if present.
+Get the brief of the balout if present.
 
 =item EMPTY_LIST_OR_STRING = $event->bailout_reason
 
@@ -1078,7 +1078,7 @@ L<https://github.com/Test-More/test-more/>.
 
 =head1 COPYRIGHT
 
-Copyright Chad Granum E<lt>exodist@cpan.orgE<gt>.
+Copyright 2020 Chad Granum E<lt>exodist@cpan.orgE<gt>.
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

@@ -1,15 +1,21 @@
 #!perl
 
+BEGIN {
+    require Config;
+    import Config;
+    if ($Config{'extensions'} !~ /\bOpcode\b/) {
+	print "1..0\n";
+	exit 0;
+    }
+}
+
 use strict;
 use warnings;
-use Config;
-use Test::More
-    $Config{'extensions'} =~ /\bOpcode\b/
-        ? (tests => 1)
-        : (skip_all => "no Opcode extension");
+use Test::More;
 use Safe;
+plan(tests => 1);
 
-my $c = Safe->new;
+my $c = new Safe;
 
 {
     package My::Controller;

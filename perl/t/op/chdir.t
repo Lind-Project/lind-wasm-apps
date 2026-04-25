@@ -12,11 +12,10 @@ BEGIN {
     set_up_inc(qw(t . lib ../lib));
 }
 
-plan(tests => 2 + 20 + 1 + 1 + 3*8 + 3);
+plan(tests => 44);
 
 use Config;
 use Errno qw(ENOENT EBADF EINVAL);
-no warnings qw(experimental::builtin); # is_bool
 
 my $IsVMS   = $^O eq 'VMS';
 
@@ -54,7 +53,7 @@ SKIP: {
 $Cwd = abs_path;
 
 SKIP: {
-    skip("no fchdir", 20) unless $has_fchdir;
+    skip("no fchdir", 19) unless $has_fchdir;
     my $has_dirfd = ($Config{d_dirfd} || $Config{d_dir_dd_fd} || "") eq "define";
     ok(opendir(my $dh, "."), "opendir .");
     ok(open(my $fh, "<", "op"), "open op");
@@ -93,9 +92,7 @@ SKIP: {
     {
         my $warn;
         local $SIG{__WARN__} = sub { $warn = shift };
-        my $r = chdir(H);
-        ok(!$r, "check we can't chdir to closed handle");
-        ok(builtin::is_bool($r), 'chdir returns bool on failure');
+        ok(!chdir(H), "check we can't chdir to closed handle");
         is(0+$!, EBADF, 'check $! set appropriately');
         like($warn, qr/on closed filehandle H/, 'like closed');
         $! = 0;
@@ -125,25 +122,20 @@ sub check_env {
 
     # Make sure $ENV{'SYS$LOGIN'} is only honored on VMS.
     if( $key eq 'SYS$LOGIN' && !$IsVMS ) {
-        my $r = chdir();
-        ok( !$r,                  "chdir() on $^O ignores only \$ENV{$key} set" );
-        ok( builtin::is_bool($r), '  and the return value is a bool' );
-        is( abs_path, $Cwd,       '  abs_path() did not change' );
-        pass( "  no need to test SYS\$LOGIN on $^O" ) for 1..5;
+        ok( !chdir(),         "chdir() on $^O ignores only \$ENV{$key} set" );
+        is( abs_path, $Cwd,   '  abs_path() did not change' );
+        pass( "  no need to test SYS\$LOGIN on $^O" ) for 1..4;
     }
     else {
         ok( chdir(),              "chdir() w/ only \$ENV{$key} set" );
         is( abs_path, $ENV{$key}, '  abs_path() agrees' );
-        my $r = chdir($Cwd);
+        chdir($Cwd);
         is( abs_path, $Cwd,       '  and back again' );
-        ok( builtin::is_bool($r), '  and the return value is a bool' );
 
         my $warning = '';
         local $SIG{__WARN__} = sub { $warning .= join '', @_ };
         $! = 0;
-        $r = chdir('');
-        ok(!$r, "chdir('') no longer implies chdir()");
-        ok(builtin::is_bool($r), 'chdir returns bool on failure');
+        ok(!chdir(''), "chdir('') no longer implied chdir()");
         is($!+0, ENOENT, 'check $! set appropriately');
         is($warning, '', 'should no longer warn about deprecation');
     }
@@ -174,6 +166,8 @@ sub clean_env {
 }
 
 END {
+    no warnings 'uninitialized';
+
     # Restore the environment for VMS (and doesn't hurt for anyone else)
     @ENV{@magic_envs} = @Saved_Env{@magic_envs};
 
@@ -184,6 +178,9 @@ END {
 
 
 foreach my $key (@magic_envs) {
+    # We're going to be using undefs a lot here.
+    no warnings 'uninitialized';
+
     clean_env;
     $ENV{$key} = catdir $Cwd, 'op';
 

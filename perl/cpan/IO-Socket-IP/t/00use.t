@@ -3,9 +3,8 @@
 use v5.14;
 use warnings;
 
-use Test2::V0;
+use Test::More;
 
-require IO::Socket::IP;
+use_ok( "IO::Socket::IP" );
 
-pass( 'Modules loaded' );
 done_testing;

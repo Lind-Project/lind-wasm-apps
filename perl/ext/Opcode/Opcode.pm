@@ -1,4 +1,4 @@
-package Opcode 1.69;
+package Opcode 1.65;
 
 use strict;
 
@@ -322,8 +322,7 @@ invert_opset function.
     slt sgt sle sge seq sne scmp
     isa
 
-    substr substr_left vec stringify study pos length index
-    rindex ord chr
+    substr vec stringify study pos length index rindex ord chr
 
     ucfirst lcfirst uc lc fc quotemeta trans transr chop schop
     chomp schomp
@@ -378,7 +377,6 @@ used to implement a resource attack (e.g., consume all available CPU time).
 
     grepstart grepwhile
     mapstart mapwhile
-    anystart allstart anywhile
     enteriter iter
     enterloop leaveloop unstack
     last next redo

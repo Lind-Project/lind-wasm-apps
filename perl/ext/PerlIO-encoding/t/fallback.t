@@ -13,7 +13,7 @@ BEGIN {
 	print "1..0 # Skip: No Encode\n";
 	exit 0;
     }
-    Encode->import(qw(:fallback_all));
+    import Encode qw(:fallback_all);
 }
 
 use Test::More tests => 10;
