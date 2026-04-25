@@ -95,14 +95,19 @@ else
     -Dprefix="$NATIVE_BUILD_DIR/install" \
     -Uusethreads
 
-  echo "[perl] [host] building miniperl..."
-  make -j"$JOBS" miniperl
+  echo "[perl] [host] building miniperl and generate_uudmap..."
+  make -j"$JOBS" miniperl generate_uudmap
 
-  # Save miniperl out of the source tree before we clean for wasm
+  # Save native tools and generated files before we clean for wasm
   cp miniperl "$NATIVE_BUILD_DIR/miniperl"
-  # Also save the generated config files we need
+  cp generate_uudmap "$NATIVE_BUILD_DIR/generate_uudmap"
   cp config.sh "$NATIVE_BUILD_DIR/config.sh.native"
   cp config.h "$NATIVE_BUILD_DIR/config.h.native"
+
+  # Generate the headers that generate_uudmap produces (bitcount.h, etc.)
+  # so they're available for the wasm build
+  make bitcount.h
+  cp bitcount.h mg_data.h uudmap.h "$NATIVE_BUILD_DIR/" 2>/dev/null || true
 
   popd >/dev/null
 fi
@@ -123,6 +128,16 @@ pushd "$PERL_ROOT" >/dev/null
 # Clean native objects but keep generated files
 echo "[perl] [wasm] cleaning native objects..."
 make clean >/dev/null 2>&1 || true
+
+# Restore generated headers from native build so generate_uudmap doesn't
+# need to run during the wasm build
+echo "[perl] [wasm] restoring native-generated headers..."
+for f in bitcount.h mg_data.h uudmap.h; do
+  if [[ -f "$NATIVE_BUILD_DIR/$f" ]]; then
+    cp "$NATIVE_BUILD_DIR/$f" .
+    touch "$f"  # ensure timestamp is newer than dependencies
+  fi
+done
 
 # --- Generate config.sh for wasm32-wasi ------------------------------------
 
