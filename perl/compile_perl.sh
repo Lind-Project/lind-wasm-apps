@@ -139,7 +139,8 @@ RANLIB="$RANLIB" \
   -Dlseeksize=8 \
   -Duidsize=4 \
   -Dgidsize=4 \
-  -Dtimesize=4
+  -Dtimesize=4 \
+  -Dbyteorder=1234
 
 ###############################################################################
 # Build
