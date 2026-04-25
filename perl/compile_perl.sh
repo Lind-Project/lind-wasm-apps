@@ -142,11 +142,13 @@ RANLIB="$RANLIB" \
   -Dtimesize=4 \
   -Dbyteorder=1234
 
-# Fix malformed config.h lines — perl-cross sometimes emits "# FOO" instead
-# of "#define FOO" or "/* #undef FOO */". Patch any such lines.
+# Fix malformed config.h lines — when a config variable is empty, config_h.SH
+# emits "# FOO /**/}" instead of "#define FOO" or "/*#undef FOO*/".
+# Treat these as undefined (safe default — better to miss a feature than
+# to incorrectly enable one).
 if [[ -f config.h ]]; then
   echo "[perl] [wasm] fixing malformed config.h directives..."
-  sed -i -E 's/^# ([A-Z_]+[[:space:]]+\/\*\*\/)$/#define \1/' config.h
+  sed -i -E 's|^# ([A-Z_]+[[:space:]]+/\*\*/)$|/*#undef \1*/|' config.h
 fi
 
 ###############################################################################
