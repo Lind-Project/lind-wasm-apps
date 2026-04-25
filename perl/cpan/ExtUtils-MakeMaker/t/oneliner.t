@@ -11,7 +11,7 @@ chdir 't';
 
 use Config;
 use MakeMaker::Test::Utils;
-use Test::More tests => 17;
+use Test::More tests => 16;
 use File::Spec;
 
 my $TB = Test::More->builder;
@@ -59,7 +59,6 @@ try_oneliner(q{print q[ "&<>^|@() !"&<>^|@() !" ]}, [],  q{ "&<>^|@() !"&<>^|@()
 try_oneliner(q{print q[ "C:\TEST A\" ]}, [],  q{ "C:\TEST A\" },  'example 8.4' );
 try_oneliner(q{print q[ "C:\TEST %&^ A\" ]}, [],  q{ "C:\TEST %&^ A\" },  'example 8.5' );
 
-try_oneliner(<<CODE, [],    "foobar",                   'newlines' );
-print "foo";
-print "bar";
-CODE
+# XXX gotta rethink the newline test.  The Makefile does newline
+# escaping, then the shell.
+

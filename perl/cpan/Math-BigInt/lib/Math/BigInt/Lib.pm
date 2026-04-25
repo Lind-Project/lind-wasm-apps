@@ -4,7 +4,7 @@ use 5.006001;
 use strict;
 use warnings;
 
-our $VERSION = '2.005002';
+our $VERSION = '2.003002';
 $VERSION =~ tr/_//d;
 
 use Carp;
@@ -413,24 +413,6 @@ sub _acmp {
     my $ystr = $class -> _str($y);
 
     length($xstr) <=> length($ystr) || $xstr cmp $ystr;
-}
-
-sub _scmp {
-    # Compare two signed values. Return -1, 0, or 1.
-    my ($class, $xa, $xs, $ya, $ys) = @_;
-    if ($xs eq '+') {
-        if ($ys eq '+') {
-            return $class -> _acmp($xa, $ya);
-        } else {
-            return 1;
-        }
-    } else {
-        if ($ys eq '+') {
-            return -1;
-        } else {
-            return $class -> _acmp($ya, $xa);
-        }
-    }
 }
 
 sub _len {
@@ -1924,19 +1906,17 @@ sub _modpow {
                                         : $class -> _zero();
     }
 
-    # We could do the following, but it doesn't actually save any time. The
-    # _copy() is needed in case $num and $mod are the same object.
-
-    $num = $class -> _mod($class -> _copy($num), $mod);
+    #  $num = $class -> _mod($num, $mod);   # this does not make it faster
 
     my $acc = $class -> _copy($num);
     my $t   = $class -> _one();
 
-    my $expbin = $class -> _to_bin($exp);
+    my $expbin = $class -> _as_bin($exp);
+    $expbin =~ s/^0b//;
     my $len = length($expbin);
 
-    while ($len--) {
-        if (substr($expbin, $len, 1) eq '1') {  # if odd
+    while (--$len >= 0) {
+        if (substr($expbin, $len, 1) eq '1') {
             $t = $class -> _mul($t, $acc);
             $t = $class -> _mod($t, $mod);
         }
@@ -2529,11 +2509,6 @@ Return a true value if OBJ is an even integer, and a false value otherwise.
 Return a true value if OBJ is an even integer, and a false value otherwise.
 
 =item CLASS-E<gt>_acmp(OBJ1, OBJ2)
-
-Compare OBJ1 and OBJ2 and return -1, 0, or 1, if OBJ1 is numerically less than,
-equal to, or larger than OBJ2, respectively.
-
-=item CLASS-E<gt>_scmp(OBJ1, SIGN1, OBJ2, SIGN2)
 
 Compare OBJ1 and OBJ2 and return -1, 0, or 1, if OBJ1 is numerically less than,
 equal to, or larger than OBJ2, respectively.

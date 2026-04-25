@@ -7,7 +7,7 @@ use warnings;
 use Carp qw< carp croak >;
 use Math::BigInt::Lib;
 
-our $VERSION = '2.005002';
+our $VERSION = '2.003002';
 $VERSION =~ tr/_//d;
 
 our @ISA = ('Math::BigInt::Lib');
@@ -2461,17 +2461,16 @@ sub _modpow {
         return $num;
     }
 
-    # We could do the following, but it doesn't actually save any time. The
-    # _copy() is needed in case $num and $mod are the same object.
-    #$num = $c->_mod($c->_copy($num), $mod);
+    #  $num = $c->_mod($num, $mod);   # this does not make it faster
 
     my $acc = $c->_copy($num);
     my $t = $c->_one();
 
-    my $expbin = $c->_to_bin($exp);
+    my $expbin = $c->_as_bin($exp);
+    $expbin =~ s/^0b//;
     my $len = length($expbin);
-    while ($len--) {
-        if (substr($expbin, $len, 1) eq '1') {  # if odd
+    while (--$len >= 0) {
+        if (substr($expbin, $len, 1) eq '1') { # is_odd
             $t = $c->_mul($t, $acc);
             $t = $c->_mod($t, $mod);
         }

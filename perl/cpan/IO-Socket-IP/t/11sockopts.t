@@ -3,16 +3,15 @@
 use v5.14;
 use warnings;
 
-use Test2::V0;
+use Test::More;
 
 use IO::Socket::IP;
 
 use Errno qw( EACCES );
 use Socket qw( SOL_SOCKET SO_REUSEADDR SO_REUSEPORT SO_BROADCAST );
 
-{
-   my $todo;
-   $todo = todo "SO_REUSEADDR doesn't appear to work on cygwin smokers" if $^O eq "cygwin";
+TODO: {
+   local $TODO = "SO_REUSEADDR doesn't appear to work on cygwin smokers" if $^O eq "cygwin";
    # I honestly have no idea why this fails, and people don't seem to be able
    # to reproduce it on a development box. I'll mark it TODO for now until we
    # can gain any more insight into it.

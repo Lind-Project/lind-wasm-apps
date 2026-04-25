@@ -157,7 +157,7 @@ MODULE = DynaLoader PACKAGE = DynaLoader
 BOOT:
     (void)dl_private_init(aTHX);
 
-SV *
+void
 dl_expandspec(filespec)
     char *	filespec
     CODE:
@@ -178,7 +178,7 @@ dl_expandspec(filespec)
     DLDEBUG(2,PerlIO_printf(Perl_debug_log, "\tSYNCHK sys$parse = %d\n",sts));
     if (!(sts & 1)) {
       dl_set_error(dl_fab.fab$l_sts,dl_fab.fab$l_stv);
-      RETVAL = &PL_sv_undef;
+      ST(0) = &PL_sv_undef;
     }
     else {
       /* Now set up a default spec - everything but the name */
@@ -199,7 +199,7 @@ dl_expandspec(filespec)
       DLDEBUG(2,PerlIO_printf(Perl_debug_log, "\tname/default sys$parse = %d\n",sts));
       if (!(sts & 1)) {
         dl_set_error(dl_fab.fab$l_sts,dl_fab.fab$l_stv);
-        RETVAL = &PL_sv_undef;
+        ST(0) = &PL_sv_undef;
       }
       else {
         /* Now find the actual file */
@@ -207,20 +207,17 @@ dl_expandspec(filespec)
         DLDEBUG(2,PerlIO_printf(Perl_debug_log, "\tsys$search = %d\n",sts));
         if (!(sts & 1)) {
           dl_set_error(dl_fab.fab$l_sts,dl_fab.fab$l_stv);
-          RETVAL = &PL_sv_undef;
+          ST(0) = &PL_sv_undef;
         }
         else {
-          RETVAL = newSVpvn(dl_nam.nam$l_rsa,dl_nam.nam$b_rsl);
+          ST(0) = sv_2mortal(newSVpvn(dl_nam.nam$l_rsa,dl_nam.nam$b_rsl));
           DLDEBUG(1,PerlIO_printf(Perl_debug_log, "\tresult = \\%.*s\\\n",
                             dl_nam.nam$b_rsl,dl_nam.nam$l_rsa));
         }
       }
     }
 
-    OUTPUT:
-      RETVAL
-
-SV *
+void
 dl_load_file(filename, flags=0)
     char *	filename
     int		flags
@@ -297,16 +294,14 @@ dl_load_file(filename, flags=0)
       Safefree(dlptr->name.dsc$a_pointer);
       Safefree(dlptr->defspec.dsc$a_pointer);
       Safefree(dlptr);
-      RETVAL = &PL_sv_undef;
+      ST(0) = &PL_sv_undef;
     }
     else {
-      RETVAL = newSViv(PTR2IV(dlptr));
+      ST(0) = sv_2mortal(newSViv(PTR2IV(dlptr)));
     }
 
-    OUTPUT:
-      RETVAL
 
-SV *
+void
 dl_find_symbol(librefptr,symname,ign_err=0)
     void *	librefptr
     SV *	symname
@@ -329,12 +324,10 @@ dl_find_symbol(librefptr,symname,ign_err=0)
                       (unsigned long int) entry));
     if (!(sts & 1)) {
       if (!ign_err) dl_set_error(sts,0);
-      RETVAL = &PL_sv_undef;
+      ST(0) = &PL_sv_undef;
     }
-    else RETVAL = newSViv(PTR2IV(entry));
+    else ST(0) = sv_2mortal(newSViv(PTR2IV(entry)));
 
-    OUTPUT:
-      RETVAL
 
 void
 dl_undef_symbols()
@@ -343,7 +336,7 @@ dl_undef_symbols()
 
 # These functions should not need changing on any platform:
 
-SV *
+void
 dl_install_xsub(perl_name, symref, filename="$Package")
     char *	perl_name
     void *	symref 
@@ -351,13 +344,11 @@ dl_install_xsub(perl_name, symref, filename="$Package")
     CODE:
     DLDEBUG(2,PerlIO_printf(Perl_debug_log, "dl_install_xsub(name=%s, symref=%x)\n",
         perl_name, symref));
-    RETVAL = newRV((SV*)newXS_flags(perl_name,
+    ST(0) = sv_2mortal(newRV((SV*)newXS_flags(perl_name,
 					      (void(*)(pTHX_ CV *))symref,
 					      filename, NULL,
-					      XS_DYNAMIC_FILENAME));
+					      XS_DYNAMIC_FILENAME)));
 
-    OUTPUT:
-      RETVAL
 
 SV *
 dl_error()

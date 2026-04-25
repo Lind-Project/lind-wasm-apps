@@ -13,7 +13,7 @@ BEGIN {
   if ($^O eq 'VMS') {
     # So we can get the return value of system()
     require vmsish;
-    vmsish->import;
+    import vmsish;
   }
 }
 

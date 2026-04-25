@@ -3,9 +3,11 @@ use warnings;
 
 package Test::Tester::Delegate;
 
-our $VERSION = '1.302210';
+our $VERSION = '1.302199';
 
 use Scalar::Util();
+
+use vars '$AUTOLOAD';
 
 sub new
 {
@@ -19,7 +21,7 @@ sub new
 
 sub AUTOLOAD
 {
-	my ($sub) = our $AUTOLOAD =~ /.*::(.*?)$/;
+	my ($sub) = $AUTOLOAD =~ /.*::(.*?)$/;
 
 	return if $sub eq "DESTROY";
 

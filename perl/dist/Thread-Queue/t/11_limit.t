@@ -17,7 +17,9 @@ BEGIN {
 use threads;
 use Thread::Queue;
 
-use Test::More tests => 13;
+use Test::More;
+
+plan tests => 13;
 
 my $q = Thread::Queue->new();
 my $rpt = Thread::Queue->new();

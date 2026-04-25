@@ -5,9 +5,10 @@ BEGIN {
     @INC = '../lib';
     require './test.pl';
 }
-use Config;
 
 plan( tests => 1);
+
+require Config; Config->import;
 
 if (($Config{'extensions'} !~ /\bFcntl\b/) ){
   BAIL_OUT("Perl configured without Fcntl module");

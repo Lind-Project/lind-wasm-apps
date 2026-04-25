@@ -1,5 +1,5 @@
 package stable;
-$stable::VERSION = '0.035';
+$stable::VERSION = '0.033';
 use strict;
 use warnings;
 use version ();
@@ -55,7 +55,7 @@ stable - Experimental features made easy, once we know they're stable
 
 =head1 VERSION
 
-version 0.035
+version 0.032
 
 =head1 SYNOPSIS
 
@@ -153,7 +153,7 @@ L<perlexperiment|perlexperiment> contains more information about experimental fe
 
 =head1 AUTHOR
 
-Leon Timmermans <fawaka@gmail.com>
+Leon Timmermans <leont@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 

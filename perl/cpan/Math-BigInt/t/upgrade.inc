@@ -180,9 +180,8 @@ while (<DATA>) {
         }
     }                           # end else all other ops
 
-    note "\n$try\n\n";
     $got = eval $try;
-    diag "Error: $@\n" if $@;
+    print "# Error: $@\n" if $@;
 
     # convert hex/binary targets to decimal
     if ($want =~ /^(0x0x|0b0b)/) {

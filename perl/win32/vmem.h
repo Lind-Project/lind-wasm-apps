@@ -19,7 +19,7 @@
  */
 
 #ifndef ___VMEM_H_INC___
-/* #define ___VMEM_H_INC___ */
+#define ___VMEM_H_INC___
 
 #define _USE_MSVCRT_MEM_ALLOC
 #define _USE_LINKED_LIST
@@ -56,36 +56,6 @@ inline void MEMODSlx(char *str, long x)
 
 #endif
 
-/* Don't link in the static-linked object code into libperl.dll that
-   implements MSVC UCRT's C++ runtime exceptions and throw/catch/RTTI-ing them.
-   Even though perl links with ucrtbase.dll, there is alot of overhead for
-   using ::new() operator. Just implement our own ::new(), more C-style. */
-#define VMEM_H_NEW_OP \
-    void* operator new(size_t size) noexcept {  \
-      void * p = (void*)win32_malloc(size); \
-      if(!p) noperl_die("%s%s","Out of memory in perl:", "???"); return p; }; \
-    void* operator new[](size_t size) noexcept { \
-      void * p = (void*)win32_malloc(size); \
-      if(!p) noperl_die("%s%s","Out of memory in perl:", "???"); return p; }; \
-    void* operator new( size_t size, int block_use, \
-                          char const* file_name, int line_number) noexcept { \
-        UNREFERENCED_PARAMETER(block_use); \
-        UNREFERENCED_PARAMETER(file_name); \
-        UNREFERENCED_PARAMETER(line_number); \
-        void * p = (void*)win32_malloc(size); \
-        if(!p) noperl_die("%s%s","Out of memory in perl:", "???"); return p; \
-    }; \
-    void* operator new[]( size_t size, int block_use, \
-                          char const* file_name, int line_number) noexcept { \
-        UNREFERENCED_PARAMETER(block_use); \
-        UNREFERENCED_PARAMETER(file_name); \
-        UNREFERENCED_PARAMETER(line_number); \
-         void * p = (void*)win32_malloc(size); \
-         if(!p) noperl_die("%s%s","Out of memory in perl:", "???"); return p; }; \
-    void operator delete (void* p) noexcept { win32_free(p); return; }; \
-    void operator delete[] (void* p) noexcept { win32_free(p);  return; }
-
-
 #ifdef _USE_MSVCRT_MEM_ALLOC
 
 #ifndef _USE_LINKED_LIST
@@ -98,18 +68,15 @@ inline void MEMODSlx(char *str, long x)
  */
 
 #ifdef _USE_LINKED_LIST
-class VMemNL; /* NL = no locks */
 class VMem;
 
 /*
- * Address an alignment issue with x64 mingw-w64 ports of gcc.
- * (We do the same thing again a little further down.)
- * See https://github.com/Perl/perl5/issues/19824.
- * Later modified as a result of discussions in
- * https://github.com/Perl/perl5/issues/22577 
+ * Address an alignment issue with x64 mingw-w64 ports of gcc-12 and
+ * (presumably) later. We do the same thing again 16 lines further down.
+ * See https://github.com/Perl/perl5/issues/19824
  */
 
-#if defined(__MINGW64__)
+#if defined(__MINGW64__) && __GNUC__ > 11
 typedef struct _MemoryBlockHeader* PMEMORY_BLOCK_HEADER __attribute__ ((aligned(16)));
 #else
 typedef struct _MemoryBlockHeader* PMEMORY_BLOCK_HEADER;
@@ -118,12 +85,9 @@ typedef struct _MemoryBlockHeader* PMEMORY_BLOCK_HEADER;
 typedef struct _MemoryBlockHeader {
     PMEMORY_BLOCK_HEADER    pNext;
     PMEMORY_BLOCK_HEADER    pPrev;
-    union {
-      VMemNL  *owner_nl;
-      VMem    *owner;
-    } u;
+    VMem *owner;
 
-#if defined(__MINGW64__)
+#if defined(__MINGW64__) && __GNUC__ > 11
 } MEMORY_BLOCK_HEADER __attribute__ ((aligned(16))), *PMEMORY_BLOCK_HEADER;
 #else
 } MEMORY_BLOCK_HEADER, *PMEMORY_BLOCK_HEADER;
@@ -131,12 +95,11 @@ typedef struct _MemoryBlockHeader {
 
 #endif
 
-class VMemNL
+class VMem
 {
 public:
-    VMemNL();
-    ~VMemNL();
-
+    VMem();
+    ~VMem();
     void* Malloc(size_t size);
     void* Realloc(void* pMem, size_t size);
     void Free(void* pMem);
@@ -159,7 +122,7 @@ protected:
         m_Dummy.pNext = ptr;
         ptr->pPrev = &m_Dummy;
         ptr->pNext = next;
-        ptr->u.owner_nl = this;
+        ptr->owner = this;
         next->pPrev = ptr;
     }
     void UnlinkBlock(PMEMORY_BLOCK_HEADER ptr)
@@ -171,90 +134,41 @@ protected:
     }
 
     MEMORY_BLOCK_HEADER	m_Dummy;
-#endif
-}; /* class VMemNL */
-
-
-class VMem : public VMemNL {
-
-protected:
-#ifdef _USE_LINKED_LIST
     CRITICAL_SECTION	m_cs;		// access lock
 #endif
-    volatile long m_lRefCount;	// number of current users
 
-public:
-    VMem();
-    ~VMem();
-    VMEM_H_NEW_OP;
-    void* Malloc(size_t size);
-    void* Realloc(void* pMem, size_t size);
-    void Free(void* pMem);
-    void GetLock(void);
-    void FreeLock(void);
-    inline int IsLocked(void);
-    long Release(void);
-    long AddRef(void);
+    long		m_lRefCount;	// number of current users
 };
 
-VMemNL::VMemNL(void)
+VMem::VMem()
 {
-#ifdef _USE_LINKED_LIST
-    m_Dummy.pNext = m_Dummy.pPrev =  &m_Dummy;
-    m_Dummy.u.owner_nl = this;
-#endif
-    return;
-}
-
-VMem::VMem(void)
-{
+    m_lRefCount = 1;
 #ifdef _USE_LINKED_LIST
     InitializeCriticalSection(&m_cs);
-#endif _USE_LINKED_LIST
-    m_lRefCount =  1;
-    return;
-}
-
-VMemNL::~VMemNL(void)
-{
-#ifdef _USE_LINKED_LIST
-    while (m_Dummy.pNext != &m_Dummy) {
-        Free(m_Dummy.pNext+1);
-    }
+    m_Dummy.pNext = m_Dummy.pPrev =  &m_Dummy;
+    m_Dummy.owner = this;
 #endif
 }
 
 VMem::~VMem(void)
 {
 #ifdef _USE_LINKED_LIST
+    while (m_Dummy.pNext != &m_Dummy) {
+        Free(m_Dummy.pNext+1);
+    }
     DeleteCriticalSection(&m_cs);
 #endif
 }
-#endif /* _USE_MSVCRT_MEM_ALLOC */
 
-#endif /* ___VMEM_H_INC___ */
-
-
-/* #include "vmem.h" a 2nd time for Malloc()/Free() defs for VMem locking class */
-#if defined(___VMEM_H_INC___) && defined(_USE_MSVCRT_MEM_ALLOC) && defined(CRT_ALLOC_BASE)
-
-#define VMemNL VMem
-#undef CRT_ALLOC_BASE
-
-#endif
-
-
-#ifdef _USE_MSVCRT_MEM_ALLOC
-
-void* VMemNL::Malloc(size_t size)
+void* VMem::Malloc(size_t size)
 {
 #ifdef _USE_LINKED_LIST
-
+    GetLock();
     PMEMORY_BLOCK_HEADER ptr = (PMEMORY_BLOCK_HEADER)malloc(size+sizeof(MEMORY_BLOCK_HEADER));
     if (!ptr) {
+        FreeLock();
         return NULL;
     }
-    GetLock();
     LinkBlock(ptr);
     FreeLock();
     return (ptr+1);
@@ -263,7 +177,7 @@ void* VMemNL::Malloc(size_t size)
 #endif
 }
 
-void* VMemNL::Realloc(void* pMem, size_t size)
+void* VMem::Realloc(void* pMem, size_t size)
 {
 #ifdef _USE_LINKED_LIST
     if (!pMem)
@@ -274,8 +188,8 @@ void* VMemNL::Realloc(void* pMem, size_t size)
         return NULL;
     }
 
-    PMEMORY_BLOCK_HEADER ptr = (PMEMORY_BLOCK_HEADER)(((char*)pMem)-sizeof(MEMORY_BLOCK_HEADER));
     GetLock();
+    PMEMORY_BLOCK_HEADER ptr = (PMEMORY_BLOCK_HEADER)(((char*)pMem)-sizeof(MEMORY_BLOCK_HEADER));
     UnlinkBlock(ptr);
     ptr = (PMEMORY_BLOCK_HEADER)realloc(ptr, size+sizeof(MEMORY_BLOCK_HEADER));
     if (!ptr) {
@@ -291,80 +205,33 @@ void* VMemNL::Realloc(void* pMem, size_t size)
 #endif
 }
 
-void VMemNL::Free(void* pMem)
+void VMem::Free(void* pMem)
 {
 #ifdef _USE_LINKED_LIST
     if (pMem) {
         PMEMORY_BLOCK_HEADER ptr = (PMEMORY_BLOCK_HEADER)(((char*)pMem)-sizeof(MEMORY_BLOCK_HEADER));
-        if (ptr->u.owner_nl != this) {
-            if (ptr->u.owner_nl) {
+        if (ptr->owner != this) {
+            if (ptr->owner) {
 #if 1
                 int *nowhere = NULL;
-                Perl_warn_nocontext("Free to wrong pool %p not %p",this,ptr->u.owner_nl);
+                Perl_warn_nocontext("Free to wrong pool %p not %p",this,ptr->owner);
                 *nowhere = 0; /* this segfault is deliberate, 
                                  so you can see the stack trace */
 #else
-                ptr->u.owner_nl->Free(pMem);
+                ptr->owner->Free(pMem);	
 #endif
             }
             return;
         }
         GetLock();
         UnlinkBlock(ptr);
-        FreeLock();
-/* rev 222c300afb1c8466398010a3403616462c302185
-1/13/2002 10:37:48 AM
-Win32 fixes-vmem.h hack to handle free-by-wrong-thread after eval "".
-*/
- /* paranoia from 2002 mostly, but still a very small debugging aid today.
-    poisoning ->owner field, stops dead cold, MS OS Heap API' Free pool
-    from reissue new blocks, with "faux initialzed" "almost legit"
-    looking Perl wrapper headers but infact that ARE 100%
-    uninit/dealloced/random data, its not aleak to chase!!!! its uninit data!!!
-    */
-        ptr->u.owner_nl = NULL;
+        ptr->owner = NULL;
         free(ptr);
-
+        FreeLock();
     }
 #else /*_USE_LINKED_LIST*/
     free(pMem);
 #endif
-}
-
-#endif
-
-#undef VMemNL
-
-#ifndef ___VMEM_H_INC___
-
-#ifdef _USE_MSVCRT_MEM_ALLOC
-
-
-void VMemNL::GetLock(void)
-{
-    return;
-}
-
-void VMemNL::FreeLock(void)
-{
-    return;
-}
-
-int VMemNL::IsLocked(void)
-{
-    abort();
-    ASSERT(0);	/* alarm bells for when somebody calls this */
-    return 0;
-}
-
-long VMemNL::Release(void)
-{
-    abort();
-}
-
-long VMemNL::AddRef(void)
-{
-    abort();
 }
 
 void VMem::GetLock(void)
@@ -401,10 +268,8 @@ int VMem::IsLocked(void)
 long VMem::Release(void)
 {
     long lCount = InterlockedDecrement(&m_lRefCount);
-    if(!lCount) {
+    if(!lCount)
         delete this;
-        return 0;
-    }
     return lCount;
 }
 
@@ -552,13 +417,12 @@ class VMem
 public:
     VMem();
     ~VMem();
-    VMEM_H_NEW_OP;
     void* Malloc(size_t size);
     void* Realloc(void* pMem, size_t size);
     void Free(void* pMem);
     void GetLock(void);
     void FreeLock(void);
-    inline int IsLocked(void);
+    int IsLocked(void);
     long Release(void);
     long AddRef(void);
 
@@ -642,6 +506,7 @@ protected:
 
 VMem::VMem()
 {
+    m_lRefCount = 1;
 #ifndef _USE_BUDDY_BLOCKS
     BOOL bRet = (NULL != (m_hHeap = HeapCreate(HEAP_NO_SERIALIZE,
                                 lAllocStart,	/* initial size of heap */
@@ -653,7 +518,6 @@ VMem::VMem()
 #ifdef _DEBUG_MEM
     m_pLog = 0;
 #endif
-    m_lRefCount =  1;
 
     Init();
 }
@@ -1050,10 +914,8 @@ int VMem::IsLocked(void)
 long VMem::Release(void)
 {
     long lCount = InterlockedDecrement(&m_lRefCount);
-    if(!lCount) {
+    if(!lCount)
         delete this;
-        return 0;
-    }
     return lCount;
 }
 
@@ -1397,7 +1259,5 @@ void VMem::WalkHeap(int complete)
 #endif	/* _DEBUG_MEM */
 
 #endif	/* _USE_MSVCRT_MEM_ALLOC */
-
-#define ___VMEM_H_INC___
 
 #endif	/* ___VMEM_H_INC___ */

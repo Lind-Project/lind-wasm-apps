@@ -4,7 +4,7 @@ use strict;
 use Cwd ();
 require File::Spec::Unix;
 
-our $VERSION = '3.94';
+our $VERSION = '3.91';
 $VERSION =~ tr/_//d;
 
 our @ISA = qw(File::Spec::Unix);
@@ -508,9 +508,7 @@ sub rel2abs {
                   ? vmspath($path)             # whether it's a directory
                   : vmsify($path) );
     }
-    # If there is no device or directory syntax on $base, make sure it
-    # is treated as a directory.
-    $base = vmspath($base) if defined $base && $base !~ m{(?<!\^)[\[<:]};
+    $base = vmspath($base) if defined $base && $base =~ m/\//;
 
     # Clean up and split up $path
     if ( ! $self->file_name_is_absolute( $path ) ) {

@@ -2,7 +2,7 @@
 #
 # Test Pod::Text::Overstrike with various snippets.
 #
-# Copyright 2002, 2004, 2006, 2009, 2012-2013, 2018-2019, 2024
+# Copyright 2002, 2004, 2006, 2009, 2012-2013, 2018-2019
 #     Russ Allbery <rra@cpan.org>
 #
 # This program is free software; you may redistribute it and/or modify it
@@ -10,12 +10,13 @@
 #
 # SPDX-License-Identifier: GPL-1.0-or-later OR Artistic-1.0-Perl
 
-use 5.012;
+use 5.008;
+use strict;
 use warnings;
 
 use lib 't/lib';
 
-use Test::More tests => 7;
+use Test::More tests => 5;
 use Test::Podlators qw(test_snippet);
 
 BEGIN {
@@ -23,7 +24,7 @@ BEGIN {
 }
 
 # List of snippets run by this test.
-my @snippets = qw(nonbreaking-wrap tag-width wrapping);
+my @snippets = qw(tag-width wrapping);
 
 # Run all the tests.
 for my $snippet (@snippets) {

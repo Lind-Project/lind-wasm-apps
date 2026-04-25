@@ -11,14 +11,18 @@
 # Modules and declarations
 ##############################################################################
 
-package Pod::ParseLink v6.0.2;
+package Pod::ParseLink;
 
-use 5.012;
+use 5.010;
+use strict;
 use warnings;
 
-use Exporter qw(import);
+use Exporter;
 
+our @ISA = qw(Exporter);
 our @EXPORT = qw(parselink);
+our $VERSION = '5.01_02';
+$VERSION =~ tr/_//d;
 
 ##############################################################################
 # Implementation
@@ -166,8 +170,7 @@ Russ Allbery <rra@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2001, 2008, 2009, 2014, 2018-2019, 2022, 2024 Russ Allbery
-<rra@cpan.org>
+Copyright 2001, 2008, 2009, 2014, 2018-2019, 2022 Russ Allbery <rra@cpan.org>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.
