@@ -189,9 +189,10 @@ sed -i \
   -e "s|^_exe=.*|_exe='.wasm'|" \
   config.sh
 
-# Regenerate config.h from config.sh
-echo "[perl] [wasm] regenerating config.h..."
+# Regenerate config.h and Makefile from config.sh
+echo "[perl] [wasm] regenerating config.h and Makefile..."
 sh config_h.SH
+sh Makefile.SH
 
 # --- Build perl for WASM ---------------------------------------------------
 
