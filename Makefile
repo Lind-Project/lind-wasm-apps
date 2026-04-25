@@ -49,7 +49,7 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils perl clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-perl install
+.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -371,10 +371,23 @@ diffutils: $(MERGE_BASE_STAMP)
 	'$(APPS_ROOT)/diffutils/compile_diffutils.sh'
 
 # ---------------- perl (WASM build) -------------------------------------------
-# Cross-compiles Perl for wasm32-wasi via two-pass build (native miniperl
-# first, then cross-compile). Stages to build/perl/usr/local/bin.
+# Cross-compiles Perl for wasm32-wasi via perl-cross.
+# Stages to build/perl/usr/local/bin.
 perl: $(MERGE_BASE_STAMP)
 	'$(APPS_ROOT)/perl/compile_perl.sh'
+
+# ---------------- awk (WASM build) --------------------------------------------
+# Cross-compiles GNU awk (gawk) to wasm32-wasi.
+# Stages to build/awk/usr/local/bin.
+awk: $(MERGE_BASE_STAMP)
+	'$(APPS_ROOT)/awk/compile_awk.sh'
+
+# ---------------- make (WASM build) -------------------------------------------
+# Cross-compiles GNU make to wasm32-wasi.
+# Stages to build/make/usr/local/bin.
+# Target named "gmake" to avoid conflict with the make command itself.
+gmake: $(MERGE_BASE_STAMP)
+	'$(APPS_ROOT)/make/compile_make.sh'
 
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
@@ -439,4 +452,10 @@ install-libcxx:
 install-perl:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' perl
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-perl install-gnulib install-libtirpc install-openssl install-zlib install-libcxx
+install-awk:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' awk
+
+install-gmake:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' make
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-perl install-awk install-gmake install-gnulib install-libtirpc install-openssl install-zlib install-libcxx
