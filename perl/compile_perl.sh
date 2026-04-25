@@ -83,6 +83,15 @@ pushd "$PERL_ROOT" >/dev/null
 echo "[perl] cleaning any previous build..."
 make distclean >/dev/null 2>&1 || true
 
+# perl-cross requires readelf and objdump, which don't exist for wasm targets.
+# Create no-op stubs so configure doesn't fail.
+STUB_BIN="$PERL_ROOT/.wasi-stubs"
+mkdir -p "$STUB_BIN"
+printf '#!/bin/sh\nexit 0\n' > "$STUB_BIN/readelf"
+printf '#!/bin/sh\nexit 0\n' > "$STUB_BIN/objdump"
+chmod +x "$STUB_BIN/readelf" "$STUB_BIN/objdump"
+export PATH="$STUB_BIN:$PATH"
+
 echo "[perl] configuring with perl-cross for wasm32-wasi..."
 ./configure \
   --target=wasm32-unknown-wasi \
