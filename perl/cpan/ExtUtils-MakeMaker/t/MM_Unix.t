@@ -12,7 +12,7 @@ BEGIN {
         plan skip_all => 'Non-Unix platform';
     }
     else {
-        plan tests => 118;
+        plan tests => 114;
     }
 }
 
@@ -178,31 +178,7 @@ is ($t->libscan('Fatty'), 'Fatty', 'libscan on something not a VC file' );
 
 open(FILE, ">command"); print FILE "foo"; close FILE;
 SKIP: {
-    skip("no separate execute mode on VOS", 4) if $^O eq "vos";
-
-    {
-        local $@;
-        my $rv;
-        my @warnings = ();
-        local $SIG{__WARN__} = sub { push @warnings, shift; };
-        eval { $rv = $t->maybe_command( undef ); };
-        ok (! @warnings, "maybe_command emits no warnings with undefined argument");
-        ok (! defined $rv,
-            "maybe_command returns undef if not provided defined argument"
-        );
-    }
-
-    {
-        local $@;
-        my $rv;
-        my @warnings = ();
-        local $SIG{__WARN__} = sub { push @warnings, shift; };
-        eval { $rv = $t->maybe_command( '' ); };
-        ok (! @warnings, "maybe_command emits no warnings with empty-string argument");
-        ok (! defined $rv,
-            "maybe_command returns undef if not provided positive-length argument"
-        );
-    }
+    skip("no separate execute mode on VOS", 2) if $^O eq "vos";
 
     ok !$t->maybe_command('command') ,"non executable file isn't a command";
 

@@ -585,24 +585,23 @@ sub flags_to_text($$)
 # Possible flag returns from utf8n_to_uvchr_error().  These should have G_,
 # instead of A_, D_, but the prefixes will be used in a later commit, so
 # minimize churn by having them here.
-# The ordering is important, sorted by lowest bit position first taken from
-# utf8.h
 my @utf8n_flags_to_text =  ( qw(
-        A_OVERFLOW
         A_EMPTY
         A_CONTINUATION
-        A_SHORT
         A_NON_CONTINUATION
-        D_SURROGATE
-        W_SURROGATE
-        D_PERL_EXTENDED
-        W_PERL_EXTENDED
-        D_SUPER
-        W_SUPER
-        D_NONCHAR
-        W_NONCHAR
+        A_SHORT
         A_LONG
         A_LONG_AND_ITS_VALUE
+        PLACEHOLDER
+        A_OVERFLOW
+        D_SURROGATE
+        W_SURROGATE
+        D_NONCHAR
+        W_NONCHAR
+        D_SUPER
+        W_SUPER
+        D_PERL_EXTENDED
+        W_PERL_EXTENDED
         CHECK_ONLY
         NO_CONFIDENCE_IN_CURLEN_
     ) );
@@ -1191,12 +1190,7 @@ foreach my $test (@tests) {
   # We try various combinations of malformations that can occur
   foreach my $short (0, 1) {
     next if $skip_most_tests && $short;
-    # Insert an unexpected non-continuation in every possible position
-    my $unexpected_noncont;
-    for ($unexpected_noncont = $length - $short - 1;
-         $unexpected_noncont > 0;
-         $unexpected_noncont--)
-    {
+    foreach my $unexpected_noncont (0, 1) {
       next if $skip_most_tests && $unexpected_noncont;
       foreach my $overlong (0, 1) {
         next if $overlong && $skip_most_tests;
@@ -1324,14 +1318,11 @@ foreach my $test (@tests) {
 
           if ($unexpected_noncont) {
 
-              # The overlong tweaking above changes the first bytes to
-              # specified values; we better not override those.
-              next if $overlong;
-
-              # To force this malformation, change a continuation byte into a
-              # start byte.
-              substr($this_bytes, $unexpected_noncont, 1) = $known_start_byte;
-              $this_expected_len = $unexpected_noncont;
+              # To force this malformation, change the final continuation
+              # byte into a start byte.
+              my $pos = ($short) ? -2 : -1;
+              substr($this_bytes, $pos, 1) = $known_start_byte;
+              $this_expected_len--;
           }
 
           # The whole point of a test that is malformed from the beginning
@@ -1560,9 +1551,9 @@ foreach my $test (@tests) {
                   # Test partial character handling, for each byte not a
                   # full character
                   my $did_test_partial = 0;
-                  for (my $byte_count = 1; $byte_count < $this_expected_len - 1; $byte_count++) {
+                  for (my $j = 1; $j < $this_length - 1; $j++) {
                       $did_test_partial = 1;
-                      my $partial = substr($this_bytes, 0, $byte_count);
+                      my $partial = substr($this_bytes, 0, $j);
                       my $ret_should_be;
                       my $comment;
                       if ($disallow_type || $malformations_name) {
@@ -1591,7 +1582,7 @@ foreach my $test (@tests) {
                               $needed_to_tell = $dl if $dl < $needed_to_tell;
                           }
 
-                          if ($byte_count < $needed_to_tell) {
+                          if ($j < $needed_to_tell) {
                               $ret_should_be = 1;
                               $comment .= ", but need $needed_to_tell"
                                         . " bytes to discern:";
@@ -1605,7 +1596,7 @@ foreach my $test (@tests) {
                       undef @warnings_gotten;
 
                       $ret = test_is_utf8_valid_partial_char_flags($partial,
-                                                      $byte_count, $disallow_flags);
+                                                      $j, $disallow_flags);
                       is($ret, $ret_should_be,
                           "    And is_utf8_valid_partial_char_flags("
                           . display_bytes($partial)
@@ -2020,12 +2011,8 @@ foreach my $test (@tests) {
                         @warnings_gotten = @returned_warnings;
                     }
 
-                  SKIP: {
-                    skip "$0 doesn't handle _msgs functions AV returns", 1
-                                                    if $utf8_func =~ /_msgs/;
                     do_warnings_test(@expected_warnings)
                       or diag "Call was: " . utf8n_display_call($eval_text);
-                    }
                     undef @warnings_gotten;
 
                     # Check CHECK_ONLY results when the input is

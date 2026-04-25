@@ -1,7 +1,14 @@
 #!./perl
 
-use strict;
-use warnings;
+sub BEGIN {
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
+    require Config; import Config;
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+        print "1..0 # Skip: Storable was not built\n";
+        exit 0;
+    }
+}
 
 use Storable ();
 use Test::More tests => 3;
@@ -13,8 +20,8 @@ package TIED_HASH;
 sub TIEHASH { bless({}, $_[0]) }
 
 sub STORE {
-    $f = Storable::freeze(\$_[2]);
-    1;
+	$f = Storable::freeze(\$_[2]);
+	1;
 }
 
 package TIED_ARRAY;
@@ -22,8 +29,8 @@ package TIED_ARRAY;
 sub TIEARRAY { bless({}, $_[0]) }
 
 sub STORE {
-    $f = Storable::freeze(\$_[2]);
-    1;
+	$f = Storable::freeze(\$_[2]);
+	1;
 }
 
 package TIED_SCALAR;
@@ -31,8 +38,8 @@ package TIED_SCALAR;
 sub TIESCALAR { bless({}, $_[0]) }
 
 sub STORE {
-    $f = Storable::freeze(\$_[1]);
-    1;
+	$f = Storable::freeze(\$_[1]);
+	1;
 }
 
 package main;

@@ -12,8 +12,15 @@
 # This file tests several known-error cases relating to STORABLE_attach, in
 # which Storable should (correctly) throw errors.
 
-use strict;
-use warnings;
+sub BEGIN {
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
+    require Config; import Config;
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+        print "1..0 # Skip: Storable was not built\n";
+        exit 0;
+    }
+}
 
 use Storable ();
 use Test::More tests => 9;
@@ -47,34 +54,34 @@ is_deeply( \@Foo::order, [ 'Bar', 'Foo' ], 'thaw order is correct (depth first)'
 
 package Foo;
 
-our @order = ();
+@order = ();
 
 sub STORABLE_freeze {
-    my ($self, $clone) = @_;
-    my $class = ref $self;
+	my ($self, $clone) = @_;
+	my $class = ref $self;
+	
+	# print "# Freezing $class\n";
 
-    # print "# Freezing $class\n";
-
-    return ($class, $self->{$class});
+	return ($class, $self->{$class});
 }
 
 sub STORABLE_thaw {
-    my ($self, $clone, $string, @refs) = @_;
-    my $class = ref $self;
+	my ($self, $clone, $string, @refs) = @_;
+	my $class = ref $self;
 
-    # print "# Thawing $class\n";
+	# print "# Thawing $class\n";
 
-    $self->{$class} = shift @refs;
+	$self->{$class} = shift @refs;
 
-    push @order, $class;
+	push @order, $class;
 
-    return;
+ 	return;
 }
 
 package Bar;
 
 BEGIN {
-our @ISA = 'Foo';
+@ISA = 'Foo';
 }
 
 1;

@@ -31,11 +31,11 @@ Test::Harness - Run Perl standard test scripts with statistics
 
 =head1 VERSION
 
-Version 3.50
+Version 3.48
 
 =cut
 
-our $VERSION = '3.50';
+our $VERSION = '3.48';
 
 # Backwards compatibility for exportable variable names.
 *verbose  = *Verbose;
@@ -145,23 +145,29 @@ sub runtests {
     local ( $\, $, );
 
     my $harness   = _new_harness();
-    local $ENV{PERL_USE_UNSAFE_INC} = 1 if not exists $ENV{PERL_USE_UNSAFE_INC};
+    my $aggregate = TAP::Parser::Aggregator->new();
 
-    # Don't propagate to our children
-    local $ENV{HARNESS_OPTIONS};
-    my $aggregate = $harness->runtests(@tests);
+    local $ENV{PERL_USE_UNSAFE_INC} = 1 if not exists $ENV{PERL_USE_UNSAFE_INC};
+    _aggregate( $harness, $aggregate, @tests );
+
+    $harness->formatter->summary($aggregate);
 
     my $total  = $aggregate->total;
     my $passed = $aggregate->passed;
     my $failed = $aggregate->failed;
-    my $total_files = $aggregate->total_files;
-    my $failed_files = $aggregate->failed_files;
+
+    my @parsers = $aggregate->parsers;
+
+    my $num_bad = 0;
+    for my $parser (@parsers) {
+        $num_bad++ if $parser->has_problems;
+    }
 
     die(sprintf(
             "Failed %d/%d test programs. %d/%d subtests failed.\n",
-            $failed_files, $total_files, $failed, $total
+            $num_bad, scalar @parsers, $failed, $total
         )
-    ) if $failed_files;
+    ) if $num_bad;
 
     return $total && $total == $passed;
 }
@@ -198,7 +204,8 @@ sub _new_harness {
         }
     }
 
-    push @lib, _filtered_inc();
+    # Do things the old way on VMS...
+    push @lib, _filtered_inc() if IS_VMS;
 
     # If $Verbose isn't numeric default to 1. This helps core.
     my $verbosity = ( $Verbose ? ( $Verbose !~ /\d/ ) ? 1 : $Verbose : 0 );

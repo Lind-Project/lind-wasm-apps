@@ -91,8 +91,7 @@ Functions for real @ARRAYs:
      each, keys, pop, push, shift, splice, unshift, values
 
 Functions for list data:
-     all, any, grep, join, map, qw/STRING/, reverse, sort,
-     unpack
+     grep, join, map, qw/STRING/, reverse, sort, unpack
 
 Functions for real %HASHes:
      delete, each, exists, keys, values

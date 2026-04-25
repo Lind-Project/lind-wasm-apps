@@ -3,7 +3,7 @@
 BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
-    require Config; Config->import;
+    require Config; import Config;
     if ($Config{'extensions'} !~ /\bFile\/Glob\b/i) {
         print "1..0\n";
         exit 0;
@@ -18,12 +18,12 @@ BEGIN {
 
 my $pat = "op/G*.t";
 
-File::Glob->import(':nocase');
+import File::Glob ':nocase';
 @a = csh_glob($pat);
 cmp_ok(scalar @a, '>=', 8, 'use of the case sensitivity tags, via csh_glob()');
 
 # This may fail on systems which are not case-PRESERVING
-File::Glob->import(':case');
+import File::Glob ':case';
 @a = csh_glob($pat);
 is(scalar @a, 0, 'None should be uppercase');
 

@@ -10,7 +10,7 @@ $|  = 1;
 use warnings;
 use Config;
 
-plan tests => 186 + 6*3 + 6*2;
+plan tests => 188;
 
 sub ok_cloexec {
     SKIP: {
@@ -254,23 +254,9 @@ like( $@, qr/Bad filehandle:\s+$afile/,          '       right error' );
     ok( open(STDOUT,     ">&", $stdout),        'restore dupped STDOUT from lexical fh');
 
     {
-	use strict; # the below should not die
-	for my $dupmode (qw( >& >>& <& +>& +>>& +<& )) {
-	    my $stdout;
-	    ok( eval("open(\$stdout, '$dupmode', STDOUT)"), "dup STDOUT into lexical fh with '$dupmode'" );
-	    is $@, "", "no errors for using '$dupmode' with bareword",
-	    ok_cloexec($stdout);
-	}
-
-	# sanity check
-	for my $xmode (qw( > >> < +> +>> +< )) {
-	    is(
-	        eval("open(my \$fh, '$xmode', STDOUT) unless \$xmode"),
-	        undef,
-	        "open with bareword filename fails to compile with '$xmode'"
-	    );
-	    like $@, qr/^Bareword "STDOUT" not allowed while "strict subs" in use /;
-        }
+	use strict; # the below should not warn
+	ok( open(my $stdout, ">&", STDOUT),         'dup STDOUT into lexical fh');
+	ok_cloexec($stdout);
     }
 
     # used to try to open a file [perl #17830]
@@ -490,7 +476,7 @@ pass("no crash when open autovivifies glob in freed package");
             skip "Errno not built yet", 8;
         }
         require Errno;
-        Errno->import('ENOENT');
+        import Errno 'ENOENT';
         # check handling of multiple arguments, which the original patch
         # mis-handled
         $! = 0;

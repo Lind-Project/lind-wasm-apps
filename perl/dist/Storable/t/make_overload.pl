@@ -1,6 +1,5 @@
-#!/usr/bin/env perl
+#!/usr/local/bin/perl -w
 use strict;
-use warnings;
 
 use Storable qw(nfreeze);
 use HAS_OVERLOAD;

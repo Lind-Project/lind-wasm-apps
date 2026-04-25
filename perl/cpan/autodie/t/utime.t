@@ -8,7 +8,6 @@ use autodie;
 use File::Temp qw(tempfile);
 
 my ($fh, $filename) = tempfile;
-close $fh if $^O eq 'VMS'; # can't utime an open file
 
 eval { utime(undef, undef, NO_SUCH_FILE); };
 isa_ok($@, 'autodie::exception', 'exception thrown for utime');

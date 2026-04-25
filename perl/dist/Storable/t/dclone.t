@@ -1,58 +1,61 @@
 #!./perl
 #
 #  Copyright (c) 1995-2000, Raphael Manfredi
-#
+#  
 #  You may redistribute only under the same terms as Perl 5, as specified
 #  in the README file that comes with the distribution.
 #
 
-use strict;
-use warnings;
-
 sub BEGIN {
-    unshift @INC, 't/lib';
+    unshift @INC, 't';
+    unshift @INC, 't/compat' if $] < 5.006002;
+    require Config; import Config;
+    if ($ENV{PERL_CORE} and $Config{'extensions'} !~ /\bStorable\b/) {
+        print "1..0 # Skip: Storable was not built\n";
+        exit 0;
+    }
+    require 'st-dump.pl';
 }
 
-use STDump;
 
 use Storable qw(dclone);
 
 use Test::More tests => 14;
 
-my $a = 'toto';
-my $b = \$a;
-my $c = bless {}, 'CLASS';
+$a = 'toto';
+$b = \$a;
+$c = bless {}, CLASS;
 $c->{attribute} = 'attrval';
-my %a = ('key', 'value', 1, 0, $a, $b, 'cvar', \$c);
-my @a = ('first', undef, 3, -4, -3.14159, 456, 4.5,
-    $b, \$a, $a, $c, \$c, \%a);
+%a = ('key', 'value', 1, 0, $a, $b, 'cvar', \$c);
+@a = ('first', undef, 3, -4, -3.14159, 456, 4.5,
+	$b, \$a, $a, $c, \$c, \%a);
 
 my $aref = dclone(\@a);
 isnt($aref, undef);
 
-my $dumped = stdump(\@a);
+$dumped = &dump(\@a);
 isnt($dumped, undef);
 
-my $got = stdump($aref);
+$got = &dump($aref);
 isnt($got, undef);
 
 is($got, $dumped);
 
-package FOO; our @ISA = qw(Storable);
+package FOO; @ISA = qw(Storable);
 
 sub make {
-    my $self = bless {};
-    $self->{key} = \%a;
-    return $self;
+	my $self = bless {};
+	$self->{key} = \%main::a;
+	return $self;
 };
 
 package main;
 
-my $foo = FOO->make;
+$foo = FOO->make;
 my $r = $foo->dclone;
 isnt($r, undef);
 
-is(stdump($foo), stdump($r));
+is(&dump($foo), &dump($r));
 
 # Ensure refs to "undef" values are properly shared during cloning
 my $hash;
@@ -83,9 +86,9 @@ is($$clone, '');
 SKIP: {
 # Do not fail if Tie::Hash and/or Tie::StdHash is not available
     skip 'No Tie::StdHash available', 2
-        unless eval { require Tie::Hash; scalar keys %Tie::StdHash:: };
+	unless eval { require Tie::Hash; scalar keys %Tie::StdHash:: };
     skip 'This version of perl has problems with Tie::StdHash', 2
-        if $] eq "5.008";
+	if $] eq "5.008";
     tie my %tie, "Tie::StdHash" or die $!;
     $tie{array} = [1,2,3,4];
     $tie{hash} = {1,2,3,4};

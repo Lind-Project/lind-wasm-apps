@@ -2,7 +2,7 @@ package Test2::Formatter::TAP;
 use strict;
 use warnings;
 
-our $VERSION = '1.302210';
+our $VERSION = '1.302199';
 
 use Test2::Util qw/clone_io/;
 
@@ -66,7 +66,7 @@ sub _open_handles {
 sub encoding {
     my $self = shift;
 
-    if ("$]" >= 5.007003 and @_) {
+    if ($] ge "5.007003" and @_) {
         my ($enc) = @_;
         my $handles = $self->{+HANDLES};
 
@@ -384,8 +384,6 @@ sub info_tap {
 
         my $msg;
         if ($table && $self->supports_tables) {
-            my $size = $self->calc_table_size($f);
-
             $msg = join "\n" => map { "# $_" } Term::Table->new(
                 header      => $table->{header},
                 rows        => $table->{rows},
@@ -393,12 +391,8 @@ sub info_tap {
                 no_collapse => $table->{no_collapse},
                 sanitize    => 1,
                 mark_tail   => 1,
-                max_width   => $size,
+                max_width   => $self->calc_table_size($f),
             )->render();
-
-            $msg .= "\n(If this table is too small, you can use the TABLE_TERM_SIZE=### env var to set a larger size, detected size is '$size')\n"
-                if $size <= 80
-                && !$ENV{TABLE_TERM_SIZE};
         }
         elsif (ref($details)) {
             require Data::Dumper;
@@ -524,7 +518,7 @@ L<https://github.com/Test-More/test-more/>.
 
 =head1 COPYRIGHT
 
-Copyright Chad Granum E<lt>exodist@cpan.orgE<gt>.
+Copyright 2020 Chad Granum E<lt>exodist@cpan.orgE<gt>.
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

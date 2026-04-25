@@ -78,11 +78,11 @@ I<file>
 
 =item B<-help>
 
-Prints a brief help message and exit.
+Print a brief help message and exit.
 
 =item B<-man>
 
-Prints this command's manual page and exit.
+Print this command's manual page and exit.
 
 =item B<-exit> I<exitval>
 
@@ -110,8 +110,9 @@ list should be separated by a ':' on Unix (';' on MSWin32 and DOS).
 
 =item B<-formatter> I<module>
 
-Which text formatter to use. Default is L<Pod::Text>. An alternative would
-be e.g.  L<Pod::Text::Termcap>.
+Which text formatter to use. Default is L<Pod::Text>, or for very old
+Perl versions L<Pod::PlainText>. An alternative would be e.g. 
+L<Pod::Text::Termcap>.
 
 =item B<-utf8>
 

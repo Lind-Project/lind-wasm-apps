@@ -2,9 +2,10 @@ package Test2::EventFacet::Meta;
 use strict;
 use warnings;
 
-our $VERSION = '1.302210';
+our $VERSION = '1.302199';
 
 BEGIN { require Test2::EventFacet; our @ISA = qw(Test2::EventFacet) }
+use vars qw/$AUTOLOAD/;
 
 # replace set_details
 {
@@ -34,7 +35,7 @@ sub can {
 }
 
 sub AUTOLOAD {
-    my $name = our $AUTOLOAD;
+    my $name = $AUTOLOAD;
     $name =~ s/^.*:://g;
     my $sub = $_[0]->can($name);
     goto &$sub;
@@ -93,7 +94,7 @@ L<https://github.com/Test-More/test-more/>.
 
 =head1 COPYRIGHT
 
-Copyright Chad Granum E<lt>exodist@cpan.orgE<gt>.
+Copyright 2020 Chad Granum E<lt>exodist@cpan.orgE<gt>.
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

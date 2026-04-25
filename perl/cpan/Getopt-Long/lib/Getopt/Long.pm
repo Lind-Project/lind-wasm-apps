@@ -3,8 +3,8 @@
 # Getopt::Long.pm -- Universal options parsing
 # Author          : Johan Vromans
 # Created On      : Tue Sep 11 15:00:12 1990
-# Last Modified On: Tue Jun 11 13:18:11 2024
-# Update Count    : 1811
+# Last Modified On: Sat Nov 11 17:48:41 2023
+# Update Count    : 1808
 # Status          : Released
 
 ################ Module Preamble ################
@@ -17,8 +17,7 @@ use warnings;
 
 package Getopt::Long;
 
-# Must match Getopt::Long::Parser::VERSION!
-our $VERSION = 2.58;
+our $VERSION = 2.57;
 
 use Exporter;
 use base qw(Exporter);
@@ -1186,7 +1185,7 @@ sub FindOption ($$$$$) {
 		warn ("Value \"", $arg, "\" invalid for option ",
 		      $opt, " (",
 		      $type eq 'o' ? "extended " : '',
-		      "integer number expected)\n");
+		      "number expected)\n");
 		$error++;
 		# Push back.
 		unshift (@$argv, $starter.$rest) if defined $rest;
