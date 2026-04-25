@@ -34,4 +34,4 @@ ok( defined $Getopt::Long::Parser::VERSION,
 is( $Getopt::Long::VERSION, $Getopt::Long::Parser::VERSION,
     "Parser version matches" );
 
-note( "Testing Getopt::Long $Getopt::Long::VERSION, Perl $], $^X" );
+diag( "Testing Getopt::Long $Getopt::Long::VERSION, Perl $], $^X" );

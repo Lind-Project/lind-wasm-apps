@@ -7,9 +7,10 @@
 BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
-    require "./test.pl";
-    require "./loc_tools.pl";
+    require Config; Config->import;
 }
+
+BEGIN { require "./test.pl";  require "./loc_tools.pl"; }
 
 use Config;
 
@@ -126,7 +127,7 @@ SKIP: {
     # Win32 won't let us open the directory, so we never get to die with
     # EISDIR, which happens after open.
     require Errno;
-    Errno->import(qw(EACCES EISDIR));
+    import Errno qw(EACCES EISDIR);
     my $error  = do {
         local $! = $^O eq 'MSWin32' ? &EACCES : &EISDIR; "$!"
     };

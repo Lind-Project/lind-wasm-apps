@@ -7686,9 +7686,6 @@ EOPL
 # of three digit per group separate by '.'s or '_'s. Names are extended
 # with ".0.0" to ensure at least three elements for the pack.
 #                                   -- H.Merijn Brand (m)'06 23-10-2006
-# pack "s>" was introduced in perl-5.10, so I had to rewrite this to an
-# sprintf approach to support bases systems with 5.6.x and 5.8.x
-#                                   -- H.Merijn Brand (m)'25 16-05-2025
 
 my @inc_version_list;
 my @candidates;
@@ -7696,7 +7693,7 @@ my @candidates;
 if (-d $stem) {
     chdir($stem);
     ;@candidates = map {
-	[ $_, sprintf "%04d%04d%04d", (split m/[._]/, "$_.0.0")[0,1,2] ] } glob("5.*");
+	[ $_, pack "s>s>s>", split m/[._]/, "$_.0.0" ] } glob("5.*");
     ;@candidates = sort { $a->[1] cmp $b->[1]} @candidates;
 }
 else {
@@ -7704,7 +7701,7 @@ else {
 }
 
 my ($pversion, $aversion, $vsn5005) = map {
-    sprintf "%04d%04d%04d", (split m/[._]/, "$_.0.0")[0,1,2] } $version, $api_versionstring, "5.005";
+    pack "s>s>s>", split m/[._]/, "$_.0.0" } $version, $api_versionstring, "5.005";
 foreach my $d (@candidates) {
     if ($d->[1] lt $pversion) {
 	if ($d->[1] ge $aversion) {
@@ -13348,6 +13345,10 @@ esac
 set i_fcntl
 eval $setvar
 
+: see if fdopendir exists
+set fdopendir d_fdopendir
+eval $inlibc
+
 : see if fork exists
 set fork d_fork
 eval $inlibc
@@ -14063,10 +14064,6 @@ eval $inlibc
 
 : see if fdim exists
 set fdim d_fdim
-eval $inlibc
-
-: see if fdopendir exists
-set fdopendir d_fdopendir
 eval $inlibc
 
 : see if fegetround exists
@@ -16763,11 +16760,6 @@ define:define:?*)
 	;;
 esac
 
-if test $ivsize -lt $ptrsize; then
-    echo "Re-run Configure adding -Duse64bitint so as to make integers as large as pointer values" >&4
-    exit 1
-fi
-
 case "$uselongdouble:$d_longdbl" in
 define:define)
 	nvtype="long double"
@@ -17483,8 +17475,6 @@ $rm_try
     esac
 esac
 
-case "$perl_lc_all_separator$perl_lc_all_category_positions_init" in
-  "")
 : Check the syntax of LC_ALL when categories are set to different locales
 echo " "
 $echo "Checking the syntax of LC_ALL when categories are set to different locales..." >&4
@@ -17861,23 +17851,6 @@ $rm -f try try.*
           # and run without having to have a bunch more #ifdef's
           d_perl_lc_all_uses_name_value_pairs="$define"
 ;;
-esac
-;;
-
-  *)    # Has an lc_all definition passed-in
-     case "$perl_lc_all_separator" in
-	\"*\") ;;     # Good, enclosed in "..."
-        *) echo "Adding enclosing double quotes to perl_lc_all_separator" >&4
-           case "$perl_lc_all_separator" in
-	      \"*) perl_lc_all_separator="$perl_lc_all_separator\"" ;;
-	      *\") perl_lc_all_separator="\"$perl_lc_all_separator" ;;
-	      *)     perl_lc_all_separator="\"$perl_lc_all_separator\"" ;;
-            esac
-     esac
-     d_perl_lc_all_separator="$define"
-     d_perl_lc_all_category_positions_init="$define"
-     d_perl_lc_all_uses_name_value_pairs="$undef"
-     ;;
 esac
 
 : see if pipe2 exists
@@ -23011,7 +22984,7 @@ else
 #include <signal.h>
 #include <stdio.h>
 int main() {
-printf("$xx %ld\n", (long) SIG${xx});
+printf("$xx %d\n", SIG${xx});
 return 0;
 }
 EOCP
@@ -25066,7 +25039,6 @@ d_fd_macros='$d_fd_macros'
 d_fd_set='$d_fd_set'
 d_fdclose='$d_fdclose'
 d_fdim='$d_fdim'
-d_fdopendir='$d_fdopendir'
 d_fds_bits='$d_fds_bits'
 d_fegetround='$d_fegetround'
 d_ffs='$d_ffs'
@@ -25080,6 +25052,7 @@ d_flockproto='$d_flockproto'
 d_fma='$d_fma'
 d_fmax='$d_fmax'
 d_fmin='$d_fmin'
+d_fdopendir='$d_fdopendir'
 d_fork='$d_fork'
 d_fp_class='$d_fp_class'
 d_fp_classify='$d_fp_classify'

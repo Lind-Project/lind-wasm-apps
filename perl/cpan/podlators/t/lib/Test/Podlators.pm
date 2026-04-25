@@ -6,15 +6,19 @@
 #
 # SPDX-License-Identifier: GPL-1.0-or-later OR Artistic-1.0-Perl
 
-package Test::Podlators v6.0.0;
+package Test::Podlators;
 
-use 5.012;
+use 5.010;
+use base qw(Exporter);
+use strict;
 use warnings;
 
 use Encode qw(decode encode);
-use Exporter qw(import);
+use Exporter;
 use File::Spec;
 use Test::More;
+
+our $VERSION = '2.01';
 
 # Export the test helper functions.
 our @EXPORT_OK = qw(
@@ -576,7 +580,7 @@ Russ Allbery <rra@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2015-2016, 2018-2020, 2022, 2024 Russ Allbery <rra@cpan.org>
+Copyright 2015-2016, 2018-2020, 2022 Russ Allbery <rra@cpan.org>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.

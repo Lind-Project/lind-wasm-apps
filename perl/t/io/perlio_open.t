@@ -11,7 +11,7 @@ BEGIN {
 use strict;
 use warnings;
 
-plan tests => 11;
+plan tests => 10;
 
 use Fcntl qw(:seek);
 
@@ -43,9 +43,4 @@ SKIP:
     is($data, "abcxyz", "check the second write appended");
 }
 
-{
-    # minimal-reproduction moral equivalent of the autodie wrapper for open()
-    # because APIs that wrap open() should be able to expose this behaviour
-    sub wrapped_open (*;$@) { open $_[0], $_[1], $_[2] }
-    ok((wrapped_open my $fh, "+>", undef), "wrapped_open my \$fh, '+>', undef");
-}
+

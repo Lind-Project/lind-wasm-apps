@@ -2,7 +2,7 @@ package SelfLoader;
 use 5.008;
 use strict;
 use IO::Handle;
-our $VERSION = "1.28";
+our $VERSION = "1.27";
 
 # The following bit of eval-magic is necessary to make this work on
 # perls < 5.009005.
@@ -425,8 +425,10 @@ You should have received a copy of the Artistic License with this
 Kit, in the file named "Artistic".  If not, I'll be glad to provide one.
 
 You should also have received a copy of the GNU General Public License
-along with this program in the file named "Copying". If not, see
-<https://www.gnu.org/licenses/>.
+along with this program in the file named "Copying". If not, write to the
+Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+MA 02110-1301, USA or visit their web page on the internet at
+L<http://www.gnu.org/copyleft/gpl.html>.
 
 For those of you that choose to use the GNU General Public License,
 my interpretation of the GNU General Public License is that no Perl

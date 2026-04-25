@@ -65,10 +65,6 @@ my %implies_numstat= (
 );
 
 sub main {
-    # we encode_utf8() manually
-    binmode STDOUT;
-    binmode STDERR;
-
     local $Data::Dumper::Sortkeys= 1;
     my %opts= (
         authors_file    => "AUTHORS",
@@ -85,8 +81,9 @@ sub main {
         \%opts,
         map {
             # support hyphens as well as underbars,
-            # underbars must be first.
-            ref $_ ? $_ : s{\b([a-z]+(?:_[a-z]+)+)\b}{"$1|".($1 =~ tr/_/-/r)}egr
+            # underbars must be first. Only handles two
+            # part words right now.
+            ref $_ ? $_ : s/\b([a-z]+)_([a-z]+)\b/${1}_${2}|${1}-${2}/gr
         } @OPTSPEC,
     ) or pod2usage(2);
     $opts{commit_range}= join " ", @ARGV;

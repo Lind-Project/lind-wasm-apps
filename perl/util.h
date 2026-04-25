@@ -34,15 +34,17 @@
 /*
 =for apidoc_section $string
 
-=for apidoc      ibcmp
-=for apidoc_item ibcmp_locale
-=for apidoc_item ibcmp_utf8
+=for apidoc ibcmp
 
-These return the complement of C<L</foldEQ>>, C<L</foldEQ_locale>>, and
-C<L</foldEQ_utf8>> respectively.  Those other names are preferred, as being
-clearer.
+This is a synonym for S<C<(! foldEQ())>>
 
-Hence, for example, C<ibcmp()> is S<C<(! foldEQ())>>
+=for apidoc ibcmp_locale
+
+This is a synonym for S<C<(! foldEQ_locale())>>
+
+=for apidoc ibcmp_utf8
+
+This is a synonym for S<C<(! foldEQ_utf8())>>
 
 =cut
 */
@@ -241,7 +243,7 @@ returning NULL if not found.  The terminating NUL bytes are not compared.
 */
 
 
-#define Perl_instr(haystack, needle) strstr(haystack, needle)
+#define instr(haystack, needle) strstr((char *) haystack, (char *) needle)
 
 #ifdef HAS_MEMMEM
 #   define ninstr(big, bigend, little, lend)                                \

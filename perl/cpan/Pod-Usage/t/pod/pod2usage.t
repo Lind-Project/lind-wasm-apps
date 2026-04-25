@@ -1,41 +1,21 @@
 use strict;
 use warnings;
 
-use Test::More tests => 1;
-
-use File::Basename;
-use File::Spec;
-use Cwd qw(abs_path);
-my $THISDIR;
 BEGIN {
-    $THISDIR = dirname(abs_path(__FILE__));
-    unshift @INC, $THISDIR;
-    require "testcmp.pl";
-    TestCompare->import;
+   use File::Basename;
+   my $THISDIR = dirname $0;
+   unshift @INC, $THISDIR;
+   require "testp2pt.pl";
+   TestPodIncPlainText->import;
 }
 
-use Pod::Text;
+my %options = map { $_ => 1 } @ARGV;  ## convert cmdline to options-hash
+my $passed  = testpodplaintext \%options, $0;
+exit( ($passed == 1) ? 0 : -1 )  unless $ENV{HARNESS_ACTIVE};
 
-my $infile = File::Spec->catfile($THISDIR, (File::Spec->updir) x 2, 'scripts', 'pod2usage.PL');
-my $cmpfile = File::Spec->catfile($THISDIR, 'pod2usage.xr');
-my $outfile = File::Spec->catfile($THISDIR, 'pod2usage.OUT');
 
-my $text_parser = Pod::Text->new;
-$text_parser->parse_from_file($infile, $outfile);
+__END__
 
-my %opts = map +($_ => 1), @ARGV;
+=include pod2usage.PL
 
-if ($opts{'-xrgen'}) {
-    if ($opts{'-force'} or ! -e $cmpfile) {
-        print "# Creating expected result for \"pod2usage\"" .
-              " pod2text test ...\n";
-        $text_parser->parse_from_file($infile, $cmpfile);
-    }
-    else {
-        print "# File $cmpfile already exists" .
-              " (use '-force' to regenerate it).\n";
-    }
-}
 
-ok !testcmp( $outfile, $cmpfile ), "$outfile matches $cmpfile";
-unlink $outfile;

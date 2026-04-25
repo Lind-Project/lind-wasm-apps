@@ -5,10 +5,11 @@ use warnings;
 
 use Config;
 use Exporter;
-our $VERSION     = "0.38";
-our @ISA         = qw( Exporter );
-our @EXPORT_OK   = qw( plv2hash summary myconfig signature );
-our %EXPORT_TAGS = (
+use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS);
+$VERSION     = "0.36";
+@ISA         = qw( Exporter );
+@EXPORT_OK   = qw( plv2hash summary myconfig signature );
+%EXPORT_TAGS = (
     'all' => [ @EXPORT_OK  ],
     'sig' => [ "signature" ],
     );
@@ -26,8 +27,6 @@ our %EXPORT_TAGS = (
 my %BTD = map {( $_ => 0 )} qw(
 
     DEBUGGING
-    HAS_LONG_DOUBLE
-    HAS_STRTOLD
     NO_HASH_SEED
     NO_MATHOMS
     NO_PERL_INTERNAL_RAND_SEED
@@ -575,7 +574,7 @@ H.Merijn Brand <h.m.brand@xs4all.nl>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2009-2025 H.Merijn Brand
+Copyright (C) 2009-2023 H.Merijn Brand
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

@@ -24,37 +24,28 @@ use warnings;
 
 # (feature name) => (internal name, used in %^H and macro names)
 my %feature = (
-    # A few features are publicly named differently than internally
+    say                     => 'say',
+    state                   => 'state',
+    switch                  => 'switch',
+    bitwise                 => 'bitwise',
+    evalbytes               => 'evalbytes',
     current_sub             => '__SUB__',
+    refaliasing             => 'refaliasing',
+    postderef_qq            => 'postderef_qq',
     unicode_eval            => 'unieval',
     declared_refs           => 'myref',
     unicode_strings         => 'unicode',
+    fc                      => 'fc',
+    signatures              => 'signatures',
+    isa                     => 'isa',
+    indirect                => 'indirect',
+    multidimensional        => 'multidimensional',
+    bareword_filehandles    => 'bareword_filehandles',
+    try                     => 'try',
+    defer                   => 'defer',
     extra_paired_delimiters => 'more_delims',
-    apostrophe_as_package_separator => 'apos_as_name_sep',
-
-    # Most features have identical public and internal names
-    map { $_ => $_ } qw(
-        say
-        state
-        switch
-        bitwise
-        evalbytes
-        refaliasing
-        postderef_qq
-        fc
-        signatures
-        isa
-        indirect
-        multidimensional
-        bareword_filehandles
-        try
-        defer
-        module_true
-        class
-        keyword_any
-        keyword_all
-        smartmatch
-    )
+    module_true             => 'module_true',
+    class                   => 'class',
 );
 
 # NOTE: If a feature is ever enabled in a non-contiguous range of Perl
@@ -64,7 +55,7 @@ my %feature = (
 # 5.odd implies the next 5.even, but an explicit 5.even can override it.
 
 # features bundles
-use constant V5_9_5 => sort qw{say state switch indirect multidimensional bareword_filehandles apostrophe_as_package_separator smartmatch};
+use constant V5_9_5 => sort qw{say state switch indirect multidimensional bareword_filehandles};
 use constant V5_11  => sort ( +V5_9_5, qw{unicode_strings} );
 use constant V5_15  => sort ( +V5_11, qw{unicode_eval evalbytes current_sub fc} );
 use constant V5_23  => sort ( +V5_15, qw{postderef_qq} );
@@ -77,18 +68,13 @@ use constant V5_35  => sort grep {; $_ ne 'switch'
 use constant V5_37  => sort grep {; $_ ne 'bareword_filehandles' } +V5_35, qw{module_true};
 
 use constant V5_39  => sort ( +V5_37, qw{try} );
-use constant V5_41  => sort
-  grep {; $_ ne 'apostrophe_as_package_separator'
-       && $_ ne 'smartmatch' }
-  ( +V5_39 );
 
 #
 # when updating features please also update the Pod entry for L</"FEATURES CHEAT SHEET">
 #
 my %feature_bundle = (
     all     => [ sort keys %feature ],
-    default => [ qw{indirect multidimensional bareword_filehandles
-                    apostrophe_as_package_separator smartmatch} ],
+    default => [ qw{indirect multidimensional bareword_filehandles} ],
     # using 5.9.5 features bundle
     "5.9.5" => [ +V5_9_5 ],
     "5.10"  => [ +V5_9_5 ],
@@ -114,8 +100,6 @@ my %feature_bundle = (
     "5.37"  => [ +V5_37 ],
     # using 5.39 features bundle
     "5.39"  => [ +V5_39 ],
-    # using 5.41 features bundle
-    "5.41"  => [ +V5_41 ],
 );
 
 my @noops = qw( postderef lexical_subs );
@@ -125,22 +109,16 @@ my @removed = qw( array_base );
 ###########################################################################
 # More data generated from the above
 
+if (keys %feature > 32) {
+    die "cop_features only has room for 32 features";
+}
+
 my %feature_bits;
-my %feature_indices;
 my $mask = 1;
-my $index = 0;
 for my $feature (sort keys %feature) {
     $feature_bits{$feature} = $mask;
-    $feature_indices{$feature} = $index;
-    if ($mask == 0x8000_0000) {
-        $mask = 1;
-        ++$index;
-    }
-    else {
-        $mask <<= 1;
-    }
+    $mask <<= 1;
 }
-my $cop_feature_size = $mask == 1 ? $index : $index + 1;
 
 for (keys %feature_bundle) {
     next unless /^5\.(\d*[13579])\z/;
@@ -317,33 +295,14 @@ print $h <<EOH;
 #if defined(PERL_CORE) || defined (PERL_EXT)
 
 #define HINT_FEATURE_SHIFT	$HintShift
+
 EOH
 
 for (sort keys %feature_bits) {
-    if ($feature_bits{$_} == 1) {
-        print $h "\n/* Index $feature_indices{$_} */\n";
-    }
-    printf $h "#define FEATURE_%s_BIT%*s %#010x\n", uc($feature{$_}),
+    printf $h "#define FEATURE_%s_BIT%*s %#06x\n", uc($feature{$_}),
       $width-length($feature{$_}), "", $feature_bits{$_};
 }
 print $h "\n";
-
-for (sort keys %feature_indices) {
-    printf $h "#define FEATURE_%s_INDEX%*s %d\n", uc($feature{$_}),
-      $width-length($feature{$_}), "", $feature_indices{$_};
-}
-print $h "\n";
-
-# we don't require that every source #includes <feature.h>
-print $h <<EOH;
-#define REAL_COP_FEATURE_SIZE $cop_feature_size
-
-/* If the following errors, update COP_FEATURE_SIZE in cop.h */
-#if defined(COP_FEATURE_SIZE) && COP_FEATURE_SIZE != REAL_COP_FEATURE_SIZE
-#  error "COP_FEATURE_SIZE and REAL_COP_FEATURE_SIZE don't match"
-#endif
-
-EOH
 
 my $count;
 for (@HintedBundles) {
@@ -364,9 +323,9 @@ print $h <<'EOH';
 #define CURRENT_FEATURE_BUNDLE \
     ((CURRENT_HINTS & HINT_FEATURE_MASK) >> HINT_FEATURE_SHIFT)
 
-#define FEATURE_IS_ENABLED_MASK(index, mask)                   \
+#define FEATURE_IS_ENABLED_MASK(mask)                   \
   ((CURRENT_HINTS & HINT_LOCALIZE_HH)                \
-    ? (PL_curcop->cop_features.bits[index] & (mask)) : FALSE)
+    ? (PL_curcop->cop_features & (mask)) : FALSE)
 
 /* The longest string we pass in.  */
 EOH
@@ -390,7 +349,7 @@ for (
     ( \\
 	CURRENT_FEATURE_BUNDLE <= FEATURE_BUNDLE_$last \\
      || (CURRENT_FEATURE_BUNDLE == FEATURE_BUNDLE_CUSTOM && \\
-	 FEATURE_IS_ENABLED_MASK(FEATURE_${NAME}_INDEX, FEATURE_${NAME}_BIT)) \\
+	 FEATURE_IS_ENABLED_MASK(FEATURE_${NAME}_BIT)) \\
     )
 
 EOI
@@ -402,7 +361,7 @@ EOI
 	(CURRENT_FEATURE_BUNDLE >= FEATURE_BUNDLE_$first && \\
 	 CURRENT_FEATURE_BUNDLE <= FEATURE_BUNDLE_$last) \\
      || (CURRENT_FEATURE_BUNDLE == FEATURE_BUNDLE_CUSTOM && \\
-	 FEATURE_IS_ENABLED_MASK(FEATURE_${NAME}_INDEX, FEATURE_${NAME}_BIT)) \\
+	 FEATURE_IS_ENABLED_MASK(FEATURE_${NAME}_BIT)) \\
     )
 
 EOH3
@@ -413,7 +372,7 @@ EOH3
     ( \\
 	CURRENT_FEATURE_BUNDLE == FEATURE_BUNDLE_$first \\
      || (CURRENT_FEATURE_BUNDLE == FEATURE_BUNDLE_CUSTOM && \\
-	 FEATURE_IS_ENABLED_MASK(FEATURE_${NAME}_INDEX, FEATURE_${NAME}_BIT)) \\
+	 FEATURE_IS_ENABLED_MASK(FEATURE_${NAME}_BIT)) \\
     )
 
 EOH4
@@ -423,27 +382,18 @@ EOH4
 #define FEATURE_${NAME}_IS_ENABLED \\
     ( \\
 	CURRENT_FEATURE_BUNDLE == FEATURE_BUNDLE_CUSTOM && \\
-	 FEATURE_IS_ENABLED_MASK(FEATURE_${NAME}_INDEX, FEATURE_${NAME}_BIT) \\
+	 FEATURE_IS_ENABLED_MASK(FEATURE_${NAME}_BIT) \\
     )
 
 EOH5
     }
 }
 
-my $save_bits = "STMT_START {  \\\n        "
-  . join("\\\n        ", map { "SAVEI32(PL_compiling.cop_features.bits[$_]); " } 0 .. $cop_feature_size-1)
-  . " \\\n    } STMT_END";
-
-my $clear_bits = "("
-  . join("   \\\n     ", map "PL_compiling.cop_features.bits[$_] = ", 0 .. $cop_feature_size-1) . "0)";
-
 print $h <<EOH;
 
-#define SAVEFEATUREBITS() \\
-    $save_bits
+#define SAVEFEATUREBITS() SAVEI32(PL_compiling.cop_features)
 
-#define CLEARFEATUREBITS() \\
-    $clear_bits
+#define CLEARFEATUREBITS() (PL_compiling.cop_features = 0)
 
 #define FETCHFEATUREBITSHH(hh) S_fetch_feature_bits_hh(aTHX_ (hh))
 
@@ -493,7 +443,6 @@ S_magic_sethint_feature(pTHX_ SV *keysv, const char *keypv, STRLEN keylen,
     if (memBEGINs(keypv, keylen, "feature_")) {
         const char *subf = keypv + (sizeof("feature_")-1);
         U32 mask = 0;
-        int index = 0;
         switch (*subf) {
 EOJ
 
@@ -514,7 +463,6 @@ EOS
             $if (keylen == sizeof("feature_$subkey")-1
                  && memcmp(subf+1, "$rest", keylen - sizeof("feature_")) == 0) {
                 mask = FEATURE_\U${subkey}\E_BIT;
-                index = FEATURE_\U${subkey}\E_INDEX;
                 break;
             }
 EOJ
@@ -532,9 +480,9 @@ print $h <<EOJ;
             return;
         }
         if (valsv ? SvTRUE(valsv) : valbool)
-            PL_compiling.cop_features.bits[index] |= mask;
+            PL_compiling.cop_features |= mask;
         else
-            PL_compiling.cop_features.bits[index] &= ~mask;
+            PL_compiling.cop_features &= ~mask;
     }
 }
 #endif /* PERL_IN_MG_C */
@@ -544,7 +492,6 @@ struct perl_feature_bit {
   const char *name;
   STRLEN namelen;
   U32 mask;
-  int index;
 };
 
 #ifdef PERL_IN_PP_CTL_C
@@ -559,53 +506,29 @@ for my $key (sort keys %feature) {
         /* feature $key */
         "feature_$val",
         STRLENs("feature_$val"),
-        FEATURE_\U$val\E_BIT,
-        FEATURE_\U$val\E_INDEX
+        FEATURE_\U$val\E_BIT
     },
 EOJ
 }
 
 print $h <<EOJ;
-    { NULL, 0, 0U, 0 }
+    { NULL, 0, 0U }
 };
 
 PERL_STATIC_INLINE void
 S_fetch_feature_bits_hh(pTHX_ HV *hh) {
-    CLEARFEATUREBITS();
+    PL_compiling.cop_features = 0;
 
     const struct perl_feature_bit *fb = PL_feature_bits;
     while (fb->name) {
         SV **svp = hv_fetch(hh, fb->name, (I32)fb->namelen, 0);
         if (svp && SvTRUE(*svp))
-               PL_compiling.cop_features.bits[fb->index] |= fb->mask;
+               PL_compiling.cop_features |= fb->mask;
         ++fb;
     }
 }
 
-#endif /* PERL_IN_PP_CTL_C */
-
-#ifdef PERL_IN_DUMP_C
-
-EOJ
-
-my $any_bits_set = "(                              \\\n      " .
-  join(" || \\\n      ", map "cop->cop_features.bits[$_]", 0 .. $cop_feature_size-1) .
-  "    \\\n    )";
-
-my $dump_bits = "STMT_START { \\\n        " .
-  join(qq( \\\n        PerlIO_putc(file, ','); \\\n        ),
-       map { qq(PerlIO_printf(file, "0x%" U32xf, cop->cop_features.bits[$_]);) }
-       0 .. $cop_feature_size-1) .
-  " \\\n    } STMT_END";
-
-print $h <<EOJ;
-#define ANY_FEATURE_BITS_SET(cop)  \\
-    $any_bits_set
-
-#define DUMP_FEATURE_BITS(file, cop) \\
-    $dump_bits
-
-#endif /* PERL_IN_DUMP_C */
+#endif
 
 #endif /* PERL_FEATURE_H_ */
 EOJ
@@ -618,7 +541,7 @@ read_only_bottom_close_and_rename($h);
 
 __END__
 package feature;
-our $VERSION = '1.97';
+our $VERSION = '1.89';
 
 FEATURES
 
@@ -708,33 +631,23 @@ See L<perlsub/"Persistent Private Variables"> for details.
 
 This feature is available starting with Perl 5.10.
 
-=head2 The 'smartmatch' feature
-
-C<use feature 'smartmatch'> tells the compiler to enable the
-smartmatch operator C<~~>.  It is enabled by default, but can be
-turned off to disallow the C<~~> operator.
-
-This feature is disabled by default in the 5.42 feature bundle
-onwards:
-
-  $x ~~ $y; # fine
-  use v5.42;
-  $x ~~ $y; # error
-
-This has no effect on the implicit smartmatches done by C<when>.
-
-See L<perlop/"Smartmatch Operator"> for details.
-
 =head2 The 'switch' feature
+
+B<WARNING>: This feature is still experimental and the implementation may
+change or be removed in future versions of Perl.  For this reason, Perl will
+warn when you use the feature, unless you have explicitly disabled the warning:
+
+    no warnings "experimental::smartmatch";
 
 C<use feature 'switch'> tells the compiler to enable the Raku
 given/when construct.
 
 See L<perlsyn/"Switch Statements"> for details.
 
-This feature is available starting with Perl 5.10.  It is enabled by
-feature bundles 5.10 through 5.34, and disabled from the 5.36 feature
-bundle onwards.
+This feature is available starting with Perl 5.10.
+It is deprecated starting with Perl 5.38, and using
+C<given>, C<when> or smartmatch will throw a warning.
+It will be removed in Perl 5.42.
 
 =head2 The 'unicode_strings' feature
 
@@ -952,7 +865,7 @@ disallow indirect object syntax.
 This feature is available under this name from Perl 5.32 onwards. In
 previous versions, it was simply on all the time.  To disallow (or
 warn on) indirect object syntax on older Perls, see the L<indirect>
-CPAN module.  It is disabled from the 5.36 feature bundle onwards.
+CPAN module.
 
 =head2 The 'multidimensional' feature
 
@@ -966,8 +879,7 @@ When this feature is disabled the syntax that is normally replaced
 will report a compilation error.
 
 This feature is available under this name from Perl 5.34 onwards. In
-previous versions, it was simply on all the time.  It is disabled from
-the 5.36 feature bundle onwards.
+previous versions, it was simply on all the time.
 
 You can use the L<multidimensional> module on CPAN to disable
 multidimensional array emulation for older versions of Perl.
@@ -983,8 +895,7 @@ The perl built-in filehandles C<STDIN>, C<STDOUT>, C<STDERR>, C<DATA>,
 C<ARGV>, C<ARGVOUT> and the special C<_> are always enabled.
 
 This feature is available under this name from Perl 5.34 onwards.  In
-previous versions it was simply on all the time.  It is disabled from
-the 5.38 feature bundle onwards.
+previous versions it was simply on all the time.
 
 You can use the L<bareword::filehandles> module on CPAN to disable
 bareword filehandles for older versions of perl.
@@ -1063,43 +974,6 @@ warn when you use the feature, unless you have explicitly disabled the warning:
 
 This feature enables the C<class> block syntax and other associated keywords
 which implement the "new" object system, previously codenamed "Corinna".
-
-=head2 The 'apostrophe_as_package_separator' feature
-
-This feature enables use C<'> (apostrophe) as an alternative to using
-C<::> as a separate in package and other global names.
-
-This is enabled by default, but disabled from the 5.42 feature bundle
-onwards.  In previous versions it was enabled all the time.
-
-This only disables C<'> in symbols in your source code, the internal
-conversion from C<'> to C<::>, including for symbolic references, is
-always enabled.
-
-=head2 The 'keyword_any' feature
-
-B<WARNING>: This feature is still experimental and the implementation may
-change or be removed in future versions of Perl.  For this reason, Perl will
-warn when you use the feature, unless you have explicitly disabled the warning:
-
-    no warnings "experimental::keyword_any";
-
-This feature enables the L<C<any>|perlfunc/any BLOCK LIST> operator keyword.
-This allow testing whether any of the values in a list satisfy a given
-condition, with short-circuiting behaviour as soon as it finds one.
-
-=head2 The 'keyword_all' feature
-
-B<WARNING>: This feature is still experimental and the implementation may
-change or be removed in future versions of Perl.  For this reason, Perl will
-warn when you use the feature, unless you have explicitly disabled the warning:
-
-    no warnings "experimental::keyword_all";
-
-This feature enables the L<C<all>|perlfunc/all BLOCK LIST> operator keyword.
-This allow testing whether all of the values in a list satisfy a given
-condition, with short-circuiting behaviour as soon as it finds one that does
-not.
 
 =head1 FEATURE BUNDLES
 

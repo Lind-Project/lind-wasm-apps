@@ -2,7 +2,7 @@ package Term::Table;
 use strict;
 use warnings;
 
-our $VERSION = '0.024';
+our $VERSION = '0.018';
 
 use Term::Table::Cell();
 
@@ -227,7 +227,7 @@ sub render {
 
     unless (USE_GCS) {
         for my $row (@out) {
-            next unless $row =~ m/[[:^ascii:]]/;
+            next unless $row =~ m/[^\x00-\x7F]/;
             unshift @out => "Unicode::GCString is not installed, table may not display all unicode characters properly";
             last;
         }

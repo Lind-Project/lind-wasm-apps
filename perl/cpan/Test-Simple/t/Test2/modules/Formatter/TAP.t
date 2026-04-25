@@ -6,8 +6,6 @@ use warnings;
 my $CLASS;
 my %BEFORE_LOAD;
 
-local $ENV{TABLE_TERM_SIZE} = 80;
-
 BEGIN {
     my $old = select STDOUT;
     $BEFORE_LOAD{STDOUT} = $|;

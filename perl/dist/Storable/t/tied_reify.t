@@ -1,11 +1,8 @@
-#!./perl
-use strict;
-use warnings;
-
 use Test::More tests => 1;
-
+ 
 package dumb_thing;
 
+use strict; use warnings;
 use Tie::Array;
 use Carp;
 use base 'Tie::StdArray';
@@ -22,6 +19,7 @@ sub TIEARRAY {
 
 package main;
 
+use strict; use warnings;
 use Storable qw(freeze thaw);
 
 my $x = [1,2,3,4];

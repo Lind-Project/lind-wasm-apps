@@ -18,7 +18,7 @@ if (-c $devnull) {
     push @tests, ['CHR', $devnull, (stat $devnull)[2]];
 }
 
-plan(tests => 34 + 6 + 8 * @tests);
+plan(tests => 34 + 6 + 9 * @tests);
 foreach (@tests) {
     my ($type, $name, $mode) = @$_;
 
@@ -62,6 +62,10 @@ foreach (@tests) {
  SKIP: {
 	skip 'No S_IFWHT', 1 unless defined eval {S_IFWHT};
 	ok(!S_ISWHT($mode), "!S_ISWHT $name");
+    }
+ SKIP: {
+	skip 'No S_ENFMT', 1 unless defined eval {S_ENFMT};
+	ok(!S_ISENFMT($mode), "!S_ISENFMT $name");
     }
 }
 

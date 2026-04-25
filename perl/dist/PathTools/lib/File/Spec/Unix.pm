@@ -3,7 +3,7 @@ package File::Spec::Unix;
 use strict;
 use Cwd ();
 
-our $VERSION = '3.94';
+our $VERSION = '3.91';
 $VERSION =~ tr/_//d;
 
 =head1 NAME
@@ -253,7 +253,7 @@ Takes no argument, returns the environment variable PATH as an array.
 
 sub path {
     return () unless exists $ENV{PATH};
-    my @path = split(':', $ENV{PATH}, -1);
+    my @path = split(':', $ENV{PATH});
     foreach (@path) { $_ = '.' if $_ eq '' }
     return @path;
 }

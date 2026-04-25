@@ -6,7 +6,6 @@
 #define NEED_my_sprintf
 #define NEED_sv_2pv_flags
 #define NEED_utf8_to_uvchr_buf
-#define NEED_sv_vstring_get
 #include "ppport.h"
 
 #ifndef strlcpy
@@ -1241,8 +1240,7 @@ DD_dump(pTHX_ SV *val, const char *name, STRLEN namelen, SV *retval, HV *seenhv,
     }
     else {
 	STRLEN i;
-	STRLEN vstr_len;
-	const char *vstr_pv;
+	const MAGIC *mg;
 	
 	if (namelen) {
 	    id_buffer = PTR2UV(val);
@@ -1388,17 +1386,17 @@ DD_dump(pTHX_ SV *val, const char *name, STRLEN namelen, SV *retval, HV *seenhv,
 	    sv_catpvs(retval, "undef");
 	}
 #ifdef SvVOK
-	else if (SvVOK(val) && (vstr_pv = SvVSTRING(val, vstr_len))) {
+	else if (SvMAGICAL(val) && (mg = mg_find(val, 'V'))) {
 # if !defined(PL_vtbl_vstring) && PERL_VERSION_LT(5,17,0)
 	    SV * const vecsv = sv_newmortal();
 #  if PERL_VERSION_LT(5,10,0)
-	    scan_vstring(vstr_pv, vecsv);
+	    scan_vstring(mg->mg_ptr, vecsv);
 #  else
-	    scan_vstring(vstr_pv, vstr_pv + vstr_len, vecsv);
+	    scan_vstring(mg->mg_ptr, mg->mg_ptr + mg->mg_len, vecsv);
 #  endif
 	    if (!sv_eq(vecsv, val)) goto integer_came_from_string;
 # endif
-	    sv_catpvn(retval, vstr_pv, vstr_len);
+	    sv_catpvn(retval, (const char *)mg->mg_ptr, mg->mg_len);
 	}
 #endif
 
@@ -1703,13 +1701,13 @@ Data_Dumper__vstring(sv)
 	CODE:
 	{
 #ifdef SvVOK
-	    if(SvVOK(sv)) {
-		STRLEN vstr_len;
-		const char *vstr_pv = SvVSTRING(sv, vstr_len);
-		RETVAL = newSVpvn(vstr_pv, vstr_len);
-	    }
-	    else
-#endif
+	    const MAGIC *mg;
+	    RETVAL =
+		SvMAGICAL(sv) && (mg = mg_find(sv, 'V'))
+		 ? newSVpvn((const char *)mg->mg_ptr, mg->mg_len)
+		 : &PL_sv_undef;
+#else
 	    RETVAL = &PL_sv_undef;
+#endif
 	}
 	OUTPUT: RETVAL

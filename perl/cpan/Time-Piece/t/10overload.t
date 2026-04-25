@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 use Time::Piece;
-use Test::More tests => 5;
+use Test::More;
 
 eval 'use Math::BigInt';
 plan skip_all => "Math::BigInt required for testing overloaded operands" if $@;
@@ -21,3 +21,5 @@ is $t->cdate, 'Tue Jan  1 01:00:00 1980', 'add overloaded value';
  
 $t = $t - $big_hour;
 is $t->cdate, 'Tue Jan  1 00:00:00 1980', 'sub overloaded value';
+
+done_testing;

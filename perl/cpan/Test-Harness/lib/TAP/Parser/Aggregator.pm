@@ -12,11 +12,11 @@ TAP::Parser::Aggregator - Aggregate TAP::Parser results
 
 =head1 VERSION
 
-Version 3.50
+Version 3.48
 
 =cut
 
-our $VERSION = '3.50';
+our $VERSION = '3.48';
 
 =head1 SYNOPSIS
 
@@ -179,17 +179,6 @@ sub _get_parsers {
         push @parsers => $self->{parser_for}{$description};
     }
     return wantarray ? @parsers : \@parsers;
-}
-
-sub total_files {
-    my $self = shift;
-    return scalar $self->parsers;
-}
-
-sub failed_files {
-    my $self = shift;
-    my $num_bad = grep { $_->has_problems } $self->parsers;
-    return $num_bad;
 }
 
 =head3 C<descriptions>

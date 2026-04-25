@@ -313,8 +313,7 @@ foreach my $x (split //, 'enrtfa\\\'"') {
 # Trying to avoid setting $_, or relying on local $_ to work.
 sub display {
     my @result;
-    foreach my $element (@_) {
-        my $x = $element; # Make a copy in case @_ contains unmodifiable elements
+    foreach my $x (@_) {
         if (defined $x and not ref $x) {
             my $y = '';
             foreach my $c (unpack($chars_template, $x)) {

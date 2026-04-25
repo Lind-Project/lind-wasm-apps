@@ -248,7 +248,7 @@ sub TIESCALAR{bless[]}
 {
  tie my $t, __PACKAGE__;
  for($t) { # $_ is now tied
-  Exporter::for::Tied::_->import;
+  import Exporter::for::Tied::_;
  }
 }
 ::ok(1, 'import with tied $_');

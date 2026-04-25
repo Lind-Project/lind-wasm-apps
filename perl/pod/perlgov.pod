@@ -492,9 +492,9 @@ how the membership has changed over time.
 
 =over
 
-=item * Aristotle Pagaltzis
-
 =item * Graham Knop
+
+=item * Paul Evans
 
 =item * Philippe Bruhat
 
@@ -507,8 +507,6 @@ The current members of the Perl Core Team are:
 =head2 Active Members
 
 =over 4
-
-=item Aristotle Pagaltzis <pagaltzis@gmx.de>
 
 =item Chad Granum <exodist7@gmail.com>
 

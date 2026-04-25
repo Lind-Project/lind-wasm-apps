@@ -144,6 +144,10 @@ Show help.
 
 =item *
 
+Update F<Porting/Maintainers.pl>
+
+=item *
+
 Optional, run a full test suite
 
 =item *
@@ -209,7 +213,7 @@ my $package_file = "$tmpdir/$package"; # this is a cache
 my $type_dir     = "cpan";
 
 my @problematic = (
-    # no current entries as of perl-5.42.2 (March 2026)
+    # no current entries as of perl-5.40.4 (Mar 2026)
 );
 
 
@@ -824,7 +828,10 @@ while (<$Maintainers_pl>) {
             my $date = localtime;
             my $user = $ENV{USER} ? "$ENV{USER} on " : "";
             my $key = "SYNCINFO";
-            unless (s/^ \s* '\Q$key\E' \s* => \s* \K '[^']+' /'$user$date'/x) {
+            if ( /^'([A-Z_]+)'\s+=>/ and $1 eq $key) {
+                s/(=>\s+)'[^']+'/$1'$user$date'/;
+            }
+            else {
                 print $new_Maintainers_pl
                     "        '$key'     => '$user$date',\n";
             }
