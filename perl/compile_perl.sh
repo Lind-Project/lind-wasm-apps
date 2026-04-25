@@ -187,6 +187,14 @@ sed -i \
   -e "s|^d_poll=.*|d_poll='define'|" \
   -e "s|^exe_ext=.*|exe_ext='.wasm'|" \
   -e "s|^_exe=.*|_exe='.wasm'|" \
+  -e "s|^libs=.*|libs='-lpthread -lm'|" \
+  -e "s|^perllibs=.*|perllibs='-lpthread -lm'|" \
+  -e "s|^d_crypt=.*|d_crypt='undef'|" \
+  -e "s|^cryptlib=.*|cryptlib=''|" \
+  -e "s|^d_suidsafe=.*|d_suidsafe='undef'|" \
+  -e "s|^d_dosuid=.*|d_dosuid='undef'|" \
+  -e "s|^d_spawn=.*|d_spawn='undef'|" \
+  -e "s|^d_aspawn=.*|d_aspawn='undef'|" \
   config.sh
 
 # Regenerate all config-dependent files from config.sh
