@@ -111,7 +111,7 @@ RANLIB="$RANLIB" \
   -Dranlib="$RANLIB" \
   -Doptimize="-O2 -g" \
   -Dccflags="-pthread -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -Wno-incompatible-function-pointer-types" \
-  -Dldflags="-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base -L$MERGED_SYSROOT/lib/wasm32-wasi -L$MERGED_SYSROOT/usr/lib/wasm32-wasi" \
+  -Dldflags="-Wl,--import-memory,--export-memory,--shared-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base -L$MERGED_SYSROOT/lib/wasm32-wasi -L$MERGED_SYSROOT/usr/lib/wasm32-wasi" \
   -Dlibs="-lpthread -lm" \
   -Dperllibs="-lpthread -lm" \
   -Uusedl \
