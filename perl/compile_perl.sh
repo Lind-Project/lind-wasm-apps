@@ -99,13 +99,12 @@ echo "[perl] configuring with perl-cross for wasm32-wasi..."
 export READELF="$STUB_BIN/readelf"
 export OBJDUMP="$STUB_BIN/objdump"
 
+CC="$CC_WASM" \
+AR="$AR" \
+RANLIB="$RANLIB" \
 ./configure \
   --target=wasm32-unknown-wasi \
-  --cc="$CC_WASM" \
-  --ar="$AR" \
-  --ranlib="$RANLIB" \
   --prefix=/usr/local \
-  -Dusedevel \
   -Dcc="$CC_WASM" \
   -Dld="$CC_WASM" \
   -Dar="$AR" \
