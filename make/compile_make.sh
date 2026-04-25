@@ -148,7 +148,7 @@ if [[ ! -x "$WASM_OPT" ]]; then
 fi
 
 echo "[make] running wasm-opt (asyncify + optimization)..."
-"$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
+"$WASM_OPT" --epoch-injection --asyncify --fpcast-emu -O2 --debuginfo \
   "$MAKE_WASM" -o "$MAKE_OPT_WASM"
 
 if [[ ! -f "$MAKE_OPT_WASM" ]]; then

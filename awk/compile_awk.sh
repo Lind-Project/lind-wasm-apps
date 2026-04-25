@@ -149,7 +149,7 @@ if [[ ! -x "$WASM_OPT" ]]; then
 fi
 
 echo "[awk] running wasm-opt (asyncify + optimization)..."
-"$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
+"$WASM_OPT" --epoch-injection --asyncify --fpcast-emu -O2 --debuginfo \
   "$AWK_WASM" -o "$AWK_OPT_WASM"
 
 if [[ ! -f "$AWK_OPT_WASM" ]]; then
