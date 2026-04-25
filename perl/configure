@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# This chunk of code handles out-of-tree builds:
+#
+#     mkdir perl-build
+#     cd perl-build
+#     ../perl-5.x.y/configure ...
+#     make
+#
+# It does nothing for regular builds and should be removed.
+#
+# Perl is not meant to be built out-of-tree. All this code
+# does is a crude implementation of a git workdir using symlinks.
+#
+# Avoid relying on this.
+# For multiple builds, just unpack the same source several times.
+
+root=${0%/*}
+
+if [ "$root" != "$0" -a ! -f "MANIFEST" ]; then
+	echo "No MANIFEST found. Assuming out-of-source build."
+	echo "Symlinking source files..."
+
+	if [ ! -f "$root/MANIFEST" ]; then
+		echo "No $root/MANIFEST either." >&2
+		echo "perl-cross is not deployed properly." >&2
+		exit 1
+	fi
+
+	(cd "$root" && find -type d) | while read d; do
+		dir="${d#./}" # ./foo/bar -> foo/bar
+
+		if [ "$d" = "." ]; then
+			dp=""
+			back="$root"
+		else
+			mkdir -p "$dir"
+			dp="$dir/"
+			up=`echo "$dir" | sed -e 's![^/]\+!..!g'`
+			back="$up/$root"
+		fi
+
+		(cd "$root/$dir" && find -maxdepth 1 -type f) | while read i; do
+			name="${i#./}"
+			ln -s "$back/$dp$name" "$dp$name"
+		done
+
+		(cd "$root/$dir" && find -maxdepth 1 -type l) | while read i; do
+			name="${i#./}"
+			ln -s "$back/$dp$name" "$dp$name"
+		done
+	done
+
+	echo "Symlinking done, proceeding with configure."
+fi
+
+cnf/configure "$@"
