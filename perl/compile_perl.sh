@@ -83,16 +83,22 @@ pushd "$PERL_ROOT" >/dev/null
 echo "[perl] cleaning any previous build..."
 make distclean >/dev/null 2>&1 || true
 
-# perl-cross requires readelf and objdump, which don't exist for wasm targets.
-# Create no-op stubs so configure doesn't fail.
+# perl-cross requires readelf and objdump for the target. For wasm there are
+# no ELF binaries, so we create stubs. But we must NOT put them on PATH
+# globally — the native miniperl build needs the real host readelf.
+# Instead, pass them explicitly via configure flags for the target only.
 STUB_BIN="$PERL_ROOT/.wasi-stubs"
 mkdir -p "$STUB_BIN"
 printf '#!/bin/sh\nexit 0\n' > "$STUB_BIN/readelf"
 printf '#!/bin/sh\nexit 0\n' > "$STUB_BIN/objdump"
 chmod +x "$STUB_BIN/readelf" "$STUB_BIN/objdump"
-export PATH="$STUB_BIN:$PATH"
 
 echo "[perl] configuring with perl-cross for wasm32-wasi..."
+# Set target-only tool overrides (buildmini uses HOST* prefix, so these
+# only affect the target configure pass)
+export READELF="$STUB_BIN/readelf"
+export OBJDUMP="$STUB_BIN/objdump"
+
 ./configure \
   --target=wasm32-unknown-wasi \
   --cc="$CC_WASM" \
