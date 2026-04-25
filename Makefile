@@ -356,7 +356,7 @@ cpython: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 # Uses postgres/compile_postgres.sh to build the PostgreSQL backend as a
 # wasm32-wasi binary using the merged sysroot and toolchain detected by
 # preflight, and stages artifacts under build/bin/postgres/wasm32-wasi/.
-postgres: merge-sysroot
+postgres: $(MERGE_BASE_STAMP)
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/postgres/compile_postgres.sh'
 
