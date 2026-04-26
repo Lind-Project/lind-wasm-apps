@@ -88,17 +88,39 @@ For static builds (default):
 LIND_DYLINK=0 make git
 ```
 
+### fpcast-emu (indirect call type mismatch fix)
+
+Some apps (bash, nginx, coreutils, grep) use `--fpcast-emu` in their wasm-opt pass to handle indirect function pointer type mismatches. For dynamic builds, fpcast-emu requires additional setup:
+
+1. Rebuild the lind-wasm sysroot with fpcast support:
+   ```bash
+   cd ~/lind-wasm
+   make sysroot WITH_FPCAST=1
+   ```
+
+2. Apps are compiled with `--fpcast-emu` automatically (see each app's compile script)
+
+3. Run with `--enable-fpcast`:
+   ```bash
+   lind-wasm --enable-fpcast usr/local/bin/bash -c "echo hello"
+   ```
+
+Without `WITH_FPCAST=1` in the sysroot, dynamic builds of apps using fpcast-emu will fail with indirect call type mismatch errors at runtime.
+
 ## Running
 
 After building and installing, run apps through the Lind runtime:
 
 ```bash
 # Static builds
-lind_run usr/local/bin/bash -c "echo hello"
-lind_run usr/local/bin/git --version
+lind-wasm usr/local/bin/bash -c "echo hello"
+lind-wasm usr/local/bin/git --version
+
+# Apps that use fpcast-emu (bash, nginx, coreutils, grep)
+lind-wasm --enable-fpcast usr/local/bin/bash -c "echo hello"
 
 # Dynamic builds (shared libs preloaded automatically after install)
-LIND_DYLINK=1 lind_run --preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so usr/local/bin/git --version
+lind-wasm --preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so usr/local/bin/git --version
 ```
 
 ## Testing
