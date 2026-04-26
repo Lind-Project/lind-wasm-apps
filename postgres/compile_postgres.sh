@@ -29,7 +29,9 @@ PG_ROOT="$APPS_ROOT/postgres"
 
 APPS_BUILD="$APPS_ROOT/build"
 MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
-STAGE_DIR="$APPS_BUILD/postgres/wasm32-wasi"
+STAGE_DIR="$APPS_BUILD/postgres"
+STAGE_BIN="$STAGE_DIR/bin"
+STAGE_SHARE="$STAGE_DIR/share"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -71,7 +73,7 @@ if [[ ! -d "$MERGED_SYSROOT" ]]; then
   exit 1
 fi
 
-mkdir -p "$STAGE_DIR"
+mkdir -p "$STAGE_BIN" "$STAGE_SHARE"
 
 # --- WASM-specific source patches -------------------------------------------
 
@@ -534,6 +536,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   # Shared library output directory
   PG_SHARED_LIB_DIR="$STAGE_DIR/lib"
   mkdir -p "$PG_SHARED_LIB_DIR"
+  mkdir -p "$STAGE_BIN" "$STAGE_SHARE"
 
   # Libraries to convert: libpq is the main one needed by client tools
   # libpgport and libpgcommon are typically linked statically into binaries
@@ -621,41 +624,41 @@ PG_REGRESS_BINARY="$PG_ROOT/src/test/regress/pg_regress"
 STAGED_BINARIES=()
 
 if [[ -f "$PG_BINARY" ]]; then
-  cp "$PG_BINARY" "$STAGE_DIR/postgres.wasm"
+  cp "$PG_BINARY" "$STAGE_BIN/postgres.wasm"
   STAGED_BINARIES+=("postgres")
-  echo "[postgres] staged: $STAGE_DIR/postgres.wasm"
+  echo "[postgres] staged: $STAGE_BIN/postgres.wasm"
 else
   echo "[postgres] WARNING: postgres binary was not produced."
 fi
 
 if [[ -f "$INITDB_BINARY" ]]; then
-  cp "$INITDB_BINARY" "$STAGE_DIR/initdb.wasm"
+  cp "$INITDB_BINARY" "$STAGE_BIN/initdb.wasm"
   STAGED_BINARIES+=("initdb")
-  echo "[postgres] staged: $STAGE_DIR/initdb.wasm"
+  echo "[postgres] staged: $STAGE_BIN/initdb.wasm"
 else
   echo "[postgres] WARNING: initdb binary was not produced."
 fi
 
 if [[ -f "$PGBENCH_BINARY" ]]; then
-  cp "$PGBENCH_BINARY" "$STAGE_DIR/pgbench.wasm"
+  cp "$PGBENCH_BINARY" "$STAGE_BIN/pgbench.wasm"
   STAGED_BINARIES+=("pgbench")
-  echo "[postgres] staged: $STAGE_DIR/pgbench.wasm"
+  echo "[postgres] staged: $STAGE_BIN/pgbench.wasm"
 else
   echo "[postgres] WARNING: pgbench binary was not produced."
 fi
 
 if [[ -f "$PSQL_BINARY" ]]; then
-  cp "$PSQL_BINARY" "$STAGE_DIR/psql.wasm"
+  cp "$PSQL_BINARY" "$STAGE_BIN/psql.wasm"
   STAGED_BINARIES+=("psql")
-  echo "[postgres] staged: $STAGE_DIR/psql.wasm"
+  echo "[postgres] staged: $STAGE_BIN/psql.wasm"
 else
   echo "[postgres] WARNING: psql binary was not produced."
 fi
 
 if [[ -f "$PG_REGRESS_BINARY" ]]; then
-  cp "$PG_REGRESS_BINARY" "$STAGE_DIR/pg_regress.wasm"
+  cp "$PG_REGRESS_BINARY" "$STAGE_BIN/pg_regress.wasm"
   STAGED_BINARIES+=("pg_regress")
-  echo "[postgres] staged: $STAGE_DIR/pg_regress.wasm"
+  echo "[postgres] staged: $STAGE_BIN/pg_regress.wasm"
 else
   echo "[postgres] WARNING: pg_regress binary was not produced."
 fi
@@ -671,8 +674,8 @@ fi
 ###############################################################################
 
 for bin_name in "${STAGED_BINARIES[@]}"; do
-  RAW_WASM="$STAGE_DIR/${bin_name}.wasm"
-  OPT_WASM="$STAGE_DIR/${bin_name}.opt.wasm"
+  RAW_WASM="$STAGE_BIN/${bin_name}.wasm"
+  OPT_WASM="$STAGE_BIN/${bin_name}.opt.wasm"
 
   if [[ -x "$WASM_OPT" ]]; then
     echo "[postgres] running wasm-opt on ${bin_name} (asyncify + optimization)..."
@@ -739,8 +742,8 @@ done
 
 echo
 echo "[postgres] build complete. Outputs under:"
-echo "  $STAGE_DIR"
-ls -lh "$STAGE_DIR" || true
+echo "  $STAGE_BIN"
+ls -lh "$STAGE_BIN" || true
 
 # ============================================================================
 # Stage share files required by initdb/postgres
@@ -748,37 +751,52 @@ ls -lh "$STAGE_DIR" || true
 echo
 echo "[postgres] staging share files..."
 
-SHARE_DIR="$STAGE_DIR/share"
-mkdir -p "$SHARE_DIR"
-mkdir -p "$SHARE_DIR/timezonesets"
+mkdir -p "$STAGE_SHARE/timezonesets"
 
 # Core catalog files
-cp "$PG_ROOT/src/include/catalog/postgres.bki" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: postgres.bki not found"
-cp "$PG_ROOT/src/include/catalog/system_constraints.sql" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: system_constraints.sql not found"
-cp "$PG_ROOT/src/backend/catalog/system_functions.sql" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: system_functions.sql not found"
-cp "$PG_ROOT/src/backend/catalog/information_schema.sql" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: information_schema.sql not found"
-cp "$PG_ROOT/src/backend/catalog/sql_features.txt" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: sql_features.txt not found"
-cp "$PG_ROOT/src/backend/catalog/system_views.sql" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: system_views.sql not found"
+cp "$PG_ROOT/src/include/catalog/postgres.bki" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: postgres.bki not found"
+cp "$PG_ROOT/src/include/catalog/system_constraints.sql" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: system_constraints.sql not found"
+cp "$PG_ROOT/src/backend/catalog/system_functions.sql" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: system_functions.sql not found"
+cp "$PG_ROOT/src/backend/catalog/information_schema.sql" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: information_schema.sql not found"
+cp "$PG_ROOT/src/backend/catalog/sql_features.txt" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: sql_features.txt not found"
+cp "$PG_ROOT/src/backend/catalog/system_views.sql" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: system_views.sql not found"
 
 # Stub snowball (text search extension not supported in WASM)
-echo "-- Snowball text search disabled for WASM" > "$SHARE_DIR/snowball_create.sql"
+echo "-- Snowball text search disabled for WASM" > "$STAGE_SHARE/snowball_create.sql"
 echo "[postgres] created stub snowball_create.sql"
 
 # Config samples
-cp "$PG_ROOT/src/backend/utils/misc/postgresql.conf.sample" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: postgresql.conf.sample not found"
-cp "$PG_ROOT/src/backend/libpq/pg_hba.conf.sample" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: pg_hba.conf.sample not found"
-cp "$PG_ROOT/src/backend/libpq/pg_ident.conf.sample" "$SHARE_DIR/" 2>/dev/null || echo "[postgres] WARNING: pg_ident.conf.sample not found"
+cp "$PG_ROOT/src/backend/utils/misc/postgresql.conf.sample" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: postgresql.conf.sample not found"
+cp "$PG_ROOT/src/backend/libpq/pg_hba.conf.sample" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: pg_hba.conf.sample not found"
+cp "$PG_ROOT/src/backend/libpq/pg_ident.conf.sample" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: pg_ident.conf.sample not found"
 
 # Timezone sets
 if [[ -d "$PG_ROOT/src/timezone/tznames" ]]; then
-  cp "$PG_ROOT/src/timezone/tznames"/*.txt "$SHARE_DIR/timezonesets/" 2>/dev/null || true
-  cp -r "$PG_ROOT/src/timezone/tznames/Australia" "$SHARE_DIR/timezonesets/" 2>/dev/null || true
-  cp -r "$PG_ROOT/src/timezone/tznames/India" "$SHARE_DIR/timezonesets/" 2>/dev/null || true
-  cp "$PG_ROOT/src/timezone/tznames/Default" "$SHARE_DIR/timezonesets/" 2>/dev/null || true
+  cp "$PG_ROOT/src/timezone/tznames"/*.txt "$STAGE_SHARE/timezonesets/" 2>/dev/null || true
+  cp -r "$PG_ROOT/src/timezone/tznames/Australia" "$STAGE_SHARE/timezonesets/" 2>/dev/null || true
+  cp -r "$PG_ROOT/src/timezone/tznames/India" "$STAGE_SHARE/timezonesets/" 2>/dev/null || true
+  cp "$PG_ROOT/src/timezone/tznames/Default" "$STAGE_SHARE/timezonesets/" 2>/dev/null || true
   echo "[postgres] copied timezone sets"
 else
   echo "[postgres] WARNING: timezone tznames directory not found"
 fi
 
-echo "[postgres] share files staged at: $SHARE_DIR"
-ls -la "$SHARE_DIR" || true
+echo "[postgres] share files staged at: $STAGE_SHARE"
+ls -la "$STAGE_SHARE" || true
+
+# ============================================================================
+# Create symlinks for binaries (initdb needs "postgres" not "postgres.cwasm")
+# ============================================================================
+echo
+echo "[postgres] creating symlinks..."
+cd "$STAGE_BIN"
+for bin_name in "${STAGED_BINARIES[@]}"; do
+  if [[ -f "${bin_name}.cwasm" ]]; then
+    ln -sf "${bin_name}.cwasm" "${bin_name}"
+    echo "[postgres] symlink: ${bin_name} -> ${bin_name}.cwasm"
+  fi
+done
+cd - >/dev/null
+
+echo
+echo "[postgres] install with: make install-postgres"
