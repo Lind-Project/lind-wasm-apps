@@ -38,11 +38,8 @@ Postgres requires fpcast-emu mode. Use the `--enable-fpcast` flag:
 ```bash
 cd $LIND_WASM_ROOT
 
-# Initialize database
-sudo ./scripts/lind_run --enable-fpcast /bin/initdb.cwasm -D /tmp/pgdata
-
-# Apply lind-wasm optimized settings
-cat lindfs/share/postgresql.conf.lind >> lindfs/tmp/pgdata/postgresql.conf
+# Initialize database (auto-applies lind-wasm optimized settings)
+sudo ./scripts/lind_run --enable-fpcast /bin/lind-initdb.sh -D /tmp/pgdata
 
 # Start server
 sudo ./scripts/lind_run --enable-fpcast /bin/postgres.cwasm -D /tmp/pgdata &
@@ -64,14 +61,9 @@ sudo ./scripts/lind_run --enable-fpcast /bin/pgbench.cwasm -h /tmp -p 5432 -d po
 
 ## pg_regress (Optional)
 
-```bash
-# Install test files
-sudo mkdir -p $LIND_WASM_ROOT/lindfs/regress
-sudo cp -r postgres/src/test/regress/sql $LIND_WASM_ROOT/lindfs/regress/
-sudo cp -r postgres/src/test/regress/expected $LIND_WASM_ROOT/lindfs/regress/
-sudo cp -r postgres/src/test/regress/data $LIND_WASM_ROOT/lindfs/regress/
-sudo cp postgres/src/test/regress/parallel_schedule $LIND_WASM_ROOT/lindfs/regress/
+Test files (`sql/`, `expected/`, `data/`, `parallel_schedule`) are installed automatically with `make install-postgres`.
 
+```bash
 # Install diff (required by pg_regress)
 make diffutils
 make install-diffutils
@@ -94,3 +86,4 @@ sudo ./scripts/lind_run --enable-fpcast /bin/pg_regress.cwasm --use-existing --h
 | `indirect call type mismatch` | Use `--enable-fpcast` flag and rebuild shared libs with `--with-fpcast` |
 | `postgres.bki does not exist` | Re-run `make install-postgres` |
 | `program postgres not found` | Re-run `make install-postgres` |
+| Manual initdb needed | Use `/bin/initdb.cwasm` directly, then `cat lindfs/share/postgresql.conf.lind >> postgresql.conf` |
