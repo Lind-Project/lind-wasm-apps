@@ -849,48 +849,7 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
 done
 cd - >/dev/null
 
-# ============================================================================
-# Create lind-initdb wrapper script (auto-applies postgresql.conf.lind)
-# ============================================================================
-echo
-echo "[postgres] creating lind-initdb wrapper..."
-cat > "$STAGE_BIN/lind-initdb.sh" << 'INITDB_WRAPPER'
-#!/bin/bash
-# Wrapper for initdb that auto-applies lind-wasm optimized settings
-set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SHARE_DIR="${SCRIPT_DIR}/../share"
-
-# Parse -D/--pgdata argument to find PGDATA
-PGDATA=""
-args=("$@")
-for ((i=0; i<${#args[@]}; i++)); do
-  case "${args[i]}" in
-    -D) PGDATA="${args[i+1]}" ;;
-    --pgdata=*) PGDATA="${args[i]#--pgdata=}" ;;
-    -D*) PGDATA="${args[i]#-D}" ;;
-  esac
-done
-
-if [[ -z "$PGDATA" ]]; then
-  echo "Error: -D <pgdata> is required" >&2
-  exit 1
-fi
-
-# Run initdb
-"${SCRIPT_DIR}/initdb.cwasm" "$@"
-
-# Apply lind-wasm optimized settings
-if [[ -f "$SHARE_DIR/postgresql.conf.lind" ]]; then
-  echo "" >> "${PGDATA}/postgresql.conf"
-  cat "$SHARE_DIR/postgresql.conf.lind" >> "${PGDATA}/postgresql.conf"
-  echo "[lind-initdb] Applied lind-wasm settings to ${PGDATA}/postgresql.conf"
-fi
-INITDB_WRAPPER
-chmod +x "$STAGE_BIN/lind-initdb.sh"
-echo "[postgres] created: $STAGE_BIN/lind-initdb.sh"
-
 echo
 echo "[postgres] install with: make install-postgres"
-echo "[postgres] initialize with: sudo ./scripts/lind_run --enable-fpcast /bin/lind-initdb.sh -D /tmp/pgdata"
+echo "[postgres] after initdb, append postgresql.conf.lind to your config:"
+echo "  cat \$LIND_WASM_ROOT/lindfs/share/postgresql.conf.lind >> \$LIND_WASM_ROOT/lindfs/tmp/pgdata/postgresql.conf"

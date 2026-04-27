@@ -38,8 +38,11 @@ Postgres requires fpcast-emu mode. Use the `--enable-fpcast` flag:
 ```bash
 cd $LIND_WASM_ROOT
 
-# Initialize database (auto-applies lind-wasm optimized settings)
-sudo ./scripts/lind_run --enable-fpcast /bin/lind-initdb.sh -D /tmp/pgdata
+# Initialize database
+sudo ./scripts/lind_run --enable-fpcast /bin/initdb.cwasm -D /tmp/pgdata
+
+# Apply lind-wasm optimized settings
+cat lindfs/share/postgresql.conf.lind >> lindfs/tmp/pgdata/postgresql.conf
 
 # Start server
 sudo ./scripts/lind_run --enable-fpcast /bin/postgres.cwasm -D /tmp/pgdata &
@@ -86,4 +89,3 @@ sudo ./scripts/lind_run --enable-fpcast /bin/pg_regress.cwasm --use-existing --h
 | `indirect call type mismatch` | Use `--enable-fpcast` flag and rebuild shared libs with `--with-fpcast` |
 | `postgres.bki does not exist` | Re-run `make install-postgres` |
 | `program postgres not found` | Re-run `make install-postgres` |
-| Manual initdb needed | Use `/bin/initdb.cwasm` directly, then `cat lindfs/share/postgresql.conf.lind >> postgresql.conf` |
