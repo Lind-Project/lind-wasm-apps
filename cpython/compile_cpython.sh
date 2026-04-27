@@ -414,6 +414,8 @@ fi
 
 popd >/dev/null
 
+cp $SCRIPT_DIR/test-helper/* $BUILD_WASM/
+
 echo
 echo "[cpython] build complete. Outputs under:"
 echo "  $PYTHON_OUT_DIR"
