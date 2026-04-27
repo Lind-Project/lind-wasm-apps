@@ -785,6 +785,46 @@ echo "[postgres] share files staged at: $STAGE_SHARE"
 ls -la "$STAGE_SHARE" || true
 
 # ============================================================================
+# Create lind-wasm optimized postgresql.conf
+# ============================================================================
+echo
+echo "[postgres] creating lind-wasm postgresql.conf..."
+cat > "$STAGE_SHARE/postgresql.conf.lind" << 'PGCONF'
+# PostgreSQL configuration for lind-wasm
+# These settings are required for stable operation
+
+# Disable parallel workers (shared memory mapping issues in lind-wasm)
+max_parallel_workers_per_gather = 0
+max_parallel_workers = 0
+
+# Use synchronous I/O (async I/O hangs in lind-wasm)
+io_method = 'sync'
+PGCONF
+echo "[postgres] created: $STAGE_SHARE/postgresql.conf.lind"
+
+# ============================================================================
+# Stage timezone data and device files
+# ============================================================================
+echo
+echo "[postgres] staging timezone data..."
+STAGE_ZONEINFO="$STAGE_DIR/usr/share/zoneinfo"
+mkdir -p "$STAGE_ZONEINFO"
+if [[ -d /usr/share/zoneinfo ]]; then
+  cp -r /usr/share/zoneinfo/* "$STAGE_ZONEINFO/" 2>/dev/null || true
+  echo "[postgres] copied timezone data to: $STAGE_ZONEINFO"
+else
+  echo "[postgres] WARNING: /usr/share/zoneinfo not found on host"
+fi
+
+echo "[postgres] staging device files..."
+STAGE_DEV="$STAGE_DIR/dev"
+mkdir -p "$STAGE_DEV"
+if [[ -e /dev/urandom ]]; then
+  cp -a /dev/urandom "$STAGE_DEV/" 2>/dev/null || echo "[postgres] WARNING: could not copy /dev/urandom (may need sudo)"
+  cp -a /dev/random "$STAGE_DEV/" 2>/dev/null || true
+fi
+
+# ============================================================================
 # Create symlinks for binaries (initdb needs "postgres" not "postgres.cwasm")
 # ============================================================================
 echo
@@ -800,3 +840,5 @@ cd - >/dev/null
 
 echo
 echo "[postgres] install with: make install-postgres"
+echo "[postgres] after initdb, append postgresql.conf.lind to your config:"
+echo "  cat \$LIND_WASM_ROOT/lindfs/share/postgresql.conf.lind >> \$LIND_WASM_ROOT/lindfs/tmp/pgdata/postgresql.conf"
