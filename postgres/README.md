@@ -7,9 +7,7 @@ PostgreSQL 19devel running on lind-wasm with dynamic linking (fpcast-emu mode).
 **lind-wasm built with fpcast-enabled shared libs:**
 ```bash
 cd $LIND_WASM_ROOT
-make build
-./scripts/make_shared_glibc.sh --with-fpcast
-./scripts/make_shared_libm.sh --with-fpcast
+make build WITH_FPCAST=1
 ```
 
 ## Build
@@ -39,27 +37,27 @@ Postgres requires fpcast-emu mode. Use the `--enable-fpcast` flag:
 cd $LIND_WASM_ROOT
 
 # Initialize database
-sudo ./scripts/lind_run --enable-fpcast /bin/initdb.cwasm -D /tmp/pgdata
+lind-wasm --enable-fpcast /bin/initdb.cwasm -D /tmp/pgdata
 
 # Apply lind-wasm optimized settings
 cat lindfs/share/postgresql.conf.lind >> lindfs/tmp/pgdata/postgresql.conf
 
 # Start server
-sudo ./scripts/lind_run --enable-fpcast /bin/postgres.cwasm -D /tmp/pgdata &
+lind-wasm --enable-fpcast /bin/postgres.cwasm -D /tmp/pgdata &
 sleep 3
 
 # Test connection
-sudo ./scripts/lind_run --enable-fpcast /bin/psql.cwasm -h /tmp -p 5432 -d postgres -c "SELECT 1;"
+lind-wasm --enable-fpcast /bin/psql.cwasm -h /tmp -p 5432 -d postgres -c "SELECT 1;"
 ```
 
 ## pgbench (Optional)
 
 ```bash
 # Initialize (scale factor 10)
-sudo ./scripts/lind_run --enable-fpcast /bin/pgbench.cwasm -h /tmp -p 5432 -d postgres -i -s 10 --no-vacuum
+lind-wasm --enable-fpcast /bin/pgbench.cwasm -h /tmp -p 5432 -d postgres -i -s 10 --no-vacuum
 
 # Run benchmark (8 clients, 100 transactions each)
-sudo ./scripts/lind_run --enable-fpcast /bin/pgbench.cwasm -h /tmp -p 5432 -d postgres -c 8 -t 100
+lind-wasm --enable-fpcast /bin/pgbench.cwasm -h /tmp -p 5432 -d postgres -c 8 -t 100
 ```
 
 ## pg_regress (Optional)
@@ -67,15 +65,11 @@ sudo ./scripts/lind_run --enable-fpcast /bin/pgbench.cwasm -h /tmp -p 5432 -d po
 Test files (`sql/`, `expected/`, `data/`, `parallel_schedule`) are installed automatically with `make install-postgres`.
 
 ```bash
-# Install diff (required by pg_regress)
-make diffutils
-make install-diffutils
-
 # Create regression database
-sudo ./scripts/lind_run --enable-fpcast /bin/psql.cwasm -h /tmp -p 5432 -d postgres -c "CREATE DATABASE regression;"
+lind-wasm --enable-fpcast /bin/psql.cwasm -h /tmp -p 5432 -d postgres -c "CREATE DATABASE regression;"
 
 # Run tests
-sudo ./scripts/lind_run --enable-fpcast /bin/pg_regress.cwasm --use-existing --host=/tmp --port=5432 \
+lind-wasm --enable-fpcast /bin/pg_regress.cwasm --use-existing --host=/tmp --port=5432 \
   --bindir=/bin --inputdir=/regress --expecteddir=/regress \
   --schedule=/regress/parallel_schedule --max-concurrent-tests=3
 ```
