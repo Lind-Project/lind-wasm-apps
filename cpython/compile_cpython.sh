@@ -32,6 +32,9 @@ ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-ex
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 LIND_DYLINK="${LIND_DYLINK:-0}"
+# Build mode: "wasi" (default, standard WASI target) or "linux" (ac_sys_system=Linux,
+# separate LINKFORSHARED, required for running Python under lind-wasm Linux syscall ABI)
+LIND_BUILD_MODE="${LIND_BUILD_MODE:-wasi}"
 
 # Load toolchain from Makefile preflight
 if [[ -r "$TOOL_ENV" ]]; then
@@ -65,6 +68,7 @@ echo "[cpython] LIND_WASM_ROOT    = $LIND_WASM_ROOT"
 echo "[cpython] merged sysroot    = $SYSROOT"
 echo "[cpython] output dir        = $PYTHON_OUT_DIR"
 echo "[cpython] LIND_DYLINK       = $LIND_DYLINK"
+echo "[cpython] LIND_BUILD_MODE  = $LIND_BUILD_MODE"
 echo
 
 ###############################################################################
@@ -76,6 +80,20 @@ echo
 ###############################################################################
 # 2. Create WASI placeholder libraries and configure/build wasm python
 ###############################################################################
+
+# Linker flags split out for linux mode (LINKFORSHARED / BLDSHARED) so that
+# CPython's build system applies them only at final link time, not per-object.
+WASM_MAIN_LDFLAGS="-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low"
+WASM_SHARED_LDFLAGS="-Wl,--import-memory,--shared-memory,--export-dynamic,--experimental-pic,--unresolved-symbols=import-dynamic,-shared"
+
+# CC passed to configure differs by mode:
+#   wasi: embed linker flags in CC (current behaviour, CPython's WASI build expects this)
+#   linux: bare CC without linker flags; LINKFORSHARED/BLDSHARED carry them instead
+if [[ "$LIND_BUILD_MODE" == "linux" ]]; then
+  CONFIGURE_CC="$CLANG -pthread --target=wasm32-unknown-wasi --sysroot $SYSROOT -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC"
+else
+  CONFIGURE_CC="$CLANG -pthread --target=wasm32-unknown-wasi --sysroot $SYSROOT $WASM_MAIN_LDFLAGS -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC"
+fi
 
 # These empty archives satisfy configure checks for WASI-unavailable libraries.
 WASI_STUB_DIR="$SYSROOT/lib/wasm32-wasi"
@@ -93,16 +111,27 @@ pushd "$BUILD_WASM" >/dev/null
 # behavior that breaks with optimization.
 
 if [[ ! -f "Makefile" ]]; then
-  echo "[cpython] configuring wasm build..."
+  echo "[cpython] configuring wasm build (mode: $LIND_BUILD_MODE)..."
+
+  # Patch CPython's configure to report the correct OS to the build system.
+  # In linux mode CPython enables Linux-specific code paths required by lind-wasm.
+  # In wasi mode restore the upstream default.
+  if [[ "$LIND_BUILD_MODE" == "linux" ]]; then
+    sed -i '/\*-\*-wasi\*)/,/;;/{s/ac_sys_system=WASI/ac_sys_system=Linux/}' "$SCRIPT_DIR/configure"
+  else
+    sed -i '/\*-\*-wasi\*)/,/;;/{s/ac_sys_system=Linux/ac_sys_system=WASI/}' "$SCRIPT_DIR/configure"
+  fi
+
+  EXTRA_CONFIGURE_ARGS=()
+  if [[ "$LIND_BUILD_MODE" == "linux" ]]; then
+    EXTRA_CONFIGURE_ARGS+=(--disable-ipv6)
+  fi
+
   ../configure \
     --host=wasm32-unknown-wasi \
     --build=x86_64-unknown-linux-gnu \
     --with-build-python=../build-native/python \
-    CC="$CLANG \
-    -pthread \
-    --target=wasm32-unknown-wasi \
-    --sysroot $SYSROOT \
-    -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC" \
+    CC="$CONFIGURE_CC" \
     ac_cv_func_working_mktime=yes \
     ac_cv_func_mmap_fixed_mapped=yes \
     bash_cv_func_sigsetjmp=no \
@@ -118,18 +147,31 @@ if [[ ! -f "Makefile" ]]; then
     ac_cv_func_eventfd=no \
     ac_cv_func_timerfd_create=no \
     ac_cv_libm_c99=yes \
+    "${EXTRA_CONFIGURE_ARGS[@]}" \
     --verbose
 fi
 
 echo "[cpython] building wasm python..."
-make AR="$AR" ARFLAGS="crs" &> make.log || {
+
+MAKE_OVERRIDES=(AR="$AR" ARFLAGS="crs")
+if [[ "$LIND_BUILD_MODE" == "linux" ]]; then
+  BARE_CC="$CLANG -pthread --target=wasm32-unknown-wasi --sysroot $SYSROOT -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC"
+  MAKE_OVERRIDES+=(
+    BLDSHARED="${BARE_CC} ${WASM_SHARED_LDFLAGS}"
+    LINKFORSHARED="${WASM_MAIN_LDFLAGS}"
+    ENSUREPIP=no
+    MODULE__HMAC_LDFLAGS="Modules/_hacl/Hacl_HMAC.o Modules/_hacl/Hacl_Streaming_HMAC.o"
+  )
+fi
+
+make "${MAKE_OVERRIDES[@]}" &> make.log || {
   echo "[cpython] ERROR: make failed. See $BUILD_WASM/make.log" >&2
   tail -20 make.log >&2
   exit 1
 }
 
 # Install python files into staging dir
-make install DESTDIR="$PYTHON_OUT_DIR"
+make "${MAKE_OVERRIDES[@]}" install DESTDIR="$PYTHON_OUT_DIR"
 
 ###############################################################################
 # 3. wasm-opt + precompile (static path)
@@ -192,11 +234,19 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   fi
 
   STATIC_LIB="$BUILD_WASM/libpython3.14.a"
+  LIBMPDEC="$BUILD_WASM/Modules/_decimal/libmpdec/libmpdec.a"
   DYNAMIC_LIB_WASM="$BUILD_WASM/libpython3.14.wasm"
   DYNAMIC_LIB_OPT="$BUILD_WASM/libpython3.14.opt.wasm"
   DYNAMIC_LIB_OPT_CWASM="$BUILD_WASM/libpython3.14.opt.cwasm"
   DYNAMIC_STAGED_LIB="$PYTHON_OUT_DIR/lib/libpython3.14.so"
   mkdir -p "$PYTHON_OUT_DIR/lib" "$PYTHON_OUT_DIR/usr/local/bin"
+
+  # In linux mode, libmpdec is not fully absorbed into the static lib so it must
+  # be included in the --whole-archive group explicitly.
+  EXTRA_WHOLE_ARCHIVE_ARGS=()
+  if [[ "$LIND_BUILD_MODE" == "linux" ]]; then
+    EXTRA_WHOLE_ARCHIVE_ARGS+=("$LIBMPDEC")
+  fi
 
   # Build shared libpython
   "$CLANG" \
@@ -212,6 +262,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     -Wl,-shared \
     -Wl,--whole-archive \
     "$STATIC_LIB" \
+    "${EXTRA_WHOLE_ARCHIVE_ARGS[@]}" \
     -Wl,--no-whole-archive \
     -Wl,--export=__wasm_call_ctors \
     -Wl,--export-if-defined=__wasm_init_tls \
@@ -258,6 +309,27 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   # Build PIE python binary
   echo "[cpython] building PIE python binary..."
 
+  # In linux mode the hacl hash modules are linked as part of the shared libpython
+  # (via MODULE__HMAC_LDFLAGS during make), so they must not be re-linked here.
+  # Arrays mirror the original WASI link order; linux mode omits the hacl archives.
+  PIE_HACL_PRE=()   # hacl libs that appear before libexpat in WASI mode
+  PIE_HACL_MID=()   # hacl libs that appear between libexpat and libmpdec in WASI mode
+  PIE_HACL_POST=()  # hacl libs that appear after libmpdec in WASI mode
+  if [[ "$LIND_BUILD_MODE" != "linux" ]]; then
+    PIE_HACL_PRE=(
+      "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA2.a"
+      "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA1.a"
+    )
+    PIE_HACL_MID=(
+      "$BUILD_WASM/Modules/_hacl/libHacl_Hash_MD5.a"
+      "$BUILD_WASM/Modules/_hacl/libHacl_Hash_BLAKE2.a"
+    )
+    PIE_HACL_POST=(
+      "$BUILD_WASM/Modules/_hacl/libHacl_HMAC.a"
+      "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA3.a"
+    )
+  fi
+
   PYTHON_WASM="$BUILD_WASM/python_shared.wasm"
   PYTHON_OPT_WASM="$BUILD_WASM/python_shared.opt.wasm"
   PYTHON_OPT_CWASM="$BUILD_WASM/python_shared.opt.cwasm"
@@ -286,14 +358,11 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     -g -O0 \
     -o "$PYTHON_WASM" \
     "$BUILD_WASM/Programs/python.o" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA2.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA1.a" \
+    "${PIE_HACL_PRE[@]}" \
     "$BUILD_WASM/Modules/expat/libexpat.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_MD5.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_BLAKE2.a" \
+    "${PIE_HACL_MID[@]}" \
     "$BUILD_WASM/Modules/_decimal/libmpdec/libmpdec.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_HMAC.a" \
-    "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA3.a" \
+    "${PIE_HACL_POST[@]}" \
     "$SYSROOT/lib/wasm32-wasi/set_stack_pointer.o" \
     "$SYSROOT/lib/wasm32-wasi/crt1_shared.o" \
     "$SYSROOT/lib/wasm32-wasi/lind_utils.o" \
