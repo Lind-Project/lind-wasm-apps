@@ -359,7 +359,7 @@ cpython: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 # Uses postgres/compile_postgres.sh to build the PostgreSQL backend as a
 # wasm32-wasi binary using the merged sysroot and toolchain detected by
 # preflight, and stages artifacts under build/bin/postgres/wasm32-wasi/.
-postgres: $(MERGE_BASE_STAMP)
+postgres: $(MERGE_BASE_STAMP) diffutils
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/postgres/compile_postgres.sh'
 
@@ -431,7 +431,7 @@ install-tinycc:
 install-cpython: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' cpython
 
-install-postgres:
+install-postgres: install-diffutils
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' postgres
 
 install-diffutils:
