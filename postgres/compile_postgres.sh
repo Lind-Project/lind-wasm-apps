@@ -836,6 +836,17 @@ else
 fi
 
 # ============================================================================
+# Stage stub /dev/urandom and /dev/random (postgres reads these for auth tokens)
+# ============================================================================
+echo
+echo "[postgres] staging stub /dev/urandom and /dev/random..."
+STAGE_DEV="$STAGE_DIR/dev"
+mkdir -p "$STAGE_DEV"
+dd if=/dev/urandom of="$STAGE_DEV/urandom" bs=1024 count=1 status=none
+cp "$STAGE_DEV/urandom" "$STAGE_DEV/random"
+echo "[postgres] staged stub: $STAGE_DEV/{urandom,random}"
+
+# ============================================================================
 # Create copies for binaries (initdb needs "postgres" not "postgres.cwasm")
 # ============================================================================
 echo
