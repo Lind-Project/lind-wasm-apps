@@ -837,7 +837,6 @@ fi
 
 # ============================================================================
 # Create copies for binaries (initdb needs "postgres" not "postgres.cwasm")
-# Note: lind-boot doesn't follow symlinks for internal exec, so we use copies
 # ============================================================================
 echo
 echo "[postgres] creating binary copies (without .cwasm extension)..."
