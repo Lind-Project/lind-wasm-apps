@@ -49,9 +49,12 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install
+.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install install-base
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
+
+# -------- Base set: common UNIX userland tools --------------------------------
+base: bash coreutils perl gmake awk curl grep sed
 
 test:
 	@if [[ -z "$(strip $(APP))" ]]; then \
@@ -356,7 +359,7 @@ cpython: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 # Uses postgres/compile_postgres.sh to build the PostgreSQL backend as a
 # wasm32-wasi binary using the merged sysroot and toolchain detected by
 # preflight, and stages artifacts under build/bin/postgres/wasm32-wasi/.
-postgres: merge-sysroot
+postgres: $(MERGE_BASE_STAMP) diffutils
 	. '$(TOOL_ENV)'
 	'$(APPS_ROOT)/postgres/compile_postgres.sh'
 
@@ -369,6 +372,25 @@ tinycc: merge-sysroot
 # Stages to build/diffutils/usr/local/bin.
 diffutils: $(MERGE_BASE_STAMP)
 	'$(APPS_ROOT)/diffutils/compile_diffutils.sh'
+
+# ---------------- perl (WASM build) -------------------------------------------
+# Cross-compiles Perl for wasm32-wasi via perl-cross.
+# Stages to build/perl/usr/local/bin.
+perl: $(MERGE_BASE_STAMP)
+	'$(APPS_ROOT)/perl/compile_perl.sh'
+
+# ---------------- awk (WASM build) --------------------------------------------
+# Cross-compiles GNU awk (gawk) to wasm32-wasi.
+# Stages to build/awk/usr/local/bin.
+awk: $(MERGE_BASE_STAMP)
+	'$(APPS_ROOT)/awk/compile_awk.sh'
+
+# ---------------- make (WASM build) -------------------------------------------
+# Cross-compiles GNU make to wasm32-wasi.
+# Stages to build/make/usr/local/bin.
+# Target named "gmake" to avoid conflict with the make command itself.
+gmake: $(MERGE_BASE_STAMP)
+	'$(APPS_ROOT)/make/compile_make.sh'
 
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
@@ -409,7 +431,7 @@ install-tinycc:
 install-cpython: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' cpython
 
-install-postgres:
+install-postgres: install-diffutils
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' postgres
 
 install-diffutils:
@@ -430,4 +452,15 @@ install-zlib:
 install-libcxx:
 	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' libcxx
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx
+install-perl:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' perl
+
+install-awk:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' awk
+
+install-gmake:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' make
+
+install-base: install-bash install-coreutils install-perl install-gmake install-awk install-curl install-grep install-sed
+
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-perl install-awk install-gmake install-gnulib install-libtirpc install-openssl install-zlib install-libcxx

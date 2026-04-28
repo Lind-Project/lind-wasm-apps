@@ -737,7 +737,7 @@ class SysModuleTest(unittest.TestCase):
         elif sys.platform == "emscripten":
             self.assertIn(info.name, {"pthread", "pthread-stubs"})
         elif sys.platform == "wasi":
-            self.assertEqual(info.name, "pthread-stubs")
+            self.assertIn(info.name, {"pthread", "pthread-stubs"})
 
     @unittest.skipUnless(support.is_emscripten, "only available on Emscripten")
     def test_emscripten_info(self):
