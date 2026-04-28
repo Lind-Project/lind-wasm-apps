@@ -595,7 +595,6 @@ if [[ -x "$LIND_BOOT" ]]; then
         # Strip .cwasm extension for final staged binary (required by issue #125)
         cp "$BASH_CWASM" "$BASH_OUT_DIR/bash"
         echo "[bash] staged final binary: $BASH_OUT_DIR/bash"
-        # Create sh symlink (many apps expect /bin/sh)
         ln -sf bash "$BASH_OUT_DIR/sh"
         echo "[bash] created symlink: $BASH_OUT_DIR/sh -> bash"
       else
