@@ -570,6 +570,11 @@ if [[ -n "$PLPGSQL_OBJS" ]]; then
     -Wl,--export-dynamic \
     -Wl,--experimental-pic \
     -Wl,--unresolved-symbols=import-dynamic \
+    -Wl,--export=Pg_magic_func \
+    -Wl,--export=_PG_init \
+    -Wl,--export=plpgsql_call_handler \
+    -Wl,--export=plpgsql_inline_handler \
+    -Wl,--export=plpgsql_validator \
     -L"$MERGED_SYSROOT/lib/wasm32-wasi" \
     -g -O2 \
     $PLPGSQL_OBJS \
