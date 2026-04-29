@@ -178,29 +178,31 @@ mkdir -p "$PERL_LIB_DEST"
 echo "[perl] copying core lib/ modules..."
 rsync -a --ignore-existing "$PERL_ROOT/lib/" "$PERL_LIB_DEST/"
 
+# Copy extension .pm files from dist/, cpan/, ext/ — these override any
+# stubs that make install may have placed.
 echo "[perl] copying extension .pm files from dist/..."
 find "$PERL_ROOT/dist" -path '*/lib/*.pm' | while read -r f; do
   rel="${f#*dist/*/lib/}"
   mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
-  cp -n "$f" "$PERL_LIB_DEST/$rel"
+  cp "$f" "$PERL_LIB_DEST/$rel"
 done
 
 echo "[perl] copying extension .pm files from cpan/..."
 find "$PERL_ROOT/cpan" -path '*/lib/*.pm' | while read -r f; do
   rel="${f#*cpan/*/lib/}"
   mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
-  cp -n "$f" "$PERL_LIB_DEST/$rel"
+  cp "$f" "$PERL_LIB_DEST/$rel"
 done
 
 echo "[perl] copying extension .pm files from ext/..."
 find "$PERL_ROOT/ext" -path '*/lib/*.pm' | while read -r f; do
   rel="${f#*ext/*/lib/}"
   mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
-  cp -n "$f" "$PERL_LIB_DEST/$rel"
+  cp "$f" "$PERL_LIB_DEST/$rel"
 done
 
 # Some XS extensions have their .pm at the top of their directory (not under lib/).
-# Copy these explicitly.
+# Copy these explicitly — force overwrite to replace any bootstrap stubs.
 echo "[perl] copying top-level extension .pm files..."
 declare -A EXT_PM_MAP=(
   ["ext/Fcntl/Fcntl.pm"]="Fcntl.pm"
@@ -217,7 +219,7 @@ declare -A EXT_PM_MAP=(
 for src_rel in "${!EXT_PM_MAP[@]}"; do
   src="$PERL_ROOT/$src_rel"
   dest="$PERL_LIB_DEST/${EXT_PM_MAP[$src_rel]}"
-  if [[ -f "$src" && ! -f "$dest" ]]; then
+  if [[ -f "$src" ]]; then
     mkdir -p "$(dirname "$dest")"
     cp "$src" "$dest"
   fi
