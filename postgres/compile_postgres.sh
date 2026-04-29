@@ -41,6 +41,7 @@ fi
 
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
+ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
@@ -79,10 +80,10 @@ mkdir -p "$STAGE_BIN" "$STAGE_SHARE"
 
 echo "[postgres] applying WASM-specific source patches..."
 
-# Disable plpgsql extension loading (shared library extensions not supported)
-if grep -q "load_plpgsql(cmdfd);" "$PG_ROOT/src/bin/initdb/initdb.c"; then
-  sed -i 's/load_plpgsql(cmdfd);/\/\/ load_plpgsql(cmdfd); \/\/ Disabled for WASM - no shared library extensions/' "$PG_ROOT/src/bin/initdb/initdb.c"
-  echo "[postgres] patched initdb.c: disabled plpgsql extension"
+# Re-enable plpgsql if it was previously disabled (we now use dynamic loading)
+if grep -q "// load_plpgsql(cmdfd);" "$PG_ROOT/src/bin/initdb/initdb.c"; then
+  sed -i 's|// load_plpgsql(cmdfd); // Disabled for WASM - no shared library extensions|load_plpgsql(cmdfd);|' "$PG_ROOT/src/bin/initdb/initdb.c"
+  echo "[postgres] patched initdb.c: re-enabled plpgsql (dynamic loading)"
 fi
 
 # --- wasm_compat header (committed in the repo) -----------------------------
@@ -527,6 +528,85 @@ make -C src/test/regress -j"$JOBS" \
 }
 
 ###############################################################################
+# Build plpgsql as shared WASM library (for dynamic loading via dlopen)
+###############################################################################
+
+echo "[postgres] [wasm] building plpgsql shared library..."
+PLPGSQL_DIR="$PG_ROOT/src/pl/plpgsql/src"
+PLPGSQL_LIB_DIR="$STAGE_DIR/lib"
+mkdir -p "$PLPGSQL_LIB_DIR"
+
+# Generate plpgsql parser and error codes (uses host perl, already done in Pass 1)
+make -C "$PLPGSQL_DIR" pl_gram.c plerrcodes.h pl_reserved_kwlist_d.h pl_unreserved_kwlist_d.h 2>/dev/null || true
+
+# Build plpgsql objects with PIC for shared library
+PLPGSQL_OBJS=""
+for src in pl_comp.c pl_exec.c pl_funcs.c pl_gram.c pl_handler.c pl_scanner.c; do
+  obj="${src%.c}.o"
+  echo "[postgres] [wasm]   compiling $src (PIC)..."
+  $CC_WASM $CFLAGS_WASM -fPIC \
+    -I"$PLPGSQL_DIR" \
+    -I"$PG_ROOT/src/include" \
+    -c "$PLPGSQL_DIR/$src" -o "$PLPGSQL_DIR/$obj" || {
+      echo "[postgres] WARNING: failed to compile $src"
+      continue
+    }
+  PLPGSQL_OBJS="$PLPGSQL_OBJS $PLPGSQL_DIR/$obj"
+done
+
+# Link as shared WASM library
+if [[ -n "$PLPGSQL_OBJS" ]]; then
+  echo "[postgres] [wasm] linking plpgsql.wasm..."
+  PLPGSQL_WASM="$PLPGSQL_LIB_DIR/plpgsql.wasm"
+  PLPGSQL_OPT="$PLPGSQL_LIB_DIR/plpgsql.opt.wasm"
+
+  "$CLANG" \
+    --target=wasm32-unknown-wasi \
+    --sysroot="$MERGED_SYSROOT" \
+    -fPIC \
+    -Wl,-shared \
+    -Wl,--import-memory \
+    -Wl,--shared-memory \
+    -Wl,--export-dynamic \
+    -Wl,--experimental-pic \
+    -Wl,--unresolved-symbols=import-dynamic \
+    -L"$MERGED_SYSROOT/lib/wasm32-wasi" \
+    -g -O2 \
+    $PLPGSQL_OBJS \
+    -o "$PLPGSQL_WASM" || {
+      echo "[postgres] WARNING: failed to link plpgsql.wasm"
+    }
+
+  echo "[postgres] [wasm] running wasm-opt on plpgsql.wasm..."
+  "$WASM_OPT" \
+    --enable-bulk-memory --enable-threads \
+    --fpcast-emu \
+    --epoch-injection --pass-arg=epoch-import \
+    --asyncify --pass-arg=asyncify-import-globals \
+    -O2 --debuginfo \
+    "$PLPGSQL_WASM" -o "$PLPGSQL_OPT" || {
+      echo "[postgres] WARNING: wasm-opt failed for plpgsql"
+    }
+
+  echo "[postgres] [wasm] adding exports to plpgsql.opt.wasm..."
+  "$ADD_EXPORT_TOOL" "$PLPGSQL_OPT" "$PLPGSQL_OPT" \
+    __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+  "$ADD_EXPORT_TOOL" "$PLPGSQL_OPT" "$PLPGSQL_OPT" \
+    __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+  "$ADD_EXPORT_TOOL" "$PLPGSQL_OPT" "$PLPGSQL_OPT" \
+    __stack_pointer global __stack_pointer optional
+
+  # Stage the optimized wasm and create .so symlink (PostgreSQL looks for $libdir/plpgsql.so)
+  if [[ -f "$PLPGSQL_OPT" ]]; then
+    mv "$PLPGSQL_OPT" "$PLPGSQL_WASM"
+    ln -sf plpgsql.wasm "$PLPGSQL_LIB_DIR/plpgsql.so"
+    echo "[postgres] staged: $PLPGSQL_LIB_DIR/plpgsql.so -> plpgsql.wasm"
+  fi
+else
+  echo "[postgres] WARNING: no plpgsql objects built"
+fi
+
+###############################################################################
 # Build shared libraries for dylink mode
 ###############################################################################
 
@@ -766,6 +846,11 @@ cp "$PG_ROOT/src/backend/catalog/system_views.sql" "$STAGE_SHARE/" 2>/dev/null |
 # Stub snowball (text search extension not supported in WASM)
 echo "-- Snowball text search disabled for WASM" > "$STAGE_SHARE/snowball_create.sql"
 echo "[postgres] created stub snowball_create.sql"
+
+# plpgsql extension files (dynamically loaded via dlopen)
+cp "$PG_ROOT/src/pl/plpgsql/src/plpgsql.control" "$STAGE_SHARE/extension/" 2>/dev/null || echo "[postgres] WARNING: plpgsql.control not found"
+cp "$PG_ROOT/src/pl/plpgsql/src/plpgsql--1.0.sql" "$STAGE_SHARE/extension/" 2>/dev/null || echo "[postgres] WARNING: plpgsql--1.0.sql not found"
+echo "[postgres] staged plpgsql extension files"
 
 # Config samples
 cp "$PG_ROOT/src/backend/utils/misc/postgresql.conf.sample" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: postgresql.conf.sample not found"
