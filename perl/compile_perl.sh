@@ -199,18 +199,27 @@ find "$PERL_ROOT/ext" -path '*/lib/*.pm' | while read -r f; do
   cp -n "$f" "$PERL_LIB_DEST/$rel"
 done
 
-# Create bootstrap .pm files for statically-linked XS modules that are
-# compiled into the perl binary but need a .pm for perl to find them.
-for mod in IO POSIX Fcntl Socket; do
-  pm="$PERL_LIB_DEST/$mod.pm"
-  if [[ ! -f "$pm" ]]; then
-    echo "[perl] creating bootstrap $mod.pm..."
-    cat > "$pm" << XSEOF
-package $mod;
-use XSLoader;
-XSLoader::load('$mod');
-1;
-XSEOF
+# Some XS extensions have their .pm at the top of their directory (not under lib/).
+# Copy these explicitly.
+echo "[perl] copying top-level extension .pm files..."
+declare -A EXT_PM_MAP=(
+  ["ext/Fcntl/Fcntl.pm"]="Fcntl.pm"
+  ["dist/IO/IO.pm"]="IO.pm"
+  ["dist/PathTools/Cwd.pm"]="Cwd.pm"
+  ["dist/PathTools/lib/File/Spec.pm"]="File/Spec.pm"
+  ["dist/PathTools/lib/File/Spec/Unix.pm"]="File/Spec/Unix.pm"
+  ["dist/PathTools/lib/File/Spec/Functions.pm"]="File/Spec/Functions.pm"
+  ["ext/POSIX/lib/POSIX.pm"]="POSIX.pm"
+  ["ext/Socket/Socket.pm"]="Socket.pm"
+  ["dist/Storable/Storable.pm"]="Storable.pm"
+  ["dist/Data-Dumper/lib/Data/Dumper.pm"]="Data/Dumper.pm"
+)
+for src_rel in "${!EXT_PM_MAP[@]}"; do
+  src="$PERL_ROOT/$src_rel"
+  dest="$PERL_LIB_DEST/${EXT_PM_MAP[$src_rel]}"
+  if [[ -f "$src" && ! -f "$dest" ]]; then
+    mkdir -p "$(dirname "$dest")"
+    cp "$src" "$dest"
   fi
 done
 
