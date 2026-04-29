@@ -167,7 +167,52 @@ if [[ ! -f "$PERL_BIN" ]]; then
 fi
 
 echo "[perl] installing to staging dir..."
-make install DESTDIR="$APPS_BUILD/perl"
+make install DESTDIR="$APPS_BUILD/perl" || true
+
+# make install may not install all .pm files (especially from XS extensions
+# that failed to build for wasm). Copy them from the source tree as a fallback.
+PERL_VER="5.40.4"
+PERL_LIB_DEST="$APPS_BUILD/perl/lib/perl5/$PERL_VER"
+mkdir -p "$PERL_LIB_DEST"
+
+echo "[perl] copying core lib/ modules..."
+rsync -a --ignore-existing "$PERL_ROOT/lib/" "$PERL_LIB_DEST/"
+
+echo "[perl] copying extension .pm files from dist/..."
+find "$PERL_ROOT/dist" -path '*/lib/*.pm' | while read -r f; do
+  rel="${f#*dist/*/lib/}"
+  mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
+  cp -n "$f" "$PERL_LIB_DEST/$rel"
+done
+
+echo "[perl] copying extension .pm files from cpan/..."
+find "$PERL_ROOT/cpan" -path '*/lib/*.pm' | while read -r f; do
+  rel="${f#*cpan/*/lib/}"
+  mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
+  cp -n "$f" "$PERL_LIB_DEST/$rel"
+done
+
+echo "[perl] copying extension .pm files from ext/..."
+find "$PERL_ROOT/ext" -path '*/lib/*.pm' | while read -r f; do
+  rel="${f#*ext/*/lib/}"
+  mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
+  cp -n "$f" "$PERL_LIB_DEST/$rel"
+done
+
+# Create bootstrap .pm files for statically-linked XS modules that are
+# compiled into the perl binary but need a .pm for perl to find them.
+for mod in IO POSIX Fcntl Socket; do
+  pm="$PERL_LIB_DEST/$mod.pm"
+  if [[ ! -f "$pm" ]]; then
+    echo "[perl] creating bootstrap $mod.pm..."
+    cat > "$pm" << XSEOF
+package $mod;
+use XSLoader;
+XSLoader::load('$mod');
+1;
+XSEOF
+  fi
+done
 
 ###############################################################################
 # wasm-opt + precompile
