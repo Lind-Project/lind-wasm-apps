@@ -100,7 +100,7 @@ for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
         fi
         
         T_BASE=$(basename "$CURRENT_TEST")
-        CMD=(lind_run usr/local/bin/perl -w -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
+        CMD=(lind_run usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
     else
         if [[ "$SKIP_BASH" -eq 1 ]]; then
             printf "[\033[33mSKIP\033[0m] %s (Bash test skipped via flag)\n" "$CURRENT_TEST"
@@ -109,7 +109,7 @@ for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
         fi
 
         sed -i 's/$srcdir/tests/g' "$HOST_TEST_PATH"
-        CMD=(lind-wasm bin/bash "$SANDBOX_PATH")
+        CMD=(lind-wasm --enable-fpcast bin/bash "$SANDBOX_PATH")
     fi
 
     echo "==================================================="
