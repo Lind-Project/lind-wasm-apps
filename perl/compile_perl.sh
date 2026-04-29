@@ -159,12 +159,15 @@ echo "[perl] building..."
 make -j"$JOBS" || {
   echo "[perl] WARNING: build had errors (best-effort, continuing)."
 }
-make install DESTDIR="$APPS_BUILD/perl"
+
 PERL_BIN="$PERL_ROOT/perl"
 if [[ ! -f "$PERL_BIN" ]]; then
   echo "[perl] ERROR: perl binary not produced." >&2
   exit 1
 fi
+
+echo "[perl] installing to staging dir..."
+make install DESTDIR="$APPS_BUILD/perl"
 
 ###############################################################################
 # wasm-opt + precompile
