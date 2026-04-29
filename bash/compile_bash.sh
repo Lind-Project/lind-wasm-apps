@@ -58,7 +58,7 @@ FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
 # LIND_DYLINK controls whether we produce a statically-linked or a shared
 # (PIE/dynamic) wasm binary.  Set LIND_DYLINK=1 to get the shared path;
 # the default is static (0).  The shared path adds the PIE linker flags, links
-# in lind_debug.o and set_stack_pointer.o, runs add-export-tool to inject the
+# in lind_debug.o, runs add-export-tool to inject the
 # __wasm_apply_* and __stack_pointer exports, and uses the additional wasm-opt
 # passes required for shared modules.
 ##################
@@ -120,7 +120,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
 
   # lind_debug.o lives in the glibc build tree (not installed to the sysroot)
   DYLINK_CRT_OBJS=(
-    "$LIND_WASM_ROOT/src/glibc/build/csu/set_stack_pointer.o"
     "$LIND_WASM_ROOT/src/glibc/build/lind_debug.o"
   )
   for obj in "${DYLINK_CRT_OBJS[@]}"; do
