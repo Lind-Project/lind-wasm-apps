@@ -104,7 +104,7 @@ AR="$AR" \
 RANLIB="$RANLIB" \
 ./configure \
   --target=wasm32-unknown-wasi \
-  --prefix=/usr/local \
+  --prefix="/" \
   -Dcc="$CC_WASM" \
   -Dld="$CC_WASM" \
   -Dar="$AR" \
@@ -165,6 +165,9 @@ if [[ ! -f "$PERL_BIN" ]]; then
   echo "[perl] ERROR: perl binary not produced." >&2
   exit 1
 fi
+
+echo "[perl] installing to staging dir..."
+make install DESTDIR="$APPS_BUILD/perl"
 
 ###############################################################################
 # wasm-opt + precompile
