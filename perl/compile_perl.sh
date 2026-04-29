@@ -104,7 +104,7 @@ AR="$AR" \
 RANLIB="$RANLIB" \
 ./configure \
   --target=wasm32-unknown-wasi \
-  --prefix=/usr/local \
+  --prefix="/" \
   -Dcc="$CC_WASM" \
   -Dld="$CC_WASM" \
   -Dar="$AR" \
@@ -159,7 +159,7 @@ echo "[perl] building..."
 make -j"$JOBS" || {
   echo "[perl] WARNING: build had errors (best-effort, continuing)."
 }
-
+make install DESTDIR="$APPS_BUILD/perl"
 PERL_BIN="$PERL_ROOT/perl"
 if [[ ! -f "$PERL_BIN" ]]; then
   echo "[perl] ERROR: perl binary not produced." >&2
