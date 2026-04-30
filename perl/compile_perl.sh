@@ -179,7 +179,7 @@ mkdir -p "$PERL_LIB_DEST"
 chmod -R u+w "$APPS_BUILD/perl" 2>/dev/null || true
 
 echo "[perl] copying core lib/ modules..."
-rsync -a --ignore-existing "$PERL_ROOT/lib/" "$PERL_LIB_DEST/"
+rsync -a --no-perms --chmod=u+w --ignore-existing "$PERL_ROOT/lib/" "$PERL_LIB_DEST/"
 
 # Copy extension .pm files from dist/, cpan/, ext/ — these override any
 # stubs that make install may have placed.
