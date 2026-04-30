@@ -2,8 +2,46 @@
 set -euo pipefail
 
 ###############################################################################
-# CPython test suite for lind-wasm
+# CPython test suite for lind-wasm with grates
 ###############################################################################
+
+# Usage info
+usage() {
+  echo "Usage: $0 <grate_type>"
+  echo ""
+  echo "Arguments:"
+  echo "  chroot    Use the chroot grate (grates/chroot-grate.cwasm --chroot-dir /)"
+  echo "  ipc       Use the IPC grate (grates/ipc-grate.cwasm)"
+  echo "  witness   Use the witness grate"
+  echo "  fsrouting Use the fsrouting with imfs grate"
+  echo ""
+  echo "Examples:"
+  echo "  $0 chroot"
+  echo "  $0 ipc"
+  exit 1
+}
+
+# Check argument is provided
+if [[ -z "${1:-}" ]]; then
+  echo "Error: No argument provided."
+  echo ""
+  usage
+fi
+
+# Set GRATE_CMD based on argument
+case "$1" in
+  chroot)
+    GRATE_CMD="grates/chroot-grate.cwasm --chroot-dir /"
+    ;;
+  ipc)
+    GRATE_CMD="grates/ipc-grate.cwasm"
+    ;;
+  *)
+    echo "Error: Unknown argument '$1'."
+    echo ""
+    usage
+    ;;
+esac
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -46,13 +84,13 @@ cp Makefile Makefile.bak
 
 if [[ "$LIND_DYLINK" == "1" ]]; then
   sed -i \
-    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= lind_run --preload env=lib/libz.so --preload env=lib/libpython3.14.so grates/chroot-grate.cwasm --chroot-dir /|" \
-    -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='lind_run --preload env=lib/libz.so --preload env=lib/libpython3.14.so grates/chroot-grate.cwasm --chroot-dir /'|" \
+    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= lind_run --preload env=lib/libz.so --preload env=lib/libpython3.14.so ${GRATE_CMD}|" \
+    -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='lind_run --preload env=lib/libz.so --preload env=lib/libpython3.14.so ${GRATE_CMD}'|" \
     Makefile
 else
   sed -i \
-    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= lind_run grates/chroot-grate.cwasm --chroot-dir /|" \
-    -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='lind_run grates/chroot-grate.cwasm --chroot-dir /'|" \
+    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= lind_run ${GRATE_CMD}|" \
+    -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='lind_run ${GRATE_CMD}'|" \
     Makefile
 fi
 
