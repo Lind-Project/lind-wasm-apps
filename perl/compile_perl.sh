@@ -175,6 +175,9 @@ PERL_VER="5.40.4"
 PERL_LIB_DEST="$APPS_BUILD/perl/lib/perl5/$PERL_VER"
 mkdir -p "$PERL_LIB_DEST"
 
+# Ensure staging dir is writable (perl's installer may set read-only perms)
+chmod -R u+w "$APPS_BUILD/perl" 2>/dev/null || true
+
 echo "[perl] copying core lib/ modules..."
 rsync -a --ignore-existing "$PERL_ROOT/lib/" "$PERL_LIB_DEST/"
 
