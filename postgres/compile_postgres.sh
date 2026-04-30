@@ -149,7 +149,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     -Wl,--unresolved-symbols=import-dynamic \
     -Wl,--export=__wasm_call_ctors \
     -Wl,--export-if-defined=__wasm_init_tls \
-    -Wl,--export-if-defined=pg_bindtextdomain \
     -Wl,--export=__tls_base \
     -Wl,-z,stack-size=8388608 \
     -L$MERGED_SYSROOT/lib/wasm32-wasi \
@@ -810,7 +809,6 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
     "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
     "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
     "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __stack_pointer global __stack_pointer
-    "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" pg_bindtextdomain func pg_bindtextdomain optional
   fi
 
   if [[ -x "$LIND_BOOT" ]]; then
