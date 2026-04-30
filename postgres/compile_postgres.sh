@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -x
 
 ###############################################################################
 # PostgreSQL WASM build helper for lind-wasm-apps
@@ -589,7 +590,7 @@ if [[ -n "$PLPGSQL_OBJS" ]]; then
   "$WASM_OPT" \
     --enable-bulk-memory --enable-threads \
     --fpcast-emu --pass-arg=relocatable-fpcast \
-    --epoch-injection --pass-arg=epoch-import \
+    --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
     --asyncify --pass-arg=asyncify-import-globals \
     -O2 --debuginfo \
     "$PLPGSQL_WASM" -o "$PLPGSQL_OPT" || {
@@ -667,7 +668,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     echo "[postgres] [dylink] running wasm-opt on lib${lib_name}.wasm..."
     "$WASM_OPT" \
       --enable-bulk-memory --enable-threads \
-      --fpcast-emu \
+      --fpcast-emu --pass-arg=relocatable-fpcast\
       --epoch-injection --pass-arg=epoch-import \
       --asyncify --pass-arg=asyncify-import-globals \
       -O2 --debuginfo \
@@ -773,7 +774,7 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
       # -O2 before asyncify helps reduce locals in large binaries like postgres
       "$WASM_OPT" \
         --enable-bulk-memory --enable-threads \
-        --fpcast-emu \
+        --fpcast-emu --pass-arg=relocatable-fpcast\
         -O2 \
         --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
         --asyncify --pass-arg=asyncify-import-globals \
