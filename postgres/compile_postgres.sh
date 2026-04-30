@@ -113,7 +113,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[postgres] Dynamic linking mode enabled (LIND_DYLINK=1)"
 
   # Add PIC for position-independent code
-  CFLAGS_WASM="$CFLAGS_WASM -fPIC"
+  CFLAGS_WASM="$CFLAGS_WASM -fPIC -fvisibility=default"
 
   # add-export-tool is used after wasm-opt to export relocation and stack symbols
   ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
@@ -142,12 +142,14 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     -Wl,--import-table \
     -Wl,--import-memory \
     -Wl,--export-memory \
+    -Wl,--export-dynamic \
     -Wl,--shared-memory \
     -Wl,--max-memory=268435456 \
     -Wl,--allow-undefined \
     -Wl,--unresolved-symbols=import-dynamic \
     -Wl,--export=__wasm_call_ctors \
     -Wl,--export-if-defined=__wasm_init_tls \
+    -Wl,--export-if-defined=pg_bindtextdomain \
     -Wl,--export=__tls_base \
     -Wl,-z,stack-size=8388608 \
     -L$MERGED_SYSROOT/lib/wasm32-wasi \
@@ -298,7 +300,7 @@ ac_cv_func_setsid=${ac_cv_func_setsid=yes}
 
 # Functions genuinely not available in WASI
 ac_cv_func_shm_open=${ac_cv_func_shm_open=no}
-ac_cv_func_dlopen=${ac_cv_func_dlopen=no}
+ac_cv_func_dlopen=${ac_cv_func_dlopen=yes}
 ac_cv_func_setproctitle=${ac_cv_func_setproctitle=no}
 ac_cv_func_setproctitle_fast=${ac_cv_func_setproctitle_fast=no}
 ac_cv_func_getpeereid=${ac_cv_func_getpeereid=no}
@@ -428,6 +430,8 @@ fi
 echo "[postgres] [wasm] compiling WASI stubs..."
 $CC_WASM $CFLAGS_WASM -c "$WASI_STUBS_C" -o "$WASI_STUBS_O"
 
+echo "OBJS += $WASI_STUBS_O" >> "$PG_ROOT/src/backend/Makefile"
+
 ###############################################################################
 # Build backend (best-effort)
 ###############################################################################
@@ -455,8 +459,9 @@ make -C src/backend all -j"$JOBS" \
   LDFLAGS="$LDFLAGS_WASM" \
   AR="$AR" \
   RANLIB="$RANLIB" \
-  LIBS="$WASI_STUBS_O -lm" || {
+  LIBS="-Wl,--whole-archive $WASI_STUBS_O -Wl,--no-whole-archive -lm" || {
     echo "[postgres] WARNING: backend build had errors (best-effort, continuing)."
+    exit 1
 }
 
 ###############################################################################
@@ -585,7 +590,7 @@ if [[ -n "$PLPGSQL_OBJS" ]]; then
   echo "[postgres] [wasm] running wasm-opt on plpgsql.wasm..."
   "$WASM_OPT" \
     --enable-bulk-memory --enable-threads \
-    --fpcast-emu \
+    --fpcast-emu --pass-arg=relocatable-fpcast \
     --epoch-injection --pass-arg=epoch-import \
     --asyncify --pass-arg=asyncify-import-globals \
     -O2 --debuginfo \
@@ -714,6 +719,7 @@ if [[ -f "$PG_BINARY" ]]; then
   echo "[postgres] staged: $STAGE_BIN/postgres.wasm"
 else
   echo "[postgres] WARNING: postgres binary was not produced."
+  exit 1
 fi
 
 if [[ -f "$INITDB_BINARY" ]]; then
@@ -804,6 +810,7 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
     "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
     "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
     "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __stack_pointer global __stack_pointer
+    "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" pg_bindtextdomain func pg_bindtextdomain optional
   fi
 
   if [[ -x "$LIND_BOOT" ]]; then
