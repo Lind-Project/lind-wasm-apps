@@ -7,34 +7,85 @@ set -euo pipefail
 
 # Usage info
 usage() {
-  echo "Usage: $0 <grate_type>"
+  echo "Usage: $0 <grate_type> [--grate-arg <arg>] [--skip test1,test2,...]"
   echo ""
   echo "Arguments:"
   echo "  chroot    Use the chroot grate (grates/chroot-grate.cwasm --chroot-dir /)"
   echo "  ipc       Use the IPC grate (grates/ipc-grate.cwasm)"
   echo "  witness   Use the witness grate"
-  echo "  fsrouting Use the fsrouting with imfs grate"
+  echo "  fs-routing-clamp Use the fsrouting with imfs grate (requires --grate-arg)"
+  echo ""
+  echo "Options:"
+  echo "  --grate-arg   Extra argument passed to the grate (required for fs-routing-clamp). Need to be passed with double quotes"
+  echo "  --skip    Comma-separated list of test modules to skip"
   echo ""
   echo "Examples:"
   echo "  $0 chroot"
   echo "  $0 ipc"
+  echo "  $0 fs-routing-clamp --grate-arg "--prefix workspace %{ grates/imfs-grate.cwasm %}" --skip test_socket"
+  echo "  $0 ipc --skip test_decimal,test_math"
+  echo "  $0 chroot --skip test_socket,test_ssl,test_hashlib"
   exit 1
 }
 
 # Check argument is provided
-if [[ -z "${1:-}" ]]; then
+if [[ $# -eq 0 ]]; then
   echo "Error: No argument provided."
   echo ""
   usage
 fi
 
+GRATE_TYPE="$1"
+GRATE_ARG=""
+SKIP_LIST=""
+shift
+
+# Parse remaining options
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --skip requires a value."
+        echo ""
+        usage
+      fi
+      SKIP_LIST="$2"
+      shift 2
+      ;;
+    --grate-arg)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --grate-arg requires a value."
+        echo ""
+        usage
+      fi
+      GRATE_ARG="$2"
+      shift 2
+      ;;
+    *)
+      echo "Error: Unknown option '$1'."
+      echo ""
+      usage
+      ;;
+  esac
+done
+
+
+
 # Set GRATE_CMD based on argument
-case "$1" in
+case "$GRATE_TYPE" in
   chroot)
     GRATE_CMD="grates/chroot-grate.cwasm --chroot-dir /"
     ;;
   ipc)
     GRATE_CMD="grates/ipc-grate.cwasm"
+    ;;
+  fs-routing-clamp)
+    if [[ -z "$GRATE_ARG" ]]; then
+      echo "Error: grate type 'fs-routing-clamp' requires --grate-arg <argument>."
+      echo ""
+      usage
+    fi
+    GRATE_CMD="grates/fs-routing-clamp.wasm ${GRATE_ARG}"
     ;;
   *)
     echo "Error: Unknown argument '$1'."
@@ -42,6 +93,17 @@ case "$1" in
     usage
     ;;
 esac
+
+# Build the skip substring
+SKIP_ARGS=""
+if [[ -n "$SKIP_LIST" ]]; then
+  IFS=',' read -ra SKIP_TESTS <<< "$SKIP_LIST"
+  for test in "${SKIP_TESTS[@]}"; do
+    SKIP_ARGS="$SKIP_ARGS -i ${test}"
+  done
+  SKIP_ARGS="${SKIP_ARGS# }"  # trim leading space
+  echo "Skipping tests: $SKIP_ARGS"
+fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -108,6 +170,6 @@ cp "$PYTHON_BINARY" "$LINDFS_ROOT/python.wasm"
 
 # --- run tests ----------------------------------------------------------------
 echo "[cpython-test] running python test suite..."
-make test
 
+make test TESTOPTS="${SKIP_ARGS}"
 popd >/dev/null
