@@ -54,7 +54,7 @@ APP            ?= $(TESTABLE_APPS)
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
 # -------- Base set: common UNIX userland tools --------------------------------
-base: bash coreutils perl gmake awk curl grep sed
+base: bash coreutils perl gmake awk curl grep sed diffutils
 
 test:
 	@if [[ -z "$(strip $(APP))" ]]; then \
@@ -461,6 +461,6 @@ install-awk:
 install-gmake:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' make
 
-install-base: install-bash install-coreutils install-perl install-gmake install-awk install-curl install-grep install-sed
+install-base: install-bash install-coreutils install-perl install-gmake install-awk install-curl install-grep install-sed install-diffutils
 
 install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-perl install-awk install-gmake install-gnulib install-libtirpc install-openssl install-zlib install-libcxx

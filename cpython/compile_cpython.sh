@@ -294,7 +294,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     "$BUILD_WASM/Modules/_decimal/libmpdec/libmpdec.a" \
     "$BUILD_WASM/Modules/_hacl/libHacl_HMAC.a" \
     "$BUILD_WASM/Modules/_hacl/libHacl_Hash_SHA3.a" \
-    "$SYSROOT/lib/wasm32-wasi/set_stack_pointer.o" \
     "$SYSROOT/lib/wasm32-wasi/crt1_shared.o" \
     "$SYSROOT/lib/wasm32-wasi/lind_utils.o" \
     -ldl -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lpthread -lm

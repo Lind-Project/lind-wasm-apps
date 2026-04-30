@@ -98,7 +98,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   fi
 
   DYLINK_CRT_OBJS=(
-    "$MERGED_SYSROOT/lib/wasm32-wasi/set_stack_pointer.o"
     "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
     "$MERGED_SYSROOT/lib/wasm32-wasi/lind_utils.o"
   )
