@@ -394,6 +394,7 @@ gmake: $(MERGE_BASE_STAMP)
 
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash
+	cp -f '$(LINDFS_ROOT)/bin/bash' '$(LINDFS_ROOT)/bin/sh'
 
 install-nginx:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' nginx

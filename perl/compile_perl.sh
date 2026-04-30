@@ -167,7 +167,66 @@ if [[ ! -f "$PERL_BIN" ]]; then
 fi
 
 echo "[perl] installing to staging dir..."
-make install DESTDIR="$APPS_BUILD/perl"
+make install DESTDIR="$APPS_BUILD/perl" || true
+
+# make install may not install all .pm files (especially from XS extensions
+# that failed to build for wasm). Copy them from the source tree as a fallback.
+PERL_VER="5.40.4"
+PERL_LIB_DEST="$APPS_BUILD/perl/lib/perl5/$PERL_VER"
+mkdir -p "$PERL_LIB_DEST"
+
+# Ensure staging dir is writable (perl's installer may set read-only perms)
+chmod -R u+w "$APPS_BUILD/perl" 2>/dev/null || true
+
+echo "[perl] copying core lib/ modules..."
+rsync -a --no-perms --chmod=u+w --ignore-existing "$PERL_ROOT/lib/" "$PERL_LIB_DEST/"
+
+# Copy extension .pm files from dist/, cpan/, ext/ — these override any
+# stubs that make install may have placed.
+echo "[perl] copying extension .pm files from dist/..."
+find "$PERL_ROOT/dist" -path '*/lib/*.pm' | while read -r f; do
+  rel="${f#*dist/*/lib/}"
+  mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
+  cp "$f" "$PERL_LIB_DEST/$rel"
+done
+
+echo "[perl] copying extension .pm files from cpan/..."
+find "$PERL_ROOT/cpan" -path '*/lib/*.pm' | while read -r f; do
+  rel="${f#*cpan/*/lib/}"
+  mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
+  cp "$f" "$PERL_LIB_DEST/$rel"
+done
+
+echo "[perl] copying extension .pm files from ext/..."
+find "$PERL_ROOT/ext" -path '*/lib/*.pm' | while read -r f; do
+  rel="${f#*ext/*/lib/}"
+  mkdir -p "$PERL_LIB_DEST/$(dirname "$rel")"
+  cp "$f" "$PERL_LIB_DEST/$rel"
+done
+
+# Some XS extensions have their .pm at the top of their directory (not under lib/).
+# Copy these explicitly — force overwrite to replace any bootstrap stubs.
+echo "[perl] copying top-level extension .pm files..."
+declare -A EXT_PM_MAP=(
+  ["ext/Fcntl/Fcntl.pm"]="Fcntl.pm"
+  ["dist/IO/IO.pm"]="IO.pm"
+  ["dist/PathTools/Cwd.pm"]="Cwd.pm"
+  ["dist/PathTools/lib/File/Spec.pm"]="File/Spec.pm"
+  ["dist/PathTools/lib/File/Spec/Unix.pm"]="File/Spec/Unix.pm"
+  ["dist/PathTools/lib/File/Spec/Functions.pm"]="File/Spec/Functions.pm"
+  ["ext/POSIX/lib/POSIX.pm"]="POSIX.pm"
+  ["ext/Socket/Socket.pm"]="Socket.pm"
+  ["dist/Storable/Storable.pm"]="Storable.pm"
+  ["dist/Data-Dumper/lib/Data/Dumper.pm"]="Data/Dumper.pm"
+)
+for src_rel in "${!EXT_PM_MAP[@]}"; do
+  src="$PERL_ROOT/$src_rel"
+  dest="$PERL_LIB_DEST/${EXT_PM_MAP[$src_rel]}"
+  if [[ -f "$src" ]]; then
+    mkdir -p "$(dirname "$dest")"
+    cp "$src" "$dest"
+  fi
+done
 
 ###############################################################################
 # wasm-opt + precompile
