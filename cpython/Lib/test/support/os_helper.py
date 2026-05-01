@@ -10,7 +10,7 @@ import sys
 import time
 import unittest
 import warnings
-
+import random
 from test import support
 
 
@@ -19,7 +19,8 @@ TESTFN_ASCII = '@test'
 
 # Disambiguate TESTFN for parallel testing, while letting it remain a valid
 # module name.
-TESTFN_ASCII = "{}_{}_tmp".format(TESTFN_ASCII, os.getpid())
+# Append a random number to prevent filename collisions when multiple test workers run in parallel.
+TESTFN_ASCII = "{}_{}_{}_tmp".format(TESTFN_ASCII, os.getpid(), random.randint(0, 99999))
 
 # TESTFN_UNICODE is a non-ascii filename
 TESTFN_UNICODE = TESTFN_ASCII + "-\xe0\xf2\u0258\u0141\u011f"
