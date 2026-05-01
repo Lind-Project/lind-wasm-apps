@@ -1,0 +1,2887 @@
+[[33mSKIP[0m] chgrp/basic (Bash test skipped via flag)
+[[33mSKIP[0m] chgrp/default-no-deref (Bash test skipped via flag)
+[[33mSKIP[0m] chgrp/deref (Bash test skipped via flag)
+[[33mSKIP[0m] chgrp/no-x (Bash test skipped via flag)
+[[33mSKIP[0m] chgrp/posix-H (Bash test skipped via flag)
+[[33mSKIP[0m] chgrp/recurse (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/c-option (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/equal-x (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/equals (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/inaccessible (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/no-x (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/octal (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/setgid (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/silent (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/thru-dangling (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/umask-x (Bash test skipped via flag)
+[[33mSKIP[0m] chmod/usage (Bash test skipped via flag)
+[[33mSKIP[0m] chown/basic (Bash test skipped via flag)
+[[33mSKIP[0m] chown/deref (Bash test skipped via flag)
+[[33mSKIP[0m] chown/preserve-root (Bash test skipped via flag)
+[[33mSKIP[0m] chown/separator (Bash test skipped via flag)
+[[33mSKIP[0m] cp/abuse (Bash test skipped via flag)
+[[33mSKIP[0m] cp/acl (Bash test skipped via flag)
+[[33mSKIP[0m] cp/backup-1 (Bash test skipped via flag)
+[[33mSKIP[0m] cp/backup-dir (Bash test skipped via flag)
+[[33mSKIP[0m] cp/backup-is-src (Bash test skipped via flag)
+[[33mSKIP[0m] cp/cp-HL (Bash test skipped via flag)
+[[33mSKIP[0m] cp/cp-a-selinux (Bash test skipped via flag)
+[[33mSKIP[0m] cp/cp-deref (Bash test skipped via flag)
+[[33mSKIP[0m] cp/cp-i (Bash test skipped via flag)
+[[33mSKIP[0m] cp/cp-mv-backup (Bash test skipped via flag)
+[[33mSKIP[0m] cp/cp-mv-enotsup-xattr (Bash test skipped via flag)
+[[33mSKIP[0m] cp/cp-parents (Bash test skipped via flag)
+[[33mSKIP[0m] cp/deref-slink (Bash test skipped via flag)
+[[33mSKIP[0m] cp/dir-rm-dest (Bash test skipped via flag)
+[[33mSKIP[0m] cp/dir-slash (Bash test skipped via flag)
+[[33mSKIP[0m] cp/dir-vs-file (Bash test skipped via flag)
+[[33mSKIP[0m] cp/existing-perm-race (Bash test skipped via flag)
+[[33mSKIP[0m] cp/fail-perm (Bash test skipped via flag)
+[[33mSKIP[0m] cp/file-perm-race (Bash test skipped via flag)
+[[33mSKIP[0m] cp/into-self (Bash test skipped via flag)
+[[33mSKIP[0m] cp/link (Bash test skipped via flag)
+[[33mSKIP[0m] cp/link-heap (Bash test skipped via flag)
+[[33mSKIP[0m] cp/link-no-deref (Bash test skipped via flag)
+[[33mSKIP[0m] cp/link-preserve (Bash test skipped via flag)
+[[33mSKIP[0m] cp/no-deref-link1 (Bash test skipped via flag)
+[[33mSKIP[0m] cp/no-deref-link2 (Bash test skipped via flag)
+[[33mSKIP[0m] cp/no-deref-link3 (Bash test skipped via flag)
+[[33mSKIP[0m] cp/parent-perm (Bash test skipped via flag)
+[[33mSKIP[0m] cp/parent-perm-race (Bash test skipped via flag)
+[[33mSKIP[0m] cp/perm (Bash test skipped via flag)
+[[33mSKIP[0m] cp/preserve-2 (Bash test skipped via flag)
+[[33mSKIP[0m] cp/preserve-gid (Bash test skipped via flag)
+[[33mSKIP[0m] cp/preserve-slink-time (Bash test skipped via flag)
+[[33mSKIP[0m] cp/proc-short-read (Bash test skipped via flag)
+[[33mSKIP[0m] cp/proc-zero-len (Bash test skipped via flag)
+[[33mSKIP[0m] cp/r-vs-symlink (Bash test skipped via flag)
+[[33mSKIP[0m] cp/reflink-auto (Bash test skipped via flag)
+[[33mSKIP[0m] cp/reflink-perm (Bash test skipped via flag)
+[[33mSKIP[0m] cp/same-file (Bash test skipped via flag)
+[[33mSKIP[0m] cp/slink-2-slink (Bash test skipped via flag)
+[[33mSKIP[0m] cp/sparse (Bash test skipped via flag)
+[[33mSKIP[0m] cp/special-bits (Bash test skipped via flag)
+[[33mSKIP[0m] cp/special-f (Bash test skipped via flag)
+[[33mSKIP[0m] cp/src-base-dot (Bash test skipped via flag)
+[[33mSKIP[0m] cp/symlink-slash (Bash test skipped via flag)
+[[33mSKIP[0m] cp/thru-dangling (Bash test skipped via flag)
+[[33mSKIP[0m] dd/direct (Bash test skipped via flag)
+[[33mSKIP[0m] dd/misc (Bash test skipped via flag)
+[[33mSKIP[0m] dd/not-rewound (Bash test skipped via flag)
+[[33mSKIP[0m] dd/reblock (Bash test skipped via flag)
+===================================================
+Executing: dd/skip-seek
+Sandbox Path: /tests/dd/skip-seek
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] dd/skip-seek-past-dev (Bash test skipped via flag)
+[[33mSKIP[0m] dd/skip-seek-past-file (Bash test skipped via flag)
+[[33mSKIP[0m] dd/skip-seek2 (Bash test skipped via flag)
+[[33mSKIP[0m] dd/stderr (Bash test skipped via flag)
+===================================================
+Executing: dd/unblock
+Sandbox Path: /tests/dd/unblock
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] dd/unblock-sync (Bash test skipped via flag)
+[[33mSKIP[0m] df/total-verify (Bash test skipped via flag)
+[[33mSKIP[0m] df/unreadable (Bash test skipped via flag)
+[[33mSKIP[0m] du/2g (Bash test skipped via flag)
+[[33mSKIP[0m] du/8gb (Bash test skipped via flag)
+[[33mSKIP[0m] du/basic (Bash test skipped via flag)
+[[33mSKIP[0m] du/deref (Bash test skipped via flag)
+[[33mSKIP[0m] du/deref-args (Bash test skipped via flag)
+[[33mSKIP[0m] du/exclude (Bash test skipped via flag)
+[[33mSKIP[0m] du/fd-leak (Bash test skipped via flag)
+===================================================
+Executing: du/files0-from
+Sandbox Path: /tests/du/files0-from
+===================================================
+files0-from: test f-extra-arg: stderr mismatch, comparing f-extra-arg.E (actual) and f-extra-arg.2 (expected)
+*** f-extra-arg.E	Thu Jan  1 00:00:00 1970
+--- f-extra-arg.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/du: extra operand `no-such'
+  file operands cannot be combined with --files0-from
+! Try `/bin/du --help' for more information.
+--- 1,3 ----
+! du: extra operand `no-such'
+  file operands cannot be combined with --files0-from
+! Try `du --help' for more information.
+files0-from: test missing: stderr mismatch, comparing missing.E (actual) and missing.1 (expected)
+*** missing.E	Thu Jan  1 00:00:00 1970
+--- missing.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/du: cannot open `missing' for reading: No such file or directory
+--- 1 ----
+! du: cannot open `missing' for reading: No such file or directory
+files0-from: test minus-in-stdin: stderr mismatch, comparing minus-in-stdin.E (actual) and minus-in-stdin.1 (expected)
+*** minus-in-stdin.E	Thu Jan  1 00:00:00 1970
+--- minus-in-stdin.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/du: when reading file names from stdin, no file name of `-' allowed
+--- 1 ----
+! du: when reading file names from stdin, no file name of `-' allowed
+files0-from: test nul-1: stderr mismatch, comparing nul-1.E (actual) and nul-1.2 (expected)
+*** nul-1.E	Thu Jan  1 00:00:00 1970
+--- nul-1.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/du: -:1: invalid zero-length file name
+--- 1 ----
+! du: -:1: invalid zero-length file name
+files0-from: test nul-2: stderr mismatch, comparing nul-2.E (actual) and nul-2.2 (expected)
+*** nul-2.E	Thu Jan  1 00:00:00 1970
+--- nul-2.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/du: -:1: invalid zero-length file name
+! /bin/du: -:2: invalid zero-length file name
+--- 1,2 ----
+! du: -:1: invalid zero-length file name
+! du: -:2: invalid zero-length file name
+files0-from: test zero-len: stderr mismatch, comparing zero-len.E (actual) and zero-len.2 (expected)
+*** zero-len.E	Thu Jan  1 00:00:00 1970
+--- zero-len.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/du: -:1: invalid zero-length file name
+--- 1 ----
+! du: -:1: invalid zero-length file name
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] du/hard-link (Bash test skipped via flag)
+[[33mSKIP[0m] du/inacc-dest (Bash test skipped via flag)
+[[33mSKIP[0m] du/inacc-dir (Bash test skipped via flag)
+[[33mSKIP[0m] du/inaccessible-cwd (Bash test skipped via flag)
+[[33mSKIP[0m] du/long-from-unreadable (Bash test skipped via flag)
+[[33mSKIP[0m] du/long-sloop (Bash test skipped via flag)
+[[33mSKIP[0m] du/no-deref (Bash test skipped via flag)
+[[33mSKIP[0m] du/no-x (Bash test skipped via flag)
+[[33mSKIP[0m] du/one-file-system (Bash test skipped via flag)
+[[33mSKIP[0m] du/restore-wd (Bash test skipped via flag)
+[[33mSKIP[0m] du/slash (Bash test skipped via flag)
+[[33mSKIP[0m] du/slink (Bash test skipped via flag)
+[[33mSKIP[0m] du/trailing-slash (Bash test skipped via flag)
+[[33mSKIP[0m] du/two-args (Bash test skipped via flag)
+[[33mSKIP[0m] id/no-context (Bash test skipped via flag)
+[[33mSKIP[0m] install/basic-1 (Bash test skipped via flag)
+[[33mSKIP[0m] install/create-leading (Bash test skipped via flag)
+[[33mSKIP[0m] install/d-slashdot (Bash test skipped via flag)
+[[33mSKIP[0m] install/install-C (Bash test skipped via flag)
+[[33mSKIP[0m] install/install-C-root (Bash test skipped via flag)
+[[33mSKIP[0m] install/install-C-selinux (Bash test skipped via flag)
+[[33mSKIP[0m] install/strip-program (Bash test skipped via flag)
+[[33mSKIP[0m] install/trap (Bash test skipped via flag)
+[[33mSKIP[0m] ln/backup-1 (Bash test skipped via flag)
+[[33mSKIP[0m] ln/hard-backup (Bash test skipped via flag)
+[[33mSKIP[0m] ln/hard-to-sym (Bash test skipped via flag)
+[[33mSKIP[0m] ln/misc (Bash test skipped via flag)
+[[33mSKIP[0m] ln/sf-1 (Bash test skipped via flag)
+[[33mSKIP[0m] ln/slash-decorated-nonexistent-dest (Bash test skipped via flag)
+[[33mSKIP[0m] ln/target-1 (Bash test skipped via flag)
+[[33mSKIP[0m] ls/abmon-align (Bash test skipped via flag)
+[[33mSKIP[0m] ls/capability (Bash test skipped via flag)
+[[33mSKIP[0m] ls/color-clear-to-eol (Bash test skipped via flag)
+[[33mSKIP[0m] ls/color-dtype-dir (Bash test skipped via flag)
+[[33mSKIP[0m] ls/dangle (Bash test skipped via flag)
+[[33mSKIP[0m] ls/dired (Bash test skipped via flag)
+[[33mSKIP[0m] ls/file-type (Bash test skipped via flag)
+[[33mSKIP[0m] ls/follow-slink (Bash test skipped via flag)
+[[33mSKIP[0m] ls/infloop (Bash test skipped via flag)
+[[33mSKIP[0m] ls/inode (Bash test skipped via flag)
+[[33mSKIP[0m] ls/m-option (Bash test skipped via flag)
+[[33mSKIP[0m] ls/multihardlink (Bash test skipped via flag)
+[[33mSKIP[0m] ls/nameless-uid (Bash test skipped via flag)
+[[33mSKIP[0m] ls/no-arg (Bash test skipped via flag)
+[[33mSKIP[0m] ls/no-cap (Bash test skipped via flag)
+[[33mSKIP[0m] ls/proc-selinux-segfault (Bash test skipped via flag)
+[[33mSKIP[0m] ls/readdir-mountpoint-inode (Bash test skipped via flag)
+[[33mSKIP[0m] ls/recursive (Bash test skipped via flag)
+[[33mSKIP[0m] ls/rt-1 (Bash test skipped via flag)
+[[33mSKIP[0m] ls/stat-dtype (Bash test skipped via flag)
+[[33mSKIP[0m] ls/stat-failed (Bash test skipped via flag)
+[[33mSKIP[0m] ls/stat-free-symlinks (Bash test skipped via flag)
+[[33mSKIP[0m] ls/stat-vs-dirent (Bash test skipped via flag)
+[[33mSKIP[0m] ls/symlink-slash (Bash test skipped via flag)
+[[33mSKIP[0m] ls/x-option (Bash test skipped via flag)
+[[33mSKIP[0m] misc/arch (Bash test skipped via flag)
+===================================================
+Executing: misc/base64
+Sandbox Path: /tests/misc/base64
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: misc/basename
+Sandbox Path: /tests/misc/basename
+===================================================
+basename: test fail-1: stderr mismatch, comparing fail-1.E (actual) and fail-1.1 (expected)
+*** fail-1.E	Thu Jan  1 00:00:00 1970
+--- fail-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/basename: missing operand
+! Try `/bin/basename --help' for more information.
+--- 1,2 ----
+! basename: missing operand
+! Try `basename --help' for more information.
+basename: test fail-2: stderr mismatch, comparing fail-2.E (actual) and fail-2.1 (expected)
+*** fail-2.E	Thu Jan  1 00:00:00 1970
+--- fail-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/basename: extra operand `c'
+! Try `/bin/basename --help' for more information.
+--- 1,2 ----
+! basename: extra operand `c'
+! Try `basename --help' for more information.
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/cat-buf (Bash test skipped via flag)
+[[33mSKIP[0m] misc/cat-proc (Bash test skipped via flag)
+[[33mSKIP[0m] misc/chcon (Bash test skipped via flag)
+[[33mSKIP[0m] misc/chcon-fail (Bash test skipped via flag)
+[[33mSKIP[0m] misc/chroot-credentials (Bash test skipped via flag)
+[[33mSKIP[0m] misc/chroot-fail (Bash test skipped via flag)
+[[33mSKIP[0m] misc/close-stdout (Bash test skipped via flag)
+===================================================
+Executing: misc/comm
+Sandbox Path: /tests/misc/comm
+===================================================
+comm: test missing-arg1: stderr mismatch, comparing missing-arg1.E (actual) and missing-arg1.1 (expected)
+*** missing-arg1.E	Thu Jan  1 00:00:00 1970
+--- missing-arg1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/comm: missing operand after `a'
+! Try `/bin/comm --help' for more information.
+--- 1,2 ----
+! comm: missing operand after `a'
+! Try `comm --help' for more information.
+comm: test missing-arg2: stderr mismatch, comparing missing-arg2.E (actual) and missing-arg2.1 (expected)
+*** missing-arg2.E	Thu Jan  1 00:00:00 1970
+--- missing-arg2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/comm: missing operand
+! Try `/bin/comm --help' for more information.
+--- 1,2 ----
+! comm: missing operand
+! Try `comm --help' for more information.
+comm: test extra-arg: stderr mismatch, comparing extra-arg.E (actual) and extra-arg.1 (expected)
+*** extra-arg.E	Thu Jan  1 00:00:00 1970
+--- extra-arg.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/comm: extra operand `no-such'
+! Try `/bin/comm --help' for more information.
+--- 1,2 ----
+! comm: extra operand `no-such'
+! Try `comm --help' for more information.
+comm: test ooo: stderr mismatch, comparing ooo.E (actual) and ooo.2 (expected)
+*** ooo.E	Thu Jan  1 00:00:00 1970
+--- ooo.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/comm: file 2 is not in sorted order
+--- 1 ----
+! comm: file 2 is not in sorted order
+comm: test ooo2: stderr mismatch, comparing ooo2.E (actual) and ooo2.2 (expected)
+*** ooo2.E	Thu Jan  1 00:00:00 1970
+--- ooo2.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/comm: file 2 is not in sorted order
+--- 1 ----
+! comm: file 2 is not in sorted order
+comm: test ooo4: stderr mismatch, comparing ooo4.E (actual) and ooo4.2 (expected)
+*** ooo4.E	Thu Jan  1 00:00:00 1970
+--- ooo4.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/comm: file 1 is not in sorted order
+! /bin/comm: file 2 is not in sorted order
+--- 1,2 ----
+! comm: file 1 is not in sorted order
+! comm: file 2 is not in sorted order
+comm: test ooo5: stderr mismatch, comparing ooo5.E (actual) and ooo5.2 (expected)
+*** ooo5.E	Thu Jan  1 00:00:00 1970
+--- ooo5.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/comm: file 1 is not in sorted order
+! /bin/comm: file 2 is not in sorted order
+--- 1,2 ----
+! comm: file 1 is not in sorted order
+! comm: file 2 is not in sorted order
+comm: test ooo5b: stderr mismatch, comparing ooo5b.E (actual) and ooo5b.2 (expected)
+*** ooo5b.E	Thu Jan  1 00:00:00 1970
+--- ooo5b.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/comm: file 1 is not in sorted order
+--- 1 ----
+! comm: file 1 is not in sorted order
+comm: test ooo5c: stderr mismatch, comparing ooo5c.E (actual) and ooo5c.2 (expected)
+*** ooo5c.E	Thu Jan  1 00:00:00 1970
+--- ooo5c.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/comm: file 2 is not in sorted order
+--- 1 ----
+! comm: file 2 is not in sorted order
+comm: test ooo7: stderr mismatch, comparing ooo7.E (actual) and ooo7.2 (expected)
+*** ooo7.E	Thu Jan  1 00:00:00 1970
+--- ooo7.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/comm: file 1 is not in sorted order
+--- 1 ----
+! comm: file 1 is not in sorted order
+comm: test ooo-prefix: stderr mismatch, comparing ooo-prefix.E (actual) and ooo-prefix.2 (expected)
+*** ooo-prefix.E	Thu Jan  1 00:00:00 1970
+--- ooo-prefix.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/comm: file 1 is not in sorted order
+--- 1 ----
+! comm: file 1 is not in sorted order
+comm: test delim-empty: stderr mismatch, comparing delim-empty.E (actual) and delim-empty.1 (expected)
+*** delim-empty.E	Thu Jan  1 00:00:00 1970
+--- delim-empty.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/comm: empty `--output-delimiter' not allowed
+--- 1 ----
+! comm: empty `--output-delimiter' not allowed
+comm: test delim-dual: stderr mismatch, comparing delim-dual.E (actual) and delim-dual.1 (expected)
+*** delim-dual.E	Thu Jan  1 00:00:00 1970
+--- delim-dual.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/comm: multiple delimiters specified
+--- 1 ----
+! comm: multiple delimiters specified
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/csplit (Bash test skipped via flag)
+===================================================
+Executing: misc/cut
+Sandbox Path: /tests/misc/cut
+===================================================
+cut: test zero-1: stderr mismatch, comparing zero-1.E (actual) and zero-1.1 (expected)
+*** zero-1.E	Thu Jan  1 00:00:00 1970
+--- zero-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: fields and positions are numbered from 1
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: fields and positions are numbered from 1
+! Try `cut --help' for more information.
+cut: test zero-2: stderr mismatch, comparing zero-2.E (actual) and zero-2.1 (expected)
+*** zero-2.E	Thu Jan  1 00:00:00 1970
+--- zero-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: fields and positions are numbered from 1
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: fields and positions are numbered from 1
+! Try `cut --help' for more information.
+cut: test y: stderr mismatch, comparing y.E (actual) and y.3 (expected)
+*** y.E	Thu Jan  1 00:00:00 1970
+--- y.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/cut: suppressing non-delimited lines makes sense
+  	only when operating on fields
+! Try `/bin/cut --help' for more information.
+--- 1,3 ----
+! cut: suppressing non-delimited lines makes sense
+  	only when operating on fields
+! Try `cut --help' for more information.
+cut: test y.r: stderr mismatch, comparing y.r.E (actual) and y.r.3 (expected)
+*** y.r.E	Thu Jan  1 00:00:00 1970
+--- y.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/cut: suppressing non-delimited lines makes sense
+  	only when operating on fields
+! Try `/bin/cut --help' for more information.
+--- 1,3 ----
+! cut: suppressing non-delimited lines makes sense
+  	only when operating on fields
+! Try `cut --help' for more information.
+cut: test y.p: stderr mismatch, comparing y.p.E (actual) and y.p.3 (expected)
+*** y.p.E	Thu Jan  1 00:00:00 1970
+--- y.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/cut: suppressing non-delimited lines makes sense
+  	only when operating on fields
+! Try `/bin/cut --help' for more information.
+--- 1,3 ----
+! cut: suppressing non-delimited lines makes sense
+  	only when operating on fields
+! Try `cut --help' for more information.
+cut: test z: stderr mismatch, comparing z.E (actual) and z.3 (expected)
+*** z.E	Thu Jan  1 00:00:00 1970
+--- z.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: you must specify a list of bytes, characters, or fields
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: you must specify a list of bytes, characters, or fields
+! Try `cut --help' for more information.
+cut: test z.r: stderr mismatch, comparing z.r.E (actual) and z.r.3 (expected)
+*** z.r.E	Thu Jan  1 00:00:00 1970
+--- z.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: you must specify a list of bytes, characters, or fields
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: you must specify a list of bytes, characters, or fields
+! Try `cut --help' for more information.
+cut: test z.p: stderr mismatch, comparing z.p.E (actual) and z.p.3 (expected)
+*** z.p.E	Thu Jan  1 00:00:00 1970
+--- z.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: you must specify a list of bytes, characters, or fields
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: you must specify a list of bytes, characters, or fields
+! Try `cut --help' for more information.
+cut: test empty-fl: stderr mismatch, comparing empty-fl.E (actual) and empty-fl.3 (expected)
+*** empty-fl.E	Thu Jan  1 00:00:00 1970
+--- empty-fl.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: fields and positions are numbered from 1
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: fields and positions are numbered from 1
+! Try `cut --help' for more information.
+cut: test empty-fl.r: stderr mismatch, comparing empty-fl.r.E (actual) and empty-fl.r.3 (expected)
+*** empty-fl.r.E	Thu Jan  1 00:00:00 1970
+--- empty-fl.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: fields and positions are numbered from 1
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: fields and positions are numbered from 1
+! Try `cut --help' for more information.
+cut: test empty-fl.p: stderr mismatch, comparing empty-fl.p.E (actual) and empty-fl.p.3 (expected)
+*** empty-fl.p.E	Thu Jan  1 00:00:00 1970
+--- empty-fl.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: fields and positions are numbered from 1
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: fields and positions are numbered from 1
+! Try `cut --help' for more information.
+cut: test missing-fl: stderr mismatch, comparing missing-fl.E (actual) and missing-fl.3 (expected)
+*** missing-fl.E	Thu Jan  1 00:00:00 1970
+--- missing-fl.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid byte or field list
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid byte or field list
+! Try `cut --help' for more information.
+cut: test missing-fl.r: stderr mismatch, comparing missing-fl.r.E (actual) and missing-fl.r.3 (expected)
+*** missing-fl.r.E	Thu Jan  1 00:00:00 1970
+--- missing-fl.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid byte or field list
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid byte or field list
+! Try `cut --help' for more information.
+cut: test missing-fl.p: stderr mismatch, comparing missing-fl.p.E (actual) and missing-fl.p.3 (expected)
+*** missing-fl.p.E	Thu Jan  1 00:00:00 1970
+--- missing-fl.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid byte or field list
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid byte or field list
+! Try `cut --help' for more information.
+cut: test empty-bl: stderr mismatch, comparing empty-bl.E (actual) and empty-bl.3 (expected)
+*** empty-bl.E	Thu Jan  1 00:00:00 1970
+--- empty-bl.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: fields and positions are numbered from 1
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: fields and positions are numbered from 1
+! Try `cut --help' for more information.
+cut: test empty-bl.r: stderr mismatch, comparing empty-bl.r.E (actual) and empty-bl.r.3 (expected)
+*** empty-bl.r.E	Thu Jan  1 00:00:00 1970
+--- empty-bl.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: fields and positions are numbered from 1
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: fields and positions are numbered from 1
+! Try `cut --help' for more information.
+cut: test empty-bl.p: stderr mismatch, comparing empty-bl.p.E (actual) and empty-bl.p.3 (expected)
+*** empty-bl.p.E	Thu Jan  1 00:00:00 1970
+--- empty-bl.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: fields and positions are numbered from 1
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: fields and positions are numbered from 1
+! Try `cut --help' for more information.
+cut: test missing-bl: stderr mismatch, comparing missing-bl.E (actual) and missing-bl.3 (expected)
+*** missing-bl.E	Thu Jan  1 00:00:00 1970
+--- missing-bl.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid byte or field list
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid byte or field list
+! Try `cut --help' for more information.
+cut: test missing-bl.r: stderr mismatch, comparing missing-bl.r.E (actual) and missing-bl.r.3 (expected)
+*** missing-bl.r.E	Thu Jan  1 00:00:00 1970
+--- missing-bl.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid byte or field list
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid byte or field list
+! Try `cut --help' for more information.
+cut: test missing-bl.p: stderr mismatch, comparing missing-bl.p.E (actual) and missing-bl.p.3 (expected)
+*** missing-bl.p.E	Thu Jan  1 00:00:00 1970
+--- missing-bl.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid byte or field list
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid byte or field list
+! Try `cut --help' for more information.
+cut: test 8bit-delim failed: exit status mismatch:  expected 0, got 1
+cut: test 8bit-delim.r failed: exit status mismatch:  expected 0, got 1
+cut: test 8bit-delim.p failed: exit status mismatch:  expected 0, got 1
+cut: test inval1: stderr mismatch, comparing inval1.E (actual) and inval1.3 (expected)
+*** inval1.E	Thu Jan  1 00:00:00 1970
+--- inval1.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid decreasing range
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid decreasing range
+! Try `cut --help' for more information.
+cut: test inval1.r: stderr mismatch, comparing inval1.r.E (actual) and inval1.r.3 (expected)
+*** inval1.r.E	Thu Jan  1 00:00:00 1970
+--- inval1.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid decreasing range
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid decreasing range
+! Try `cut --help' for more information.
+cut: test inval1.p: stderr mismatch, comparing inval1.p.E (actual) and inval1.p.3 (expected)
+*** inval1.p.E	Thu Jan  1 00:00:00 1970
+--- inval1.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid decreasing range
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid decreasing range
+! Try `cut --help' for more information.
+cut: test inval2: stderr mismatch, comparing inval2.E (actual) and inval2.3 (expected)
+*** inval2.E	Thu Jan  1 00:00:00 1970
+--- inval2.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval2.r: stderr mismatch, comparing inval2.r.E (actual) and inval2.r.3 (expected)
+*** inval2.r.E	Thu Jan  1 00:00:00 1970
+--- inval2.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval2.p: stderr mismatch, comparing inval2.p.E (actual) and inval2.p.3 (expected)
+*** inval2.p.E	Thu Jan  1 00:00:00 1970
+--- inval2.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval3: stderr mismatch, comparing inval3.E (actual) and inval3.3 (expected)
+*** inval3.E	Thu Jan  1 00:00:00 1970
+--- inval3.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval3.r: stderr mismatch, comparing inval3.r.E (actual) and inval3.r.3 (expected)
+*** inval3.r.E	Thu Jan  1 00:00:00 1970
+--- inval3.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval3.p: stderr mismatch, comparing inval3.p.E (actual) and inval3.p.3 (expected)
+*** inval3.p.E	Thu Jan  1 00:00:00 1970
+--- inval3.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval4: stderr mismatch, comparing inval4.E (actual) and inval4.3 (expected)
+*** inval4.E	Thu Jan  1 00:00:00 1970
+--- inval4.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval4.r: stderr mismatch, comparing inval4.r.E (actual) and inval4.r.3 (expected)
+*** inval4.r.E	Thu Jan  1 00:00:00 1970
+--- inval4.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval4.p: stderr mismatch, comparing inval4.p.E (actual) and inval4.p.3 (expected)
+*** inval4.p.E	Thu Jan  1 00:00:00 1970
+--- inval4.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval5: stderr mismatch, comparing inval5.E (actual) and inval5.3 (expected)
+*** inval5.E	Thu Jan  1 00:00:00 1970
+--- inval5.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval5.r: stderr mismatch, comparing inval5.r.E (actual) and inval5.r.3 (expected)
+*** inval5.r.E	Thu Jan  1 00:00:00 1970
+--- inval5.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval5.p: stderr mismatch, comparing inval5.p.E (actual) and inval5.p.3 (expected)
+*** inval5.p.E	Thu Jan  1 00:00:00 1970
+--- inval5.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval6: stderr mismatch, comparing inval6.E (actual) and inval6.3 (expected)
+*** inval6.E	Thu Jan  1 00:00:00 1970
+--- inval6.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval6.r: stderr mismatch, comparing inval6.r.E (actual) and inval6.r.3 (expected)
+*** inval6.r.E	Thu Jan  1 00:00:00 1970
+--- inval6.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+cut: test inval6.p: stderr mismatch, comparing inval6.p.E (actual) and inval6.p.3 (expected)
+*** inval6.p.E	Thu Jan  1 00:00:00 1970
+--- inval6.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/cut: invalid range with no endpoint: -
+! Try `/bin/cut --help' for more information.
+--- 1,2 ----
+! cut: invalid range with no endpoint: -
+! Try `cut --help' for more information.
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/date
+Sandbox Path: /tests/misc/date
+===================================================
+localtime(72057594037927936) too large at /tests/misc/date line 53.
+localtime(72057594037927936) failed at /tests/misc/date line 53.
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: misc/date-next-dow
+Sandbox Path: /tests/misc/date-next-dow
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/date-sec (Bash test skipped via flag)
+[[33mSKIP[0m] misc/df (Bash test skipped via flag)
+[[33mSKIP[0m] misc/df-P (Bash test skipped via flag)
+===================================================
+Executing: misc/dircolors
+Sandbox Path: /tests/misc/dircolors
+===================================================
+dircolors: test a: stderr mismatch, comparing a.E (actual) and a.1 (expected)
+*** a.E	Thu Jan  1 00:00:00 1970
+--- a.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/dircolors: k:1: invalid line;  missing second token
+--- 1 ----
+! dircolors: k:1: invalid line;  missing second token
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/dirname
+Sandbox Path: /tests/misc/dirname
+===================================================
+dirname: test fail-1: stderr mismatch, comparing fail-1.E (actual) and fail-1.1 (expected)
+*** fail-1.E	Thu Jan  1 00:00:00 1970
+--- fail-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/dirname: missing operand
+! Try `/bin/dirname --help' for more information.
+--- 1,2 ----
+! dirname: missing operand
+! Try `dirname --help' for more information.
+dirname: test fail-2: stderr mismatch, comparing fail-2.E (actual) and fail-2.1 (expected)
+*** fail-2.E	Thu Jan  1 00:00:00 1970
+--- fail-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/dirname: extra operand `b'
+! Try `/bin/dirname --help' for more information.
+--- 1,2 ----
+! dirname: extra operand `b'
+! Try `dirname --help' for more information.
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/env (Bash test skipped via flag)
+[[33mSKIP[0m] misc/env-null (Bash test skipped via flag)
+===================================================
+Executing: misc/expand
+Sandbox Path: /tests/misc/expand
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: misc/expr
+Sandbox Path: /tests/misc/expr
+===================================================
+/bin/expr: 9758060798730154302876482828124348356960410232492450771490: Numerical result out of range
+expr: test fail-a: stderr mismatch, comparing fail-a.E (actual) and fail-a.1 (expected)
+*** fail-a.E	Thu Jan  1 00:00:00 1970
+--- fail-a.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: non-numeric argument
+--- 1 ----
+! expr: non-numeric argument
+expr: test bre3: stderr mismatch, comparing bre3.E (actual) and bre3.1 (expected)
+*** bre3.E	Thu Jan  1 00:00:00 1970
+--- bre3.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Unmatched ( or \(
+--- 1 ----
+! expr: Unmatched ( or \(
+expr: test bre4: stderr mismatch, comparing bre4.E (actual) and bre4.1 (expected)
+*** bre4.E	Thu Jan  1 00:00:00 1970
+--- bre4.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Unmatched ( or \(
+--- 1 ----
+! expr: Unmatched ( or \(
+expr: test bre7: stderr mismatch, comparing bre7.E (actual) and bre7.1 (expected)
+*** bre7.E	Thu Jan  1 00:00:00 1970
+--- bre7.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Unmatched ) or \)
+--- 1 ----
+! expr: Unmatched ) or \)
+expr: test bre8: stderr mismatch, comparing bre8.E (actual) and bre8.1 (expected)
+*** bre8.E	Thu Jan  1 00:00:00 1970
+--- bre8.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Unmatched ) or \)
+--- 1 ----
+! expr: Unmatched ) or \)
+expr: test bre42: stderr mismatch, comparing bre42.E (actual) and bre42.1 (expected)
+*** bre42.E	Thu Jan  1 00:00:00 1970
+--- bre42.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Unmatched \{
+--- 1 ----
+! expr: Unmatched \{
+expr: test bre43: stderr mismatch, comparing bre43.E (actual) and bre43.1 (expected)
+*** bre43.E	Thu Jan  1 00:00:00 1970
+--- bre43.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Unmatched \{
+--- 1 ----
+! expr: Unmatched \{
+expr: test bre44: stderr mismatch, comparing bre44.E (actual) and bre44.1 (expected)
+*** bre44.E	Thu Jan  1 00:00:00 1970
+--- bre44.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Invalid content of \{\}
+--- 1 ----
+! expr: Invalid content of \{\}
+expr: test bre47: stderr mismatch, comparing bre47.E (actual) and bre47.1 (expected)
+*** bre47.E	Thu Jan  1 00:00:00 1970
+--- bre47.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Invalid content of \{\}
+--- 1 ----
+! expr: Invalid content of \{\}
+expr: test bre48: stderr mismatch, comparing bre48.E (actual) and bre48.1 (expected)
+*** bre48.E	Thu Jan  1 00:00:00 1970
+--- bre48.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Unmatched \{
+--- 1 ----
+! expr: Unmatched \{
+expr: test bre49: stderr mismatch, comparing bre49.E (actual) and bre49.1 (expected)
+*** bre49.E	Thu Jan  1 00:00:00 1970
+--- bre49.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Invalid content of \{\}
+--- 1 ----
+! expr: Invalid content of \{\}
+expr: test bre50: stderr mismatch, comparing bre50.E (actual) and bre50.1 (expected)
+*** bre50.E	Thu Jan  1 00:00:00 1970
+--- bre50.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: Invalid content of \{\}
+--- 1 ----
+! expr: Invalid content of \{\}
+expr: test fail-b: stderr mismatch, comparing fail-b.E (actual) and fail-b.1 (expected)
+*** fail-b.E	Thu Jan  1 00:00:00 1970
+--- fail-b.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/expr: syntax error
+--- 1 ----
+! expr: syntax error
+expr: test fail-c: stderr mismatch, comparing fail-c.E (actual) and fail-c.1 (expected)
+*** fail-c.E	Thu Jan  1 00:00:00 1970
+--- fail-c.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/expr: missing operand
+! Try `/bin/expr --help' for more information.
+--- 1,2 ----
+! expr: missing operand
+! Try `expr --help' for more information.
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/factor
+Sandbox Path: /tests/misc/factor
+===================================================
+factor: test z: stderr mismatch, comparing z.E (actual) and z.1 (expected)
+*** z.E	Thu Jan  1 00:00:00 1970
+--- z.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/factor: invalid option -- 1
+! Try `/bin/factor --help' for more information.
+--- 1,2 ----
+! factor: invalid option -- 1
+! Try `factor --help' for more information.
+factor: test cont: stderr mismatch, comparing cont.E (actual) and cont.2 (expected)
+*** cont.E	Thu Jan  1 00:00:00 1970
+--- cont.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/factor: `a' is not a valid positive integer
+--- 1 ----
+! factor: `a' is not a valid positive integer
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/false-status (Bash test skipped via flag)
+===================================================
+Executing: misc/fmt
+Sandbox Path: /tests/misc/fmt
+===================================================
+fmt: test wide-1: stderr mismatch, comparing wide-1.E (actual) and wide-1.1 (expected)
+*** wide-1.E	Thu Jan  1 00:00:00 1970
+--- wide-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/fmt: invalid width: `32768'
+--- 1 ----
+! fmt: invalid width: `32768'
+fmt: test wide-2: stderr mismatch, comparing wide-2.E (actual) and wide-2.1 (expected)
+*** wide-2.E	Thu Jan  1 00:00:00 1970
+--- wide-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/fmt: invalid width: `2147483647'
+--- 1 ----
+! fmt: invalid width: `2147483647'
+fmt: test bad-suffix: stderr mismatch, comparing bad-suffix.E (actual) and bad-suffix.2 (expected)
+*** bad-suffix.E	Thu Jan  1 00:00:00 1970
+--- bad-suffix.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/fmt: invalid width: `72x'
+--- 1 ----
+! fmt: invalid width: `72x'
+fmt: test no-file: stderr mismatch, comparing no-file.E (actual) and no-file.1 (expected)
+*** no-file.E	Thu Jan  1 00:00:00 1970
+--- no-file.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/fmt: cannot open `no-such-file' for reading: No such file or directory
+--- 1 ----
+! fmt: cannot open `no-such-file' for reading: No such file or directory
+fmt: test obs-1: stderr mismatch, comparing obs-1.E (actual) and obs-1.1 (expected)
+*** obs-1.E	Thu Jan  1 00:00:00 1970
+--- obs-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/fmt: invalid option -- 7; -WIDTH is recognized only when it is the first
+  option; use -w N instead
+! Try `/bin/fmt --help' for more information.
+--- 1,3 ----
+! fmt: invalid option -- 7; -WIDTH is recognized only when it is the first
+  option; use -w N instead
+! Try `fmt --help' for more information.
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/fmt-long-line (Bash test skipped via flag)
+===================================================
+Executing: misc/fold
+Sandbox Path: /tests/misc/fold
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/groups-dash (Bash test skipped via flag)
+[[33mSKIP[0m] misc/groups-version (Bash test skipped via flag)
+===================================================
+Executing: misc/head
+Sandbox Path: /tests/misc/head
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/head-c (Bash test skipped via flag)
+===================================================
+Executing: misc/head-elide-tail
+Sandbox Path: /tests/misc/head-elide-tail
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/head-pos (Bash test skipped via flag)
+[[33mSKIP[0m] misc/help-version (Bash test skipped via flag)
+[[33mSKIP[0m] misc/id-context (Bash test skipped via flag)
+[[33mSKIP[0m] misc/id-groups (Bash test skipped via flag)
+===================================================
+Executing: misc/invalid-opt
+Sandbox Path: /tests/misc/invalid-opt
+===================================================
+Use of uninitialized value $ENV{"built_programs"} in split at /tests/misc/invalid-opt line 62.
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: misc/join
+Sandbox Path: /tests/misc/join
+===================================================
+Use of uninitialized value in concatenation (.) or string at /tests/misc/join line 35.
+Use of uninitialized value in concatenation (.) or string at /tests/misc/join line 35.
+join: test 8-bit-t failed: exit status mismatch:  expected 0, got 1
+join: test bigfield1 failed: exit status mismatch:  expected 0, got 1
+join: test bigfield2 failed: exit status mismatch:  expected 0, got 1
+join: test invalid-j: stderr mismatch, comparing invalid-j.E (actual) and invalid-j.2 (expected)
+*** invalid-j.E	Thu Jan  1 00:00:00 1970
+--- invalid-j.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/join: invalid field number: `x'
+--- 1 ----
+! join: invalid field number: `x'
+join: test chkodr-5: stderr mismatch, comparing chkodr-5.E (actual) and chkodr-5.4 (expected)
+*** chkodr-5.E	Thu Jan  1 00:00:00 1970
+--- chkodr-5.4	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/join: file 1 is not in sorted order
+--- 1 ----
+! join: file 1 is not in sorted order
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/ls-misc
+Sandbox Path: /tests/misc/ls-misc
+===================================================
+Use of uninitialized value $ENV{"abs_top_builddir"} in concatenation (.) or string at /tests/misc/ls-misc line 58.
+/bin/sh: /src/test: No such file or directory
+ls-misc: cannot create setuid/setgid/sticky files,so can't run this test
+===================================================
+Result: [[33mSKIP[0m] (Exit 77)
+[[33mSKIP[0m] misc/ls-time (Bash test skipped via flag)
+===================================================
+Executing: misc/md5sum
+Sandbox Path: /tests/misc/md5sum
+===================================================
+md5sum: test check-quiet2: stderr mismatch, comparing check-quiet2.E (actual) and check-quiet2.2 (expected)
+*** check-quiet2.E	Thu Jan  1 00:00:00 1970
+--- check-quiet2.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/md5sum: WARNING: 1 of 1 computed checksum did NOT match
+--- 1 ----
+! md5sum: WARNING: 1 of 1 computed checksum did NOT match
+md5sum: test check-bsd: stderr mismatch, comparing check-bsd.E (actual) and check-bsd.1 (expected)
+*** check-bsd.E	Thu Jan  1 00:00:00 1970
+--- check-bsd.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/md5sum: f.sha1: no properly formatted MD5 checksum lines found
+--- 1 ----
+! md5sum: f.sha1: no properly formatted MD5 checksum lines found
+md5sum: test check-openssl: stderr mismatch, comparing check-openssl.E (actual) and check-openssl.1 (expected)
+*** check-openssl.E	Thu Jan  1 00:00:00 1970
+--- check-openssl.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/md5sum: f.sha1: no properly formatted MD5 checksum lines found
+--- 1 ----
+! md5sum: f.sha1: no properly formatted MD5 checksum lines found
+md5sum: test bsd-segv: stderr mismatch, comparing bsd-segv.E (actual) and bsd-segv.1 (expected)
+*** bsd-segv.E	Thu Jan  1 00:00:00 1970
+--- bsd-segv.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/md5sum: z: no properly formatted MD5 checksum lines found
+--- 1 ----
+! md5sum: z: no properly formatted MD5 checksum lines found
+md5sum: test nul-in-cksum: stderr mismatch, comparing nul-in-cksum.E (actual) and nul-in-cksum.1 (expected)
+*** nul-in-cksum.E	Thu Jan  1 00:00:00 1970
+--- nul-in-cksum.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/md5sum: h: no properly formatted MD5 checksum lines found
+--- 1 ----
+! md5sum: h: no properly formatted MD5 checksum lines found
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/md5sum-newline
+Sandbox Path: /tests/misc/md5sum-newline
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/md5sum-parallel (Bash test skipped via flag)
+[[33mSKIP[0m] misc/mknod (Bash test skipped via flag)
+===================================================
+Executing: misc/mktemp
+Sandbox Path: /tests/misc/mktemp
+===================================================
+mktemp: test too-many: stderr mismatch, comparing too-many.E (actual) and too-many.1 (expected)
+*** too-many.E	Thu Jan  1 00:00:00 1970
+--- too-many.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/mktemp: too many templates
+! Try `/bin/mktemp --help' for more information.
+--- 1,2 ----
+! mktemp: too many templates
+! Try `mktemp --help' for more information.
+mktemp: test too-few-x: stderr mismatch, comparing too-few-x.E (actual) and too-few-x.1 (expected)
+*** too-few-x.E	Thu Jan  1 00:00:00 1970
+--- too-few-x.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: too few X's in template `foo.XX'
+--- 1 ----
+! mktemp: too few X's in template `foo.XX'
+mktemp: test invalid-tl: stderr mismatch, comparing invalid-tl.E (actual) and invalid-tl.1 (expected)
+*** invalid-tl.E	Thu Jan  1 00:00:00 1970
+--- invalid-tl.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: invalid template, `a/bXXXX', contains directory separator
+--- 1 ----
+! mktemp: invalid template, `a/bXXXX', contains directory separator
+mktemp: test invalid-t2: stderr mismatch, comparing invalid-t2.E (actual) and invalid-t2.1 (expected)
+*** invalid-t2.E	Thu Jan  1 00:00:00 1970
+--- invalid-t2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: invalid template, `/bXXXX'; with --tmpdir, it may not be absolute
+--- 1 ----
+! mktemp: invalid template, `/bXXXX'; with --tmpdir, it may not be absolute
+mktemp: test suffix5f: stderr mismatch, comparing suffix5f.E (actual) and suffix5f.1 (expected)
+*** suffix5f.E	Thu Jan  1 00:00:00 1970
+--- suffix5f.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: invalid suffix `/b', contains directory separator
+--- 1 ----
+! mktemp: invalid suffix `/b', contains directory separator
+mktemp: test suffix6f: stderr mismatch, comparing suffix6f.E (actual) and suffix6f.1 (expected)
+*** suffix6f.E	Thu Jan  1 00:00:00 1970
+--- suffix6f.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: invalid suffix `/b', contains directory separator
+--- 1 ----
+! mktemp: invalid suffix `/b', contains directory separator
+mktemp: test suffix7f: stderr mismatch, comparing suffix7f.E (actual) and suffix7f.1 (expected)
+*** suffix7f.E	Thu Jan  1 00:00:00 1970
+--- suffix7f.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: with --suffix, template `aXXXXb' must end in X
+--- 1 ----
+! mktemp: with --suffix, template `aXXXXb' must end in X
+mktemp: test suffix7d: stderr mismatch, comparing suffix7d.E (actual) and suffix7d.1 (expected)
+*** suffix7d.E	Thu Jan  1 00:00:00 1970
+--- suffix7d.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: with --suffix, template `' must end in X
+--- 1 ----
+! mktemp: with --suffix, template `' must end in X
+mktemp: test suffix9f: stderr mismatch, comparing suffix9f.E (actual) and suffix9f.1 (expected)
+*** suffix9f.E	Thu Jan  1 00:00:00 1970
+--- suffix9f.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/mktemp: too many templates
+! Try `/bin/mktemp --help' for more information.
+--- 1,2 ----
+! mktemp: too many templates
+! Try `mktemp --help' for more information.
+mktemp: test suffix10f: stderr mismatch, comparing suffix10f.E (actual) and suffix10f.1 (expected)
+*** suffix10f.E	Thu Jan  1 00:00:00 1970
+--- suffix10f.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: too few X's in template `aXXb'
+--- 1 ----
+! mktemp: too few X's in template `aXXb'
+mktemp: test suffix10d: stderr mismatch, comparing suffix10d.E (actual) and suffix10d.1 (expected)
+*** suffix10d.E	Thu Jan  1 00:00:00 1970
+--- suffix10d.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: too few X's in template `aXXX'
+--- 1 ----
+! mktemp: too few X's in template `aXXX'
+mktemp: test pipe-bad-tmpdir: stderr mismatch, comparing pipe-bad-tmpdir.E (actual) and pipe-bad-tmpdir.1 (expected)
+*** pipe-bad-tmpdir.E	Thu Jan  1 00:00:00 1970
+--- pipe-bad-tmpdir.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/mktemp: failed to create file via template `no/such/dir/...
+--- 1 ----
+! mktemp: failed to create file via template `no/such/dir/...
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/nice (Bash test skipped via flag)
+[[33mSKIP[0m] misc/nice-fail (Bash test skipped via flag)
+[[33mSKIP[0m] misc/nl (Bash test skipped via flag)
+[[33mSKIP[0m] misc/nohup (Bash test skipped via flag)
+[[33mSKIP[0m] misc/nproc-avail (Bash test skipped via flag)
+[[33mSKIP[0m] misc/nproc-positive (Bash test skipped via flag)
+===================================================
+Executing: misc/od
+Sandbox Path: /tests/misc/od
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/od-N (Bash test skipped via flag)
+[[33mSKIP[0m] misc/od-multiple-t (Bash test skipped via flag)
+[[33mSKIP[0m] misc/od-x8 (Bash test skipped via flag)
+===================================================
+Executing: misc/paste
+Sandbox Path: /tests/misc/paste
+===================================================
+paste: test delim-bs1: stderr mismatch, comparing delim-bs1.E (actual) and delim-bs1.1 (expected)
+*** delim-bs1.E	Thu Jan  1 00:00:00 1970
+--- delim-bs1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/paste: delimiter list ends with an unescaped backslash: \\
+--- 1 ----
+! paste: delimiter list ends with an unescaped backslash: \\
+paste: test delim-bs2: stderr mismatch, comparing delim-bs2.E (actual) and delim-bs2.1 (expected)
+*** delim-bs2.E	Thu Jan  1 00:00:00 1970
+--- delim-bs2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/paste: delimiter list ends with an unescaped backslash: \\
+--- 1 ----
+! paste: delimiter list ends with an unescaped backslash: \\
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/pathchk1 (Bash test skipped via flag)
+===================================================
+Executing: misc/pr
+Sandbox Path: /tests/misc/pr
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/printenv (Bash test skipped via flag)
+[[33mSKIP[0m] misc/printf (Bash test skipped via flag)
+===================================================
+Executing: misc/printf-cov
+Sandbox Path: /tests/misc/printf-cov
+===================================================
+printf: test no-args: stderr mismatch, comparing no-args.E (actual) and no-args.1 (expected)
+*** no-args.E	Thu Jan  1 00:00:00 1970
+--- no-args.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/printf: missing operand
+! Try `/bin/printf --help' for more information.
+--- 1,2 ----
+! printf: missing operand
+! Try `printf --help' for more information.
+printf: test no-arg2: stderr mismatch, comparing no-arg2.E (actual) and no-arg2.1 (expected)
+*** no-arg2.E	Thu Jan  1 00:00:00 1970
+--- no-arg2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/printf: missing operand
+! Try `/bin/printf --help' for more information.
+--- 1,2 ----
+! printf: missing operand
+! Try `printf --help' for more information.
+printf: test d-big-prec: stderr mismatch, comparing d-big-prec.E (actual) and d-big-prec.1 (expected)
+*** d-big-prec.E	Thu Jan  1 00:00:00 1970
+--- d-big-prec.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: invalid precision: 2147483648
+--- 1 ----
+! printf: invalid precision: 2147483648
+printf: test d-big-fwidth: stderr mismatch, comparing d-big-fwidth.E (actual) and d-big-fwidth.1 (expected)
+*** d-big-fwidth.E	Thu Jan  1 00:00:00 1970
+--- d-big-fwidth.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: invalid field width: 2147483648
+--- 1 ----
+! printf: invalid field width: 2147483648
+printf: test F: stdout mismatch, comparing F.O (actual) and F.1 (expected)
+*** F.O	Thu Jan  1 00:00:00 1970
+--- F.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! NAN
+\ No newline at end of file
+--- 1 ----
+! 1.000000
+\ No newline at end of file
+printf: test LF: stdout mismatch, comparing LF.O (actual) and LF.1 (expected)
+*** LF.O	Thu Jan  1 00:00:00 1970
+--- LF.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! NAN
+\ No newline at end of file
+--- 1 ----
+! 1.000000
+\ No newline at end of file
+printf: test E: stdout mismatch, comparing E.O (actual) and E.1 (expected)
+*** E.O	Thu Jan  1 00:00:00 1970
+--- E.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! NAN
+\ No newline at end of file
+--- 1 ----
+! 2.000000E+00
+\ No newline at end of file
+printf: test LE: stdout mismatch, comparing LE.O (actual) and LE.1 (expected)
+*** LE.O	Thu Jan  1 00:00:00 1970
+--- LE.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! NAN
+\ No newline at end of file
+--- 1 ----
+! 2.000000E+00
+\ No newline at end of file
+printf: test G-ucXwp: stdout mismatch, comparing G-ucXwp.O (actual) and G-ucXwp.1 (expected)
+*** G-ucXwp.O	Thu Jan  1 00:00:00 1970
+--- G-ucXwp.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+!   NAN
+\ No newline at end of file
+--- 1 ----
+!     3
+\ No newline at end of file
+printf: test G-vw: stdout mismatch, comparing G-vw.O (actual) and G-vw.1 (expected)
+*** G-vw.O	Thu Jan  1 00:00:00 1970
+--- G-vw.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+!  NAN
+\ No newline at end of file
+--- 1 ----
+!   42
+\ No newline at end of file
+printf: test G-vp: stdout mismatch, comparing G-vp.O (actual) and G-vp.1 (expected)
+*** G-vp.O	Thu Jan  1 00:00:00 1970
+--- G-vp.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! NAN
+\ No newline at end of file
+--- 1 ----
+! 42
+\ No newline at end of file
+printf: test G-vwvp: stdout mismatch, comparing G-vwvp.O (actual) and G-vwvp.1 (expected)
+*** G-vwvp.O	Thu Jan  1 00:00:00 1970
+--- G-vwvp.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+!   NAN
+\ No newline at end of file
+--- 1 ----
+!    15
+\ No newline at end of file
+printf: test esc-bad-hex: stderr mismatch, comparing esc-bad-hex.E (actual) and esc-bad-hex.1 (expected)
+*** esc-bad-hex.E	Thu Jan  1 00:00:00 1970
+--- esc-bad-hex.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: missing hexadecimal number in escape
+--- 1 ----
+! printf: missing hexadecimal number in escape
+printf: test u-invalid: stderr mismatch, comparing u-invalid.E (actual) and u-invalid.1 (expected)
+*** u-invalid.E	Thu Jan  1 00:00:00 1970
+--- u-invalid.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: invalid universal character name \u0000
+--- 1 ----
+! printf: invalid universal character name \u0000
+printf: test u-missing: stderr mismatch, comparing u-missing.E (actual) and u-missing.1 (expected)
+*** u-missing.E	Thu Jan  1 00:00:00 1970
+--- u-missing.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: missing hexadecimal number in escape
+--- 1 ----
+! printf: missing hexadecimal number in escape
+printf: test d-invalid: stderr mismatch, comparing d-invalid.E (actual) and d-invalid.2 (expected)
+*** d-invalid.E	Thu Jan  1 00:00:00 1970
+--- d-invalid.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: no-num: expected a numeric value
+--- 1 ----
+! printf: no-num: expected a numeric value
+printf: test d-bad-suffix: stderr mismatch, comparing d-bad-suffix.E (actual) and d-bad-suffix.2 (expected)
+*** d-bad-suffix.E	Thu Jan  1 00:00:00 1970
+--- d-bad-suffix.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: 9z: value not completely converted
+--- 1 ----
+! printf: 9z: value not completely converted
+printf: test d-out-of-range: stderr mismatch, comparing d-out-of-range.E (actual) and d-out-of-range.2 (expected)
+*** d-out-of-range.E	Thu Jan  1 00:00:00 1970
+--- d-out-of-range.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: 9...9
+--- 1 ----
+! printf: 9...9
+printf: test excess: stderr mismatch, comparing excess.E (actual) and excess.2 (expected)
+*** excess.E	Thu Jan  1 00:00:00 1970
+--- excess.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: warning: ignoring excess arguments, starting with `1'
+--- 1 ----
+! printf: warning: ignoring excess arguments, starting with `1'
+printf: test d-hash: stderr mismatch, comparing d-hash.E (actual) and d-hash.1 (expected)
+*** d-hash.E	Thu Jan  1 00:00:00 1970
+--- d-hash.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/printf: %#d: invalid conversion specification
+--- 1 ----
+! printf: %#d: invalid conversion specification
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/printf-hex (Bash test skipped via flag)
+[[33mSKIP[0m] misc/printf-surprise (Bash test skipped via flag)
+===================================================
+Executing: misc/ptx
+Sandbox Path: /tests/misc/ptx
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/ptx-overrun (Bash test skipped via flag)
+[[33mSKIP[0m] misc/pwd-long (Bash test skipped via flag)
+[[33mSKIP[0m] misc/pwd-option (Bash test skipped via flag)
+[[33mSKIP[0m] misc/pwd-unreadable-parent (Bash test skipped via flag)
+[[33mSKIP[0m] misc/readlink-fp-loop (Bash test skipped via flag)
+[[33mSKIP[0m] misc/runcon-no-reorder (Bash test skipped via flag)
+[[33mSKIP[0m] misc/selinux (Bash test skipped via flag)
+===================================================
+Executing: misc/seq
+Sandbox Path: /tests/misc/seq
+===================================================
+seq: test onearg-1: stdout mismatch, comparing onearg-1.O (actual) and onearg-1.1 (expected)
+*** onearg-1.O	Thu Jan  1 00:00:00 1970
+--- onearg-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1,10 ----
++ 1
++ 2
++ 3
++ 4
++ 5
++ 6
++ 7
++ 8
++ 9
++ 10
+seq: test empty-rev: stdout mismatch, comparing empty-rev.O (actual) and empty-rev.1 (expected)
+*** empty-rev.O	Thu Jan  1 00:00:00 1970
+--- empty-rev.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+- nan
+--- 0 ----
+seq: test neg-1: stdout mismatch, comparing neg-1.O (actual) and neg-1.1 (expected)
+*** neg-1.O	Thu Jan  1 00:00:00 1970
+--- neg-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1,3 ----
++ -10
++ 0
++ 10
+seq: test neg-3: stdout mismatch, comparing neg-3.O (actual) and neg-3.1 (expected)
+*** neg-3.O	Thu Jan  1 00:00:00 1970
+--- neg-3.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1,2 ----
++ 1
++ 0
+seq: test neg-4: stdout mismatch, comparing neg-4.O (actual) and neg-4.1 (expected)
+*** neg-4.O	Thu Jan  1 00:00:00 1970
+--- neg-4.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,3 ----
+! 1
+! 0
+! -1
+seq: test float-1: stdout mismatch, comparing float-1.O (actual) and float-1.1 (expected)
+*** float-1.O	Thu Jan  1 00:00:00 1970
+--- float-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! 0.0
+--- 1,2 ----
+! 0.8
+! 0.9
+seq: test float-2: stdout mismatch, comparing float-2.O (actual) and float-2.1 (expected)
+*** float-2.O	Thu Jan  1 00:00:00 1970
+--- float-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! 0.00
+--- 1,2 ----
+! 0.10
+! 1.09
+seq: test float-3: stdout mismatch, comparing float-3.O (actual) and float-3.1 (expected)
+*** float-3.O	Thu Jan  1 00:00:00 1970
+--- float-3.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1,2 ----
++ 10.8
++ 10.9
+seq: test float-4: stdout mismatch, comparing float-4.O (actual) and float-4.1 (expected)
+*** float-4.O	Thu Jan  1 00:00:00 1970
+--- float-4.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+--- 1,4 ----
++ 0.1
+  0.0
++ -0.1
++ -0.2
+seq: test float-5: stdout mismatch, comparing float-5.O (actual) and float-5.1 (expected)
+*** float-5.O	Thu Jan  1 00:00:00 1970
+--- float-5.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! 0.0
+--- 1,2 ----
+! 0.8
+! 0.9
+seq: test float-6: stdout mismatch, comparing float-6.O (actual) and float-6.1 (expected)
+*** float-6.O	Thu Jan  1 00:00:00 1970
+--- float-6.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! 0.0
+--- 1,2 ----
+! 0.8
+! 0.9
+seq: test wid-1: stdout mismatch, comparing wid-1.O (actual) and wid-1.1 (expected)
+*** wid-1.O	Thu Jan  1 00:00:00 1970
+--- wid-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! 0.00
+--- 1,2 ----
+! 0.80
+! 0.81
+seq: test wid-2: stdout mismatch, comparing wid-2.O (actual) and wid-2.1 (expected)
+*** wid-2.O	Thu Jan  1 00:00:00 1970
+--- wid-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! 0.0000000
+--- 1,2 ----
+! 0.8999900
+! 0.8999901
+seq: test eq-wid-1: stdout mismatch, comparing eq-wid-1.O (actual) and eq-wid-1.1 (expected)
+*** eq-wid-1.O	Thu Jan  1 00:00:00 1970
+--- eq-wid-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,3 ----
+! 01
+! 00
+! -1
+seq: test eq-wid-2: stdout mismatch, comparing eq-wid-2.O (actual) and eq-wid-2.1 (expected)
+*** eq-wid-2.O	Thu Jan  1 00:00:00 1970
+--- eq-wid-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1,3 ----
++ -0.1
++ 00.0
++ 00.1
+seq: test eq-wid-3: stdout mismatch, comparing eq-wid-3.O (actual) and eq-wid-3.1 (expected)
+*** eq-wid-3.O	Thu Jan  1 00:00:00 1970
+--- eq-wid-3.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,3 ----
+! 1
+! 2
+! 3
+seq: test eq-wid-4: stdout mismatch, comparing eq-wid-4.O (actual) and eq-wid-4.1 (expected)
+*** eq-wid-4.O	Thu Jan  1 00:00:00 1970
+--- eq-wid-4.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! 0.00
+--- 1,2 ----
+! 0.80
+! 0.81
+seq: test eq-wid-5: stdout mismatch, comparing eq-wid-5.O (actual) and eq-wid-5.1 (expected)
+*** eq-wid-5.O	Thu Jan  1 00:00:00 1970
+--- eq-wid-5.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,3 ----
+! 1.0
+! 1.5
+! 2.0
+seq: test eq-wid-6: stdout mismatch, comparing eq-wid-6.O (actual) and eq-wid-6.1 (expected)
+*** eq-wid-6.O	Thu Jan  1 00:00:00 1970
+--- eq-wid-6.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,2 ----
+! 1
+! 2
+seq: test eq-wid-7: stdout mismatch, comparing eq-wid-7.O (actual) and eq-wid-7.1 (expected)
+*** eq-wid-7.O	Thu Jan  1 00:00:00 1970
+--- eq-wid-7.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! 0.0
+--- 1 ----
+! 0.1
+seq: test eq-wid-8: stdout mismatch, comparing eq-wid-8.O (actual) and eq-wid-8.1 (expected)
+*** eq-wid-8.O	Thu Jan  1 00:00:00 1970
+--- eq-wid-8.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+!  nan
+--- 1,3 ----
+! 09.0
+! 09.5
+! 10.0
+seq: test fmt-1: stdout mismatch, comparing fmt-1.O (actual) and fmt-1.1 (expected)
+*** fmt-1.O	Thu Jan  1 00:00:00 1970
+--- fmt-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,2 ----
+! 1.5
+! 2.0
+seq: test fmt-2: stdout mismatch, comparing fmt-2.O (actual) and fmt-2.1 (expected)
+*** fmt-2.O	Thu Jan  1 00:00:00 1970
+--- fmt-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,2 ----
+! 1.5
+! 2.0
+seq: test fmt-3: stdout mismatch, comparing fmt-3.O (actual) and fmt-3.1 (expected)
+*** fmt-3.O	Thu Jan  1 00:00:00 1970
+--- fmt-3.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,2 ----
+! 1.5
+! 2.0
+seq: test fmt-4: stdout mismatch, comparing fmt-4.O (actual) and fmt-4.1 (expected)
+*** fmt-4.O	Thu Jan  1 00:00:00 1970
+--- fmt-4.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,2 ----
+!   1
+!   2
+seq: test fmt-5: stdout mismatch, comparing fmt-5.O (actual) and fmt-5.1 (expected)
+*** fmt-5.O	Thu Jan  1 00:00:00 1970
+--- fmt-5.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! nan
+--- 1,2 ----
+! 1  
+! 2  
+seq: test fmt-6: stdout mismatch, comparing fmt-6.O (actual) and fmt-6.1 (expected)
+*** fmt-6.O	Thu Jan  1 00:00:00 1970
+--- fmt-6.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! +nan
+--- 1,2 ----
+!  +1
+!  +2
+seq: test fmt-7: stdout mismatch, comparing fmt-7.O (actual) and fmt-7.1 (expected)
+*** fmt-7.O	Thu Jan  1 00:00:00 1970
+--- fmt-7.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! +nan
+--- 1,2 ----
+! +01
+! +02
+seq: test fmt-8: stdout mismatch, comparing fmt-8.O (actual) and fmt-8.1 (expected)
+*** fmt-8.O	Thu Jan  1 00:00:00 1970
+--- fmt-8.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! +nan
+--- 1,2 ----
+! +1
+! +2
+seq: test fmt-9: stdout mismatch, comparing fmt-9.O (actual) and fmt-9.1 (expected)
+*** fmt-9.O	Thu Jan  1 00:00:00 1970
+--- fmt-9.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1,2 ----
++ -1 
++  0 
+seq: test fmt-a: stdout mismatch, comparing fmt-a.O (actual) and fmt-a.1 (expected)
+*** fmt-a.O	Thu Jan  1 00:00:00 1970
+--- fmt-a.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1,2 ----
++ -1
++  0
+seq: test fmt-b: stdout mismatch, comparing fmt-b.O (actual) and fmt-b.1 (expected)
+*** fmt-b.O	Thu Jan  1 00:00:00 1970
+--- fmt-b.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1 ----
++ %1%
+seq: test fmt-c: stderr mismatch, comparing fmt-c.E (actual) and fmt-c.1 (expected)
+*** fmt-c.E	Thu Jan  1 00:00:00 1970
+--- fmt-c.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/seq: format `%%g' has no % directive
+--- 1 ----
+! seq: format `%%g' has no % directive
+seq: test fmt-eos1: stderr mismatch, comparing fmt-eos1.E (actual) and fmt-eos1.1 (expected)
+*** fmt-eos1.E	Thu Jan  1 00:00:00 1970
+--- fmt-eos1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/seq: format `%' ends in %
+--- 1 ----
+! seq: format `%' ends in %
+seq: test fmt-eos2: stderr mismatch, comparing fmt-eos2.E (actual) and fmt-eos2.1 (expected)
+*** fmt-eos2.E	Thu Jan  1 00:00:00 1970
+--- fmt-eos2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/seq: format `%g%' has too many % directives
+--- 1 ----
+! seq: format `%g%' has too many % directives
+seq: test fmt-d: stderr mismatch, comparing fmt-d.E (actual) and fmt-d.1 (expected)
+*** fmt-d.E	Thu Jan  1 00:00:00 1970
+--- fmt-d.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/seq: format `' has no % directive
+--- 1 ----
+! seq: format `' has no % directive
+seq: test fmt-e: stderr mismatch, comparing fmt-e.E (actual) and fmt-e.1 (expected)
+*** fmt-e.E	Thu Jan  1 00:00:00 1970
+--- fmt-e.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/seq: format `%g%g' has too many % directives
+--- 1 ----
+! seq: format `%g%g' has too many % directives
+seq: test locale-dec-pt: stdout mismatch, comparing locale-dec-pt.O (actual) and locale-dec-pt.1 (expected)
+*** locale-dec-pt.O	Thu Jan  1 00:00:00 1970
+--- locale-dec-pt.1	Thu Jan  1 00:00:00 1970
+***************
+*** 0 ****
+--- 1,22 ----
++ -0.1
++ 0.0
++ 0.1
++ 0.2
++ 0.3
++ 0.4
++ 0.5
++ 0.6
++ 0.7
++ 0.8
++ 0.9
++ 1.0
++ 1.1
++ 1.2
++ 1.3
++ 1.4
++ 1.5
++ 1.6
++ 1.7
++ 1.8
++ 1.9
++ 2.0
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/seq-long-double (Bash test skipped via flag)
+===================================================
+Executing: misc/sha1sum
+Sandbox Path: /tests/misc/sha1sum
+===================================================
+sha1sum: test check-bsd: stderr mismatch, comparing check-bsd.E (actual) and check-bsd.1 (expected)
+*** check-bsd.E	Thu Jan  1 00:00:00 1970
+--- check-bsd.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sha1sum: f.md5: no properly formatted SHA1 checksum lines found
+--- 1 ----
+! sha1sum: f.md5: no properly formatted SHA1 checksum lines found
+sha1sum: test check-openssl: stderr mismatch, comparing check-openssl.E (actual) and check-openssl.1 (expected)
+*** check-openssl.E	Thu Jan  1 00:00:00 1970
+--- check-openssl.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sha1sum: f.md5: no properly formatted SHA1 checksum lines found
+--- 1 ----
+! sha1sum: f.md5: no properly formatted SHA1 checksum lines found
+sha1sum: test bsd-segv: stderr mismatch, comparing bsd-segv.E (actual) and bsd-segv.1 (expected)
+*** bsd-segv.E	Thu Jan  1 00:00:00 1970
+--- bsd-segv.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sha1sum: z: no properly formatted SHA1 checksum lines found
+--- 1 ----
+! sha1sum: z: no properly formatted SHA1 checksum lines found
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/sha1sum-vec
+Sandbox Path: /tests/misc/sha1sum-vec
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: misc/sha224sum
+Sandbox Path: /tests/misc/sha224sum
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: misc/sha256sum
+Sandbox Path: /tests/misc/sha256sum
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: misc/sha384sum
+Sandbox Path: /tests/misc/sha384sum
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: misc/sha512sum
+Sandbox Path: /tests/misc/sha512sum
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/shred-exact (Bash test skipped via flag)
+[[33mSKIP[0m] misc/shred-passes (Bash test skipped via flag)
+[[33mSKIP[0m] misc/shred-remove (Bash test skipped via flag)
+[[33mSKIP[0m] misc/shuf (Bash test skipped via flag)
+===================================================
+Executing: misc/sort
+Sandbox Path: /tests/misc/sort
+===================================================
+Use of uninitialized value in concatenation (.) or string at /tests/misc/sort line 38.
+Use of uninitialized value in concatenation (.) or string at /tests/misc/sort line 38.
+sort: test h3: stderr mismatch, comparing h3.E (actual) and h3.3 (expected)
+*** h3.E	Thu Jan  1 00:00:00 1970
+--- h3.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: both SI and IEC prefixes present on units
+--- 1 ----
+! sort: both SI and IEC prefixes present on units
+sort: test h3.r: stderr mismatch, comparing h3.r.E (actual) and h3.r.3 (expected)
+*** h3.r.E	Thu Jan  1 00:00:00 1970
+--- h3.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: both SI and IEC prefixes present on units
+--- 1 ----
+! sort: both SI and IEC prefixes present on units
+sort: test h3.p: stderr mismatch, comparing h3.p.E (actual) and h3.p.3 (expected)
+*** h3.p.E	Thu Jan  1 00:00:00 1970
+--- h3.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: both SI and IEC prefixes present on units
+--- 1 ----
+! sort: both SI and IEC prefixes present on units
+sort: test h7: stderr mismatch, comparing h7.E (actual) and h7.3 (expected)
+*** h7.E	Thu Jan  1 00:00:00 1970
+--- h7.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-hn' are incompatible
+--- 1 ----
+! sort: options `-hn' are incompatible
+sort: test h7.r: stderr mismatch, comparing h7.r.E (actual) and h7.r.3 (expected)
+*** h7.r.E	Thu Jan  1 00:00:00 1970
+--- h7.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-hn' are incompatible
+--- 1 ----
+! sort: options `-hn' are incompatible
+sort: test h7.p: stderr mismatch, comparing h7.p.E (actual) and h7.p.3 (expected)
+*** h7.p.E	Thu Jan  1 00:00:00 1970
+--- h7.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-hn' are incompatible
+--- 1 ----
+! sort: options `-hn' are incompatible
+sort: test 02b: stderr mismatch, comparing 02b.E (actual) and 02b.3 (expected)
+*** 02b.E	Thu Jan  1 00:00:00 1970
+--- 02b.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: 02b.1:3: disorder: B
+--- 1 ----
+! sort: -:3: disorder: B
+sort: test 02b.r: stderr mismatch, comparing 02b.r.E (actual) and 02b.r.3 (expected)
+*** 02b.r.E	Thu Jan  1 00:00:00 1970
+--- 02b.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:3: disorder: B
+--- 1 ----
+! sort: -:3: disorder: B
+sort: test 02b.p: stderr mismatch, comparing 02b.p.E (actual) and 02b.p.3 (expected)
+*** 02b.p.E	Thu Jan  1 00:00:00 1970
+--- 02b.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:3: disorder: B
+--- 1 ----
+! sort: -:3: disorder: B
+sort: test 02m: stderr mismatch, comparing 02m.E (actual) and 02m.3 (expected)
+*** 02m.E	Thu Jan  1 00:00:00 1970
+--- 02m.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: 02m.1:2: disorder: A
+--- 1 ----
+! sort: -:2: disorder: A
+sort: test 02m.r: stderr mismatch, comparing 02m.r.E (actual) and 02m.r.3 (expected)
+*** 02m.r.E	Thu Jan  1 00:00:00 1970
+--- 02m.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:2: disorder: A
+--- 1 ----
+! sort: -:2: disorder: A
+sort: test 02m.p: stderr mismatch, comparing 02m.p.E (actual) and 02m.p.3 (expected)
+*** 02m.p.E	Thu Jan  1 00:00:00 1970
+--- 02m.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:2: disorder: A
+--- 1 ----
+! sort: -:2: disorder: A
+sort: test 02o: stderr mismatch, comparing 02o.E (actual) and 02o.3 (expected)
+*** 02o.E	Thu Jan  1 00:00:00 1970
+--- 02o.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: 02o.1:3: disorder: B
+--- 1 ----
+! sort: -:3: disorder: B
+sort: test 02o.r: stderr mismatch, comparing 02o.r.E (actual) and 02o.r.3 (expected)
+*** 02o.r.E	Thu Jan  1 00:00:00 1970
+--- 02o.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:3: disorder: B
+--- 1 ----
+! sort: -:3: disorder: B
+sort: test 02o.p: stderr mismatch, comparing 02o.p.E (actual) and 02o.p.3 (expected)
+*** 02o.p.E	Thu Jan  1 00:00:00 1970
+--- 02o.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:3: disorder: B
+--- 1 ----
+! sort: -:3: disorder: B
+sort: test 02p: stderr mismatch, comparing 02p.E (actual) and 02p.3 (expected)
+*** 02p.E	Thu Jan  1 00:00:00 1970
+--- 02p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: 02p.1:2: disorder: A
+--- 1 ----
+! sort: -:2: disorder: A
+sort: test 02p.r: stderr mismatch, comparing 02p.r.E (actual) and 02p.r.3 (expected)
+*** 02p.r.E	Thu Jan  1 00:00:00 1970
+--- 02p.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:2: disorder: A
+--- 1 ----
+! sort: -:2: disorder: A
+sort: test 02p.p: stderr mismatch, comparing 02p.p.E (actual) and 02p.p.3 (expected)
+*** 02p.p.E	Thu Jan  1 00:00:00 1970
+--- 02p.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:2: disorder: A
+--- 1 ----
+! sort: -:2: disorder: A
+sort: test 03d: stderr mismatch, comparing 03d.E (actual) and 03d.1 (expected)
+*** 03d.E	Thu Jan  1 00:00:00 1970
+--- 03d.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: field number is zero: invalid field specification `0'
+--- 1 ----
+! sort: -: invalid field specification `0'
+sort: test 03e: stderr mismatch, comparing 03e.E (actual) and 03e.1 (expected)
+*** 03e.E	Thu Jan  1 00:00:00 1970
+--- 03e.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: character offset is zero: invalid field specification `1.0'
+--- 1 ----
+! sort: character offset is zero: invalid field specification `1.0'
+sort: test 03f: stderr mismatch, comparing 03f.E (actual) and 03f.1 (expected)
+*** 03f.E	Thu Jan  1 00:00:00 1970
+--- 03f.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: invalid number after `,': invalid count at start of `-k0'
+--- 1 ----
+! sort: invalid number after `,': invalid count at start of `-k0'
+sort: test 08a: stderr mismatch, comparing 08a.E (actual) and 08a.1 (expected)
+*** 08a.E	Thu Jan  1 00:00:00 1970
+--- 08a.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: invalid number after `.': invalid count at start of `,3'
+--- 1 ----
+! sort: invalid number after `.': invalid count at start of `,3'
+sort: test 08b: stderr mismatch, comparing 08b.E (actual) and 08b.1 (expected)
+*** 08b.E	Thu Jan  1 00:00:00 1970
+--- 08b.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: invalid number after `,': invalid count at start of `'
+--- 1 ----
+! sort: invalid number after `,': invalid count at start of `'
+sort: test no-file1: stderr mismatch, comparing no-file1.E (actual) and no-file1.1 (expected)
+*** no-file1.E	Thu Jan  1 00:00:00 1970
+--- no-file1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: open failed: no-file: No such file or directory
+--- 1 ----
+! sort: open failed: no-file: No such file or directory
+sort: test o-no-file1: stderr mismatch, comparing o-no-file1.E (actual) and o-no-file1.1 (expected)
+*** o-no-file1.E	Thu Jan  1 00:00:00 1970
+--- o-no-file1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: open failed: no-file: No such file or directory
+--- 1 ----
+! sort: open failed: no-file: No such file or directory
+sort: test create-empty: stderr mismatch, comparing create-empty.E (actual) and create-empty.1 (expected)
+*** create-empty.E	Thu Jan  1 00:00:00 1970
+--- create-empty.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: open failed: no/such/file: No such file or directory
+--- 1 ----
+! sort: open failed: no/such/file: No such file or directory
+sort: test o2: stderr mismatch, comparing o2.E (actual) and o2.1 (expected)
+*** o2.E	Thu Jan  1 00:00:00 1970
+--- o2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: multiple output files specified
+--- 1 ----
+! foo
+sort: test incompat1: stderr mismatch, comparing incompat1.E (actual) and incompat1.1 (expected)
+*** incompat1.E	Thu Jan  1 00:00:00 1970
+--- incompat1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-in' are incompatible
+--- 1 ----
+! sort: options `-in' are incompatible
+sort: test incompat2: stderr mismatch, comparing incompat2.E (actual) and incompat2.1 (expected)
+*** incompat2.E	Thu Jan  1 00:00:00 1970
+--- incompat2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-fR' are incompatible
+--- 1 ----
+! sort: options `-fR' are incompatible
+sort: test incompat3: stderr mismatch, comparing incompat3.E (actual) and incompat3.1 (expected)
+*** incompat3.E	Thu Jan  1 00:00:00 1970
+--- incompat3.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-dfgMnR' are incompatible
+--- 1 ----
+! sort: options `-dfgMnR' are incompatible
+sort: test incompat4: stderr mismatch, comparing incompat4.E (actual) and incompat4.1 (expected)
+*** incompat4.E	Thu Jan  1 00:00:00 1970
+--- incompat4.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-co' are incompatible
+--- 1 ----
+! sort: options `-co' are incompatible
+sort: test incompat5: stderr mismatch, comparing incompat5.E (actual) and incompat5.1 (expected)
+*** incompat5.E	Thu Jan  1 00:00:00 1970
+--- incompat5.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-Co' are incompatible
+--- 1 ----
+! sort: options `-Co' are incompatible
+sort: test incompat6: stderr mismatch, comparing incompat6.E (actual) and incompat6.1 (expected)
+*** incompat6.E	Thu Jan  1 00:00:00 1970
+--- incompat6.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-cC' are incompatible
+--- 1 ----
+! sort: options `-cC' are incompatible
+sort: test incompat7: stderr mismatch, comparing incompat7.E (actual) and incompat7.1 (expected)
+*** incompat7.E	Thu Jan  1 00:00:00 1970
+--- incompat7.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: options `-nR' are incompatible
+--- 1 ----
+! sort: options `-nR' are incompatible
+sort: test bigfield1 failed: exit status mismatch:  expected 0, got 2
+sort: test bigfield1.r failed: exit status mismatch:  expected 0, got 2
+sort: test bigfield1.p failed: exit status mismatch:  expected 0, got 2
+sort: test bigfield2 failed: exit status mismatch:  expected 0, got 2
+sort: test bigfield2.r failed: exit status mismatch:  expected 0, got 2
+sort: test bigfield2.p failed: exit status mismatch:  expected 0, got 2
+sort: test obs-inval: stderr mismatch, comparing obs-inval.E (actual) and obs-inval.1 (expected)
+*** obs-inval.E	Thu Jan  1 00:00:00 1970
+--- obs-inval.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: open failed: +1x: No such file or directory
+--- 1 ----
+! foo
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/sort-compress (Bash test skipped via flag)
+[[33mSKIP[0m] misc/sort-continue (Bash test skipped via flag)
+===================================================
+Executing: misc/sort-files0-from
+Sandbox Path: /tests/misc/sort-files0-from
+===================================================
+sort-files0-from: test f-extra-arg: stderr mismatch, comparing f-extra-arg.E (actual) and f-extra-arg.2 (expected)
+*** f-extra-arg.E	Thu Jan  1 00:00:00 1970
+--- f-extra-arg.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/sort: extra operand `no-such'
+  file operands cannot be combined with --files0-from
+! Try `/bin/sort --help' for more information.
+--- 1,3 ----
+! sort: extra operand `no-such'
+  file operands cannot be combined with --files0-from
+! Try `sort --help' for more information.
+sort-files0-from: test missing: stderr mismatch, comparing missing.E (actual) and missing.1 (expected)
+*** missing.E	Thu Jan  1 00:00:00 1970
+--- missing.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: cannot open `missing' for reading: No such file or directory
+--- 1 ----
+! sort: cannot open `missing' for reading: No such file or directory
+sort-files0-from: test minus-in-stdin: stderr mismatch, comparing minus-in-stdin.E (actual) and minus-in-stdin.1 (expected)
+*** minus-in-stdin.E	Thu Jan  1 00:00:00 1970
+--- minus-in-stdin.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: when reading file names from stdin, no file name of `-' allowed
+--- 1 ----
+! sort: when reading file names from stdin, no file name of `-' allowed
+sort-files0-from: test empty: stderr mismatch, comparing empty.E (actual) and empty.2 (expected)
+*** empty.E	Thu Jan  1 00:00:00 1970
+--- empty.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: 
+--- 1 ----
+! sort: 
+sort-files0-from: test empty-nonreg: stderr mismatch, comparing empty-nonreg.E (actual) and empty-nonreg.1 (expected)
+*** empty-nonreg.E	Thu Jan  1 00:00:00 1970
+--- empty-nonreg.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: no input from `/dev/null'
+--- 1 ----
+! sort: no input from `/dev/null'
+sort-files0-from: test nul-1: stderr mismatch, comparing nul-1.E (actual) and nul-1.2 (expected)
+*** nul-1.E	Thu Jan  1 00:00:00 1970
+--- nul-1.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:1: invalid zero-length file name
+--- 1 ----
+! sort: -:1: invalid zero-length file name
+sort-files0-from: test nul-2: stderr mismatch, comparing nul-2.E (actual) and nul-2.2 (expected)
+*** nul-2.E	Thu Jan  1 00:00:00 1970
+--- nul-2.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:1: invalid zero-length file name
+--- 1 ----
+! sort: -:1: invalid zero-length file name
+sort-files0-from: test 1 failed: exit status mismatch:  expected 0, got 2
+sort-files0-from: test 1a failed: exit status mismatch:  expected 0, got 2
+sort-files0-from: test 2 failed: exit status mismatch:  expected 0, got 2
+sort-files0-from: test 2a failed: exit status mismatch:  expected 0, got 2
+sort-files0-from: test zero-len: stderr mismatch, comparing zero-len.E (actual) and zero-len.1 (expected)
+*** zero-len.E	Thu Jan  1 00:00:00 1970
+--- zero-len.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: -:1: invalid zero-length file name
+--- 1 ----
+! sort: -:1: invalid zero-length file name
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/sort-merge
+Sandbox Path: /tests/misc/sort-merge
+===================================================
+Use of uninitialized value $bigint in concatenation (.) or string at /tests/misc/sort-merge line 39.
+Use of uninitialized value $bigint in concatenation (.) or string at /tests/misc/sort-merge line 39.
+sort-merge: test nmerge-0: stderr mismatch, comparing nmerge-0.E (actual) and nmerge-0.1 (expected)
+*** nmerge-0.E	Thu Jan  1 00:00:00 1970
+--- nmerge-0.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/sort: invalid --batch-size argument `0'
+! /bin/sort: minimum --batch-size argument is `2'
+--- 1,2 ----
+! sort: invalid --batch-size argument `0'
+! sort: minimum --batch-size argument is `2'
+sort-merge: test nmerge-1: stderr mismatch, comparing nmerge-1.E (actual) and nmerge-1.1 (expected)
+*** nmerge-1.E	Thu Jan  1 00:00:00 1970
+--- nmerge-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/sort: invalid --batch-size argument `1'
+! /bin/sort: minimum --batch-size argument is `2'
+--- 1,2 ----
+! sort: invalid --batch-size argument `1'
+! sort: minimum --batch-size argument is `2'
+sort-merge: test nmerge-neg: stderr mismatch, comparing nmerge-neg.E (actual) and nmerge-neg.1 (expected)
+*** nmerge-neg.E	Thu Jan  1 00:00:00 1970
+--- nmerge-neg.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: invalid --batch-size argument `-1'
+--- 1 ----
+! sort: invalid --batch-size argument `-1'
+sort-merge: test nmerge-nan: stderr mismatch, comparing nmerge-nan.E (actual) and nmerge-nan.1 (expected)
+*** nmerge-nan.E	Thu Jan  1 00:00:00 1970
+--- nmerge-nan.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: invalid --batch-size argument `a'
+--- 1 ----
+! sort: invalid --batch-size argument `a'
+sort-merge: test nmerge-big: stderr mismatch, comparing nmerge-big.E (actual) and nmerge-big.1 (expected)
+*** nmerge-big.E	Thu Jan  1 00:00:00 1970
+--- nmerge-big.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: invalid --batch-size argument `'
+--- 1,2 ----
+! sort: --batch-size argument `' too large
+! sort: maximum --batch-size argument with current rlimit is
+sort-merge: test nmerge-no: stderr mismatch, comparing nmerge-no.E (actual) and nmerge-no.1 (expected)
+*** nmerge-no.E	Thu Jan  1 00:00:00 1970
+--- nmerge-no.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/sort: cannot create temporary file in `does/not/exist':
+--- 1 ----
+! sort: cannot create temporary file in `does/not/exist':
+sort-merge: test batch-size failed: exit status mismatch:  expected 0, got 2
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/sort-merge-fdlimit (Bash test skipped via flag)
+[[33mSKIP[0m] misc/sort-rand (Bash test skipped via flag)
+[[33mSKIP[0m] misc/sort-version (Bash test skipped via flag)
+[[33mSKIP[0m] misc/split-a (Bash test skipped via flag)
+[[33mSKIP[0m] misc/split-fail (Bash test skipped via flag)
+[[33mSKIP[0m] misc/split-l (Bash test skipped via flag)
+[[33mSKIP[0m] misc/stat-fmt (Bash test skipped via flag)
+[[33mSKIP[0m] misc/stat-hyphen (Bash test skipped via flag)
+===================================================
+Executing: misc/stat-printf
+Sandbox Path: /tests/misc/stat-printf
+===================================================
+stat-printf: test hex-3: stderr mismatch, comparing hex-3.E (actual) and hex-3.2 (expected)
+*** hex-3.E	Thu Jan  1 00:00:00 1970
+--- hex-3.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/stat: warning: unrecognized escape `\x'
+--- 1 ----
+! stat: warning: unrecognized escape `\x'
+stat-printf: test end-bs: stderr mismatch, comparing end-bs.E (actual) and end-bs.2 (expected)
+*** end-bs.E	Thu Jan  1 00:00:00 1970
+--- end-bs.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/stat: warning: backslash at end of format
+--- 1 ----
+! stat: warning: backslash at end of format
+stat-printf: test err-1: stderr mismatch, comparing err-1.E (actual) and err-1.1 (expected)
+*** err-1.E	Thu Jan  1 00:00:00 1970
+--- err-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/stat: %9%: invalid directive
+--- 1 ----
+! stat: %9%: invalid directive
+stat-printf: test err-2: stderr mismatch, comparing err-2.E (actual) and err-2.1 (expected)
+*** err-2.E	Thu Jan  1 00:00:00 1970
+--- err-2.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/stat: %9: invalid directive
+--- 1 ----
+! stat: %9: invalid directive
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/stat-slash (Bash test skipped via flag)
+[[33mSKIP[0m] misc/stdbuf (Bash test skipped via flag)
+[[33mSKIP[0m] misc/stty (Bash test skipped via flag)
+[[33mSKIP[0m] misc/stty-invalid (Bash test skipped via flag)
+[[33mSKIP[0m] misc/stty-row-col (Bash test skipped via flag)
+[[33mSKIP[0m] misc/su-fail (Bash test skipped via flag)
+===================================================
+Executing: misc/sum
+Sandbox Path: /tests/misc/sum
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/sum-sysv (Bash test skipped via flag)
+===================================================
+Executing: misc/tac
+Sandbox Path: /tests/misc/tac
+===================================================
+tac: test pipe-bad-tmpdir: stderr mismatch, comparing pipe-bad-tmpdir.E (actual) and pipe-bad-tmpdir.2 (expected)
+*** pipe-bad-tmpdir.E	Thu Jan  1 00:00:00 1970
+--- pipe-bad-tmpdir.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tac: cannot create temporary file in ...
+--- 1 ----
+! tac: cannot create temporary file in ...
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/tac-continue (Bash test skipped via flag)
+===================================================
+Executing: misc/tail
+Sandbox Path: /tests/misc/tail
+===================================================
+tail: test err-1.r: stderr mismatch, comparing err-1.r.E (actual) and err-1.r.3 (expected)
+*** err-1.r.E	Thu Jan  1 00:00:00 1970
+--- err-1.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: cannot open `+cl' for reading: No such file or directory
+--- 1 ----
+! tail: cannot open `+cl' for reading: No such file or directory
+tail: test err-1.p: stderr mismatch, comparing err-1.p.E (actual) and err-1.p.3 (expected)
+*** err-1.p.E	Thu Jan  1 00:00:00 1970
+--- err-1.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: cannot open `+cl' for reading: No such file or directory
+--- 1 ----
+! tail: cannot open `+cl' for reading: No such file or directory
+tail: test err-2: stderr mismatch, comparing err-2.E (actual) and err-2.3 (expected)
+*** err-2.E	Thu Jan  1 00:00:00 1970
+--- err-2.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: l: invalid number of bytes
+--- 1 ----
+! tail: l: invalid number of bytes
+tail: test err-2.r: stderr mismatch, comparing err-2.r.E (actual) and err-2.r.3 (expected)
+*** err-2.r.E	Thu Jan  1 00:00:00 1970
+--- err-2.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: l: invalid number of bytes
+--- 1 ----
+! tail: l: invalid number of bytes
+tail: test err-2.p: stderr mismatch, comparing err-2.p.E (actual) and err-2.p.3 (expected)
+*** err-2.p.E	Thu Jan  1 00:00:00 1970
+--- err-2.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: l: invalid number of bytes
+--- 1 ----
+! tail: l: invalid number of bytes
+tail: test err-3.r: stderr mismatch, comparing err-3.r.E (actual) and err-3.r.3 (expected)
+*** err-3.r.E	Thu Jan  1 00:00:00 1970
+--- err-3.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: cannot open `+2cz' for reading: No such file or directory
+--- 1 ----
+! tail: cannot open `+2cz' for reading: No such file or directory
+tail: test err-3.p: stderr mismatch, comparing err-3.p.E (actual) and err-3.p.3 (expected)
+*** err-3.p.E	Thu Jan  1 00:00:00 1970
+--- err-3.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: cannot open `+2cz' for reading: No such file or directory
+--- 1 ----
+! tail: cannot open `+2cz' for reading: No such file or directory
+tail: test err-4: stderr mismatch, comparing err-4.E (actual) and err-4.3 (expected)
+*** err-4.E	Thu Jan  1 00:00:00 1970
+--- err-4.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: option used in invalid context -- 2
+--- 1 ----
+! tail: option used in invalid context -- 2
+tail: test err-4.r: stderr mismatch, comparing err-4.r.E (actual) and err-4.r.3 (expected)
+*** err-4.r.E	Thu Jan  1 00:00:00 1970
+--- err-4.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: option used in invalid context -- 2
+--- 1 ----
+! tail: option used in invalid context -- 2
+tail: test err-4.p: stderr mismatch, comparing err-4.p.E (actual) and err-4.p.3 (expected)
+*** err-4.p.E	Thu Jan  1 00:00:00 1970
+--- err-4.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: option used in invalid context -- 2
+--- 1 ----
+! tail: option used in invalid context -- 2
+tail: test err-5: stderr mismatch, comparing err-5.E (actual) and err-5.3 (expected)
+*** err-5.E	Thu Jan  1 00:00:00 1970
+--- err-5.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: 99999999999999999999: invalid number of bytes
+--- 1 ----
+! tail: 99999999999999999999: invalid number of bytes
+tail: test err-5.r: stderr mismatch, comparing err-5.r.E (actual) and err-5.r.3 (expected)
+*** err-5.r.E	Thu Jan  1 00:00:00 1970
+--- err-5.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: 99999999999999999999: invalid number of bytes
+--- 1 ----
+! tail: 99999999999999999999: invalid number of bytes
+tail: test err-5.p: stderr mismatch, comparing err-5.p.E (actual) and err-5.p.3 (expected)
+*** err-5.p.E	Thu Jan  1 00:00:00 1970
+--- err-5.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: 99999999999999999999: invalid number of bytes
+--- 1 ----
+! tail: 99999999999999999999: invalid number of bytes
+tail: test err-6: stderr mismatch, comparing err-6.E (actual) and err-6.3 (expected)
+*** err-6.E	Thu Jan  1 00:00:00 1970
+--- err-6.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: -: invalid number of bytes
+--- 1 ----
+! tail: -: invalid number of bytes
+tail: test err-6.r: stderr mismatch, comparing err-6.r.E (actual) and err-6.r.3 (expected)
+*** err-6.r.E	Thu Jan  1 00:00:00 1970
+--- err-6.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: -: invalid number of bytes
+--- 1 ----
+! tail: -: invalid number of bytes
+tail: test err-6.p: stderr mismatch, comparing err-6.p.E (actual) and err-6.p.3 (expected)
+*** err-6.p.E	Thu Jan  1 00:00:00 1970
+--- err-6.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tail: -: invalid number of bytes
+--- 1 ----
+! tail: -: invalid number of bytes
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/tee (Bash test skipped via flag)
+[[33mSKIP[0m] misc/tee-dash (Bash test skipped via flag)
+===================================================
+Executing: misc/test
+Sandbox Path: /tests/misc/test
+===================================================
+Use of uninitialized value in concatenation (.) or string at /tests/misc/test line 119.
+Use of uninitialized value in concatenation (.) or string at /tests/misc/test line 119.
+Use of uninitialized value in concatenation (.) or string at /tests/misc/test line 119.
+Use of uninitialized value in concatenation (.) or string at /tests/misc/test line 119.
+Use of uninitialized value in concatenation (.) or string at /tests/misc/test line 119.
+test: test eq-6 failed: exit status mismatch:  expected 1, got 2
+test: test N-eq-6 failed: exit status mismatch:  expected 0, got 2
+test: test P-eq-6 failed: exit status mismatch:  expected 1, got 2
+test: test NP-eq-6 failed: exit status mismatch:  expected 0, got 2
+test: test NNP-eq-6 failed: exit status mismatch:  expected 1, got 2
+test: test ne-6 failed: exit status mismatch:  expected 0, got 2
+test: test N-ne-6 failed: exit status mismatch:  expected 1, got 2
+test: test P-ne-6 failed: exit status mismatch:  expected 0, got 2
+test: test NP-ne-6 failed: exit status mismatch:  expected 1, got 2
+test: test NNP-ne-6 failed: exit status mismatch:  expected 0, got 2
+test: test P-gt-5 failed: exit status mismatch:  expected 0, got 2
+test: test NP-gt-5 failed: exit status mismatch:  expected 1, got 2
+test: test le-5 failed: exit status mismatch:  expected 1, got 0
+test: test N-le-5 failed: exit status mismatch:  expected 0, got 1
+test: test P-le-5 failed: exit status mismatch:  expected 1, got 2
+test: test NP-le-5 failed: exit status mismatch:  expected 0, got 2
+test: test NNP-le-5 failed: exit status mismatch:  expected 1, got 0
+test: test P-lt-5 failed: exit status mismatch:  expected 0, got 2
+test: test NP-lt-5 failed: exit status mismatch:  expected 1, got 2
+test: test ge-5 failed: exit status mismatch:  expected 1, got 0
+test: test N-ge-5 failed: exit status mismatch:  expected 0, got 1
+test: test P-ge-5 failed: exit status mismatch:  expected 1, got 2
+test: test NP-ge-5 failed: exit status mismatch:  expected 0, got 2
+test: test NNP-ge-5 failed: exit status mismatch:  expected 1, got 0
+test: test inv-1: stderr mismatch, comparing inv-1.E (actual) and inv-1.1 (expected)
+*** inv-1.E	Thu Jan  1 00:00:00 1970
+--- inv-1.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/test: invalid integer `0x0'
+--- 1 ----
+! test: invalid integer `0x0'
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/test-diag
+Sandbox Path: /tests/misc/test-diag
+===================================================
+Use of uninitialized value $ENV{"abs_top_builddir"} in concatenation (.) or string at /tests/misc/test-diag line 26.
+test-diag: test o failed: exit status mismatch:  expected 2, got 127
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/timeout (Bash test skipped via flag)
+[[33mSKIP[0m] misc/timeout-parameters (Bash test skipped via flag)
+===================================================
+Executing: misc/tr
+Sandbox Path: /tests/misc/tr
+===================================================
+tr: test null.r: stderr mismatch, comparing null.r.E (actual) and null.r.3 (expected)
+*** null.r.E	Thu Jan  1 00:00:00 1970
+--- null.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: when not truncating set1, string2 must be non-empty
+--- 1 ----
+! tr: when not truncating set1, string2 must be non-empty
+tr: test null.p: stderr mismatch, comparing null.p.E (actual) and null.p.3 (expected)
+*** null.p.E	Thu Jan  1 00:00:00 1970
+--- null.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: when not truncating set1, string2 must be non-empty
+--- 1 ----
+! tr: when not truncating set1, string2 must be non-empty
+tr: test o-rep-1.r: stderr mismatch, comparing o-rep-1.r.E (actual) and o-rep-1.r.3 (expected)
+*** o-rep-1.r.E	Thu Jan  1 00:00:00 1970
+--- o-rep-1.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: invalid repeat count `08' in [c*n] construct
+--- 1 ----
+! tr: invalid repeat count `08' in [c*n] construct
+tr: test o-rep-1.p: stderr mismatch, comparing o-rep-1.p.E (actual) and o-rep-1.p.3 (expected)
+*** o-rep-1.p.E	Thu Jan  1 00:00:00 1970
+--- o-rep-1.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: invalid repeat count `08' in [c*n] construct
+--- 1 ----
+! tr: invalid repeat count `08' in [c*n] construct
+tr: test bs-at-end.r: stderr mismatch, comparing bs-at-end.r.E (actual) and bs-at-end.r.3 (expected)
+*** bs-at-end.r.E	Thu Jan  1 00:00:00 1970
+--- bs-at-end.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: warning: an unescaped backslash at end of string is not portable
+--- 1 ----
+! tr: warning: an unescaped backslash at end of string is not portable
+tr: test bs-at-end.p: stderr mismatch, comparing bs-at-end.p.E (actual) and bs-at-end.p.3 (expected)
+*** bs-at-end.p.E	Thu Jan  1 00:00:00 1970
+--- bs-at-end.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: warning: an unescaped backslash at end of string is not portable
+--- 1 ----
+! tr: warning: an unescaped backslash at end of string is not portable
+tr: test ross-0a.r: stderr mismatch, comparing ross-0a.r.E (actual) and ross-0a.r.3 (expected)
+*** ross-0a.r.E	Thu Jan  1 00:00:00 1970
+--- ross-0a.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/tr: when translating with complemented character classes,
+  string2 must map all characters in the domain to one
+--- 1,2 ----
+! tr: when translating with complemented character classes,
+  string2 must map all characters in the domain to one
+tr: test ross-0a.p: stderr mismatch, comparing ross-0a.p.E (actual) and ross-0a.p.3 (expected)
+*** ross-0a.p.E	Thu Jan  1 00:00:00 1970
+--- ross-0a.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/tr: when translating with complemented character classes,
+  string2 must map all characters in the domain to one
+--- 1,2 ----
+! tr: when translating with complemented character classes,
+  string2 must map all characters in the domain to one
+tr: test ross-0b.r: stderr mismatch, comparing ross-0b.r.E (actual) and ross-0b.r.3 (expected)
+*** ross-0b.r.E	Thu Jan  1 00:00:00 1970
+--- ross-0b.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/tr: when translating with complemented character classes,
+  string2 must map all characters in the domain to one
+--- 1,2 ----
+! tr: when translating with complemented character classes,
+  string2 must map all characters in the domain to one
+tr: test ross-0b.p: stderr mismatch, comparing ross-0b.p.E (actual) and ross-0b.p.3 (expected)
+*** ross-0b.p.E	Thu Jan  1 00:00:00 1970
+--- ross-0b.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/tr: when translating with complemented character classes,
+  string2 must map all characters in the domain to one
+--- 1,2 ----
+! tr: when translating with complemented character classes,
+  string2 must map all characters in the domain to one
+tr: test empty-eq.r: stderr mismatch, comparing empty-eq.r.E (actual) and empty-eq.r.3 (expected)
+*** empty-eq.r.E	Thu Jan  1 00:00:00 1970
+--- empty-eq.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: missing equivalence class character `[==]'
+--- 1 ----
+! tr: missing equivalence class character `[==]'
+tr: test empty-eq.p: stderr mismatch, comparing empty-eq.p.E (actual) and empty-eq.p.3 (expected)
+*** empty-eq.p.E	Thu Jan  1 00:00:00 1970
+--- empty-eq.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: missing equivalence class character `[==]'
+--- 1 ----
+! tr: missing equivalence class character `[==]'
+tr: test empty-cc.r: stderr mismatch, comparing empty-cc.r.E (actual) and empty-cc.r.3 (expected)
+*** empty-cc.r.E	Thu Jan  1 00:00:00 1970
+--- empty-cc.r.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: missing character class name `[::]'
+--- 1 ----
+! tr: missing character class name `[::]'
+tr: test empty-cc.p: stderr mismatch, comparing empty-cc.p.E (actual) and empty-cc.p.3 (expected)
+*** empty-cc.p.E	Thu Jan  1 00:00:00 1970
+--- empty-cc.p.3	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tr: missing character class name `[::]'
+--- 1 ----
+! tr: missing character class name `[::]'
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+[[33mSKIP[0m] misc/truncate-dangling-symlink (Bash test skipped via flag)
+[[33mSKIP[0m] misc/truncate-dir-fail (Bash test skipped via flag)
+[[33mSKIP[0m] misc/truncate-fail-diag (Bash test skipped via flag)
+[[33mSKIP[0m] misc/truncate-fifo (Bash test skipped via flag)
+[[33mSKIP[0m] misc/truncate-no-create-missing (Bash test skipped via flag)
+[[33mSKIP[0m] misc/truncate-overflow (Bash test skipped via flag)
+[[33mSKIP[0m] misc/truncate-owned-by-other (Bash test skipped via flag)
+[[33mSKIP[0m] misc/truncate-parameters (Bash test skipped via flag)
+[[33mSKIP[0m] misc/truncate-relative (Bash test skipped via flag)
+===================================================
+Executing: misc/tsort
+Sandbox Path: /tests/misc/tsort
+===================================================
+tsort: test cycle-1: stderr mismatch, comparing cycle-1.E (actual) and cycle-1.2 (expected)
+*** cycle-1.E	Thu Jan  1 00:00:00 1970
+--- cycle-1.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/tsort: f: input contains a loop:
+! /bin/tsort: s
+! /bin/tsort: t
+--- 1,3 ----
+! tsort: f: input contains a loop:
+! tsort: s
+! tsort: t
+tsort: test cycle-2: stderr mismatch, comparing cycle-2.E (actual) and cycle-2.2 (expected)
+*** cycle-2.E	Thu Jan  1 00:00:00 1970
+--- cycle-2.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/tsort: f: input contains a loop:
+! /bin/tsort: s
+! /bin/tsort: t
+--- 1,3 ----
+! tsort: f: input contains a loop:
+! tsort: s
+! tsort: t
+tsort: test odd: stderr mismatch, comparing odd.E (actual) and odd.2 (expected)
+*** odd.E	Thu Jan  1 00:00:00 1970
+--- odd.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/tsort: odd.1: input contains an odd number of tokens
+--- 1 ----
+! tsort: odd.1: input contains an odd number of tokens
+tsort: test only-one: stderr mismatch, comparing only-one.E (actual) and only-one.1 (expected)
+*** only-one.E	Thu Jan  1 00:00:00 1970
+--- only-one.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1,2 ****
+! /bin/tsort: extra operand `g'
+! Try `/bin/tsort --help' for more information.
+--- 1,2 ----
+! tsort: extra operand `g'
+! Try `tsort --help' for more information.
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: misc/tty-eof
+Sandbox Path: /tests/misc/tty-eof
+===================================================
+tty-eof: this script requires Perl's Expect package >=1.11
+===================================================
+Result: [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: misc/unexpand
+Sandbox Path: /tests/misc/unexpand
+===================================================
+Use of uninitialized value in concatenation (.) or string at /tests/misc/unexpand line 30.
+===================================================
+Result: [[31mFAIL[0m] (Exit 130)
+===================================================
+Executing: misc/uniq
+Sandbox Path: /tests/misc/uniq
+===================================================
+uniq: skipping this test -- no appropriate locale
+===================================================
+Result: [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: misc/wc
+Sandbox Path: /tests/misc/wc
+===================================================
+===================================================
+Result: [[32mPASS[0m] (Exit 0)
+[[33mSKIP[0m] misc/wc-files0 (Bash test skipped via flag)
+===================================================
+Executing: misc/wc-files0-from
+Sandbox Path: /tests/misc/wc-files0-from
+===================================================
+wc-files0-from: test f-extra-arg: stderr mismatch, comparing f-extra-arg.E (actual) and f-extra-arg.2 (expected)
+*** f-extra-arg.E	Thu Jan  1 00:00:00 1970
+--- f-extra-arg.2	Thu Jan  1 00:00:00 1970
+***************
+*** 1,3 ****
+! /bin/wc: extra operand `no-such'
+  file operands cannot be combined with --files0-from
+! Try `/bin/wc --help' for more information.
+--- 1,3 ----
+! wc: extra operand `no-such'
+  file operands cannot be combined with --files0-from
+! Try `wc --help' for more information.
+wc-files0-from: test missing: stderr mismatch, comparing missing.E (actual) and missing.1 (expected)
+*** missing.E	Thu Jan  1 00:00:00 1970
+--- missing.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/wc: cannot open `missing' for reading: No such file or directory
+--- 1 ----
+! wc: cannot open `missing' for reading: No such file or directory
+wc-files0-from: test minus-in-stdin: stderr mismatch, comparing minus-in-stdin.E (actual) and minus-in-stdin.1 (expected)
+*** minus-in-stdin.E	Thu Jan  1 00:00:00 1970
+--- minus-in-stdin.1	Thu Jan  1 00:00:00 1970
+***************
+*** 1 ****
+! /bin/wc: when reading file names from stdin, no file name of `-' allowed
+--- 1 ----
+! wc: when reading file names from stdin, no file name of `-' allowed
+
+thread 'lind-fork-15' (281805) panicked at /home/lind/lind-wasm/src/wasmtime/crates/lind-multi-process/src/lib.rs:1489:50:
+exec-ed module error: failed to run main module
+
+Caused by:
+    0: failed to invoke command default
+    1: wasm trap: indirect call type mismatch
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
