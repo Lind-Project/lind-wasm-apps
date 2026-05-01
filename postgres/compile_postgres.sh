@@ -13,8 +13,8 @@ set -x
 #   Pass 2 (WASM):    Clean .o files, re-configure for wasm32-wasi with a
 #                      config cache, then build src/backend (best-effort).
 #
-# Only the backend binary (postgres) is targeted; client tools (psql, pg_dump,
-# etc.) are out of scope.  This is a best-effort port — link or build failures
+# Only the backend binary (postgres) is targeted.
+# This is a best-effort port — link or build failures
 # are tolerated where possible.
 #
 # Prerequisites:
@@ -942,7 +942,7 @@ cp "$STAGE_DEV/urandom" "$STAGE_DEV/random"
 echo "[postgres] staged stub: $STAGE_DEV/{urandom,random}"
 
 # ============================================================================
-# Create copies for binaries (initdb needs "postgres" not "postgres.cwasm")
+# Create copies for binaries
 # ============================================================================
 echo
 echo "[postgres] creating binary copies (without .cwasm extension)..."
