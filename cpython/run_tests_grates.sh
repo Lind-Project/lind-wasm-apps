@@ -79,6 +79,9 @@ case "$GRATE_TYPE" in
   ipc)
     GRATE_CMD="grates/ipc-grate.cwasm"
     ;;
+  witness)
+    GRATE_CMD="grates/witness.cwasm"
+    ;;
   fs-routing-clamp)
     if [[ -z "$GRATE_ARG" ]]; then
       echo "Error: grate type 'fs-routing-clamp' requires --grate-arg <argument>."
