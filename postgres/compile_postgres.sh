@@ -116,13 +116,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   # Add PIC for position-independent code
   CFLAGS_WASM="$CFLAGS_WASM -fPIC -fvisibility=default"
 
-  # add-export-tool is used after wasm-opt to export relocation and stack symbols
-  ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
-  if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
-    echo "[postgres] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'" >&2
-    exit 1
-  fi
-
   # Extra CRT objects required for dynamic PIE executables
   DYLINK_CRT_OBJS=(
     "$MERGED_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
@@ -429,7 +422,7 @@ fi
 echo "[postgres] [wasm] compiling WASI stubs..."
 $CC_WASM $CFLAGS_WASM -c "$WASI_STUBS_C" -o "$WASI_STUBS_O"
 
-echo "OBJS += $WASI_STUBS_O" >> "$PG_ROOT/src/backend/Makefile"
+grep -q "wasi_stubs" "$PG_ROOT/src/backend/Makefile" || echo "OBJS += $WASI_STUBS_O" >> "$PG_ROOT/src/backend/Makefile"
 
 ###############################################################################
 # Build backend (best-effort)
@@ -459,7 +452,7 @@ make -C src/backend all -j"$JOBS" \
   AR="$AR" \
   RANLIB="$RANLIB" \
   LIBS="-Wl,--whole-archive $WASI_STUBS_O -Wl,--no-whole-archive -lm" || {
-    echo "[postgres] WARNING: backend build had errors (best-effort, continuing)."
+    echo "[postgres] ERROR: backend build failed."
     exit 1
 }
 
@@ -533,8 +526,10 @@ make -C src/test/regress -j"$JOBS" \
 
 ###############################################################################
 # Build plpgsql as shared WASM library (for dynamic loading via dlopen)
+# Only built for dynamic linking mode since it requires dlopen support.
 ###############################################################################
 
+if [[ "$LIND_DYLINK" == "1" ]]; then
 echo "[postgres] [wasm] building plpgsql shared library..."
 PLPGSQL_DIR="$PG_ROOT/src/pl/plpgsql/src"
 PLPGSQL_LIB_DIR="$STAGE_DIR/lib"
@@ -613,6 +608,9 @@ if [[ -n "$PLPGSQL_OBJS" ]]; then
   fi
 else
   echo "[postgres] WARNING: no plpgsql objects built"
+fi
+else
+  echo "[postgres] skipping plpgsql build (requires LIND_DYLINK=1)"
 fi
 
 ###############################################################################
@@ -932,6 +930,8 @@ fi
 
 # ============================================================================
 # Stage stub /dev/urandom and /dev/random (postgres reads these for auth tokens)
+# NOTE: This is a static 1KB file, not a real entropy source. Once postgres
+# reads through the 1KB, it gets repeated bytes. Fine for testing only.
 # ============================================================================
 echo
 echo "[postgres] staging stub /dev/urandom and /dev/random..."

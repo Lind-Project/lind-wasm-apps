@@ -594,8 +594,8 @@ if [[ -x "$LIND_BOOT" ]]; then
         # Strip .cwasm extension for final staged binary (required by issue #125)
         cp "$BASH_CWASM" "$BASH_OUT_DIR/bash"
         echo "[bash] staged final binary: $BASH_OUT_DIR/bash"
-        ln -sf bash "$BASH_OUT_DIR/sh"
-        echo "[bash] created symlink: $BASH_OUT_DIR/sh -> bash"
+        cp "$BASH_OUT_DIR/bash" "$BASH_OUT_DIR/sh"
+        echo "[bash] created copy: $BASH_OUT_DIR/sh (copy of bash)"
       else
         echo "[bash] ERROR: No .cwasm binary generated and hence no binaries copied to build/bash folder."
 	echo "[bash] ERROR: Exiting.."
