@@ -36,11 +36,11 @@ Postgres requires fpcast-emu mode. Use the `--enable-fpcast` flag:
 ```bash
 cd $LIND_WASM_ROOT
 
-# Initialize database
-lind-wasm --enable-fpcast /bin/initdb.cwasm -D /tmp/pgdata
-
-# Apply lind-wasm optimized settings
-cat lindfs/share/postgresql.conf.lind >> lindfs/tmp/pgdata/postgresql.conf
+# Initialize database with lind-wasm optimized settings
+lind-wasm --enable-fpcast /bin/initdb.cwasm -D /tmp/pgdata \
+  -c max_parallel_workers=0 \
+  -c max_parallel_workers_per_gather=0 \
+  -c io_method=sync
 
 # Start server
 lind-wasm --enable-fpcast /bin/postgres.cwasm -D /tmp/pgdata &

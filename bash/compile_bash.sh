@@ -47,7 +47,7 @@ ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-ex
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ##################
 # These knobs are the script-level control surface for the speedups below.
-# ``ARTIFACT_MODE=fast` gives a quick development path,while FORCE_CLEAN` 
+# ``ARTIFACT_MODE=fast` gives a quick development path,while FORCE_CLEAN`
 # and `FORCE_CONFIGURE` preserve a simple way to fall back to a from-scratch
 # rebuild when debugging or validating the cache logic.
 ##################
@@ -74,7 +74,7 @@ CACHE_REVISION="2"
 # phase is still valid. That phase is slow, and in practice it only needs to
 # rerun when bash's configure inputs change or the user explicitly asks for it.
 ##################
-mkdir -p "$BASH_OUT_DIR" "$BASH_STATE_DIR" 
+mkdir -p "$BASH_OUT_DIR" "$BASH_STATE_DIR"
 
 WASM_COMPAT_H="$BASH_ROOT/wasm_compat.h"
 
@@ -594,6 +594,8 @@ if [[ -x "$LIND_BOOT" ]]; then
         # Strip .cwasm extension for final staged binary (required by issue #125)
         cp "$BASH_CWASM" "$BASH_OUT_DIR/bash"
         echo "[bash] staged final binary: $BASH_OUT_DIR/bash"
+        cp "$BASH_OUT_DIR/bash" "$BASH_OUT_DIR/sh"
+        echo "[bash] created copy: $BASH_OUT_DIR/sh"
       else
         echo "[bash] ERROR: No .cwasm binary generated and hence no binaries copied to build/bash folder."
 	echo "[bash] ERROR: Exiting.."
