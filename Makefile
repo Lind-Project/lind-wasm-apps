@@ -33,6 +33,7 @@ MERGE_GNULIB_STAMP  := $(APPS_BUILD)/.stamp_merge_gnulib
 MERGE_ZLIB_STAMP    := $(APPS_BUILD)/.stamp_merge_zlib
 MERGE_OPENSSL_STAMP := $(APPS_BUILD)/.stamp_merge_openssl
 MERGE_LIBCXX_STAMP  := $(APPS_BUILD)/.stamp_merge_libcxx
+MERGE_ED25519_STAMP := $(APPS_BUILD)/.stamp_merge_ed25519
 MERGE_ALL_STAMP     := $(APPS_BUILD)/.stamp_merge_sysroot
 
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
@@ -49,7 +50,7 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install install-base
+.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install install-base
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -101,7 +102,7 @@ clean:
 	@# Infrastructure: stamps, sysroot, overlay, toolchain env
 	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
 	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)'
-	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
+	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)'
 
 print-config:
 	@echo "LIND_WASM_ROOT=$(LIND_WASM_ROOT)"
@@ -253,8 +254,17 @@ $(MERGE_LIBCXX_STAMP): $(MERGE_BASE_STAMP) $(LIBCXX_STAMP)
 	rsync -a '$(APPS_OVERLAY)/lib/wasm32-wasi/'     '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
 	touch '$@'
 
+# ---------------- ed25519 headers / source-only sysroot payload ---------------
+# ed25519 does not need compilation.  Its src/ tree is copied directly into the
+# merged sysroot after the base sysroot has been refreshed.
+$(MERGE_ED25519_STAMP): $(MERGE_BASE_STAMP)
+	mkdir -p '$(MERGED_SYSROOT)/include/ed25519'
+	rsync -a '$(APPS_ROOT)/ed25519/src/' '$(MERGED_SYSROOT)/include/ed25519/'
+	touch '$@'
 
-$(MERGE_ALL_STAMP): $(MERGE_TIRPC_STAMP) $(MERGE_GNULIB_STAMP) $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP) $(MERGE_LIBCXX_STAMP)
+ed25519: $(MERGE_ED25519_STAMP)
+
+$(MERGE_ALL_STAMP): $(MERGE_TIRPC_STAMP) $(MERGE_GNULIB_STAMP) $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP) $(MERGE_LIBCXX_STAMP) $(MERGE_ED25519_STAMP)
 	touch '$@'
 
 merge-sysroot: $(MERGE_ALL_STAMP)
@@ -344,10 +354,10 @@ clang: $(MERGE_LIBCXX_STAMP)
 
 rebuild-libs:
 	rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)' \
-	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
+	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)'
 
 rebuild-sysroot:
-	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ALL_STAMP)'
+	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)'
 
 # ---------------- cpython (WASM build) ----------------------------------------
 # Uses cpython/compile_cpython.sh to cross-compile CPython for wasm32-wasi.
