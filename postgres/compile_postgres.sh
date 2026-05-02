@@ -39,7 +39,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
@@ -581,12 +581,7 @@ if [[ -n "$PLPGSQL_OBJS" ]]; then
     }
 
   echo "[postgres] [wasm] running wasm-opt on plpgsql.wasm..."
-  "$WASM_OPT" \
-    --enable-bulk-memory --enable-threads \
-    --fpcast-emu --pass-arg=relocatable-fpcast \
-    --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-    --asyncify --pass-arg=asyncify-import-globals \
-    -O2 --debuginfo \
+  "$LIND_WASM_OPT" --target=main --fpcast-emu \
     "$PLPGSQL_WASM" -o "$PLPGSQL_OPT" || {
       echo "[postgres] WARNING: wasm-opt failed for plpgsql"
     }
@@ -663,12 +658,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
       }
 
     echo "[postgres] [dylink] running wasm-opt on lib${lib_name}.wasm..."
-    "$WASM_OPT" \
-      --enable-bulk-memory --enable-threads \
-      --fpcast-emu --pass-arg=relocatable-fpcast \
-      --epoch-injection --pass-arg=epoch-import \
-      --asyncify --pass-arg=asyncify-import-globals \
-      -O2 --debuginfo \
+    "$LIND_WASM_OPT" --target=library --fpcast-emu \
       "$SHARED_WASM" -o "$SHARED_OPT" || {
         echo "[postgres] [dylink] WARNING: wasm-opt failed for lib${lib_name}"
         continue
@@ -764,41 +754,23 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
   RAW_WASM="$STAGE_BIN/${bin_name}.wasm"
   OPT_WASM="$STAGE_BIN/${bin_name}.opt.wasm"
 
-  if [[ -x "$WASM_OPT" ]]; then
+  if [[ -x "$LIND_WASM_OPT" ]]; then
     echo "[postgres] running wasm-opt on ${bin_name} (asyncify + optimization)..."
     if [[ "$LIND_DYLINK" == "1" ]]; then
-      # Dylink wasm-opt flags: import epoch/asyncify globals from shared libc
-      # -O2 before asyncify helps reduce locals in large binaries like postgres
-      # NOTE: --pass-arg=relocatable-fpcast omitted for main binary — crashes
-      # wasm-opt on binaries this large. Shared libs (plpgsql, libpq) keep it.
-      "$WASM_OPT" \
-        --enable-bulk-memory --enable-threads \
-        --fpcast-emu \
-        -O2 \
-        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-        --asyncify --pass-arg=asyncify-import-globals \
-        --debuginfo \
-        "$RAW_WASM" \
-        -o "$OPT_WASM" || {
+      "$LIND_WASM_OPT" --target=main --fpcast-emu \
+        "$RAW_WASM" -o "$OPT_WASM" || {
           echo "[postgres] WARNING: wasm-opt failed for ${bin_name}; skipping optimization."
           continue
         }
     else
-      # Static wasm-opt flags
-      "$WASM_OPT" \
-        --fpcast-emu \
-        --epoch-injection \
-        --asyncify \
-        --debuginfo \
-        -O2 \
-        "$RAW_WASM" \
-        -o "$OPT_WASM" || {
+      "$LIND_WASM_OPT" --static --fpcast-emu \
+        "$RAW_WASM" -o "$OPT_WASM" || {
           echo "[postgres] WARNING: wasm-opt failed for ${bin_name}; skipping optimization."
           continue
         }
     fi
   else
-    echo "[postgres] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization."
+    echo "[postgres] NOTE: lind-wasm-opt not found at '$LIND_WASM_OPT'; skipping optimization."
     continue
   fi
 
