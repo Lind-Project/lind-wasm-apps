@@ -951,6 +951,7 @@ cd "$STAGE_BIN"
 for bin_name in "${STAGED_BINARIES[@]}"; do
   if [[ -f "${bin_name}.cwasm" ]]; then
     cp "${bin_name}.cwasm" "${bin_name}"
+    chmod +x "${bin_name}"
     echo "[postgres] copy: ${bin_name}.cwasm -> ${bin_name}"
   fi
 done
