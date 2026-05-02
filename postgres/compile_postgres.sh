@@ -769,9 +769,11 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
     if [[ "$LIND_DYLINK" == "1" ]]; then
       # Dylink wasm-opt flags: import epoch/asyncify globals from shared libc
       # -O2 before asyncify helps reduce locals in large binaries like postgres
+      # NOTE: --pass-arg=relocatable-fpcast omitted for main binary — crashes
+      # wasm-opt on binaries this large. Shared libs (plpgsql, libpq) keep it.
       "$WASM_OPT" \
         --enable-bulk-memory --enable-threads \
-        --fpcast-emu --pass-arg=relocatable-fpcast \
+        --fpcast-emu \
         -O2 \
         --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
         --asyncify --pass-arg=asyncify-import-globals \
