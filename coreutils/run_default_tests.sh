@@ -73,12 +73,12 @@ case "$GRATE_NAME" in
         SKIP_FILE="skip_ipc.txt"
 	;;
     "witness")
-        GRATE_CMD=("grates/witness.cwasm")
+        GRATE_CMD=("grates/witness-grate.cwasm")
         SKIP_FILE="skip_witness.txt"
 	;;
     "fs-routing-clamp")
         # Every space-separated item becomes its own element in the array
-        GRATE_CMD=("grates/fs-routing-clamp.wasm" "--prefix" "/tmp" "%{" "grates/imfs-grate.cwasm" "%}")
+        GRATE_CMD=("grates/fs-routing-clamp.cwasm" "--prefix" "/tmp" "%{" "grates/imfs-grate.cwasm" "%}")
         SKIP_FILE="skip_fsrouting.txt"
 	;;
     "")
