@@ -161,7 +161,7 @@ for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
         fi
         
         T_BASE=$(basename "$CURRENT_TEST")
-        if [[ -n "$GRATE_CMD" ]]; then
+	if [[ ${#GRATE_CMD[@]} -gt 0 ]]; then	
 		CMD=(lind_run --enable-fpcast "${GRATE_CMD[@]}" usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
         else
 		CMD=(lind_run --enable-fpcast usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
@@ -174,8 +174,8 @@ else
         fi
 
         sed -i 's/$srcdir/tests/g' "$HOST_TEST_PATH"
-	if [[ -n "$GRATE_CMD" ]]; then
-   		CMD=(lind-wasm --enable-fpcast "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
+   	if [[ ${#GRATE_CMD[@]} -gt 0 ]]; then
+		CMD=(lind-wasm --enable-fpcast "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
 	else
 		CMD=(lind-wasm --enable-fpcast bin/bash "$SANDBOX_PATH")
 	fi	
