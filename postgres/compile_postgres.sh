@@ -925,6 +925,17 @@ if [[ -d "$PG_ROOT/src/test/regress" ]]; then
   cp -r "$PG_ROOT/src/test/regress/data" "$STAGE_REGRESS/" 2>/dev/null || true
   cp "$PG_ROOT/src/test/regress/parallel_schedule" "$STAGE_REGRESS/" 2>/dev/null || true
   echo "[postgres] copied pg_regress files to: $STAGE_REGRESS"
+
+  # Generate serial_schedule from parallel_schedule: one test per line, skip float8.
+  if [[ -f "$STAGE_REGRESS/parallel_schedule" ]]; then
+    grep -v "^#" "$STAGE_REGRESS/parallel_schedule" \
+      | sed 's/test: //' \
+      | tr ' ' '\n' \
+      | grep -v "^$" \
+      | grep -v "float8" \
+      | sed 's/^/test: /' > "$STAGE_REGRESS/serial_schedule"
+    echo "[postgres] generated: $STAGE_REGRESS/serial_schedule"
+  fi
 else
   echo "[postgres] WARNING: pg_regress source not found"
 fi
