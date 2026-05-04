@@ -11,6 +11,7 @@ fi
 
 LINDFS="$LIND_WASM_ROOT/lindfs"
 LINDFS_TESTS="$LINDFS/tests"
+rm -rf "$LINDFS_TESTS/tmp"
 
 # Ensure temp directory exists in the sandbox
 mkdir -p "$LINDFS/tmp"
@@ -18,23 +19,78 @@ mkdir -p "$LINDFS/tmp"
 cp -r $SCRIPT_DIR/tests $LINDFS
 file="$LINDFS_TESTS/test-lib.sh"
 sed -i 's|"$abs_top_builddir/src/mktemp"|bin/mktemp|g' "$file"
-
+sed -i 's|^test_dir_=\$(pwd)|test_dir_=/tmp|' "$LINDFS_TESTS/test-lib.sh"
+sed -i "s|my \$cwd = \$@ ? '\.' : Cwd::getcwd();|my \$cwd = '/tmp';|" "$LINDFS_TESTS/CuTmpdir.pm"
+find "$LINDFS_TESTS" -type f -executable ! -name "*.pm" ! -name "*.pl" -exec sed -i 's|\$abs_top_builddir/src/|/bin/|g' {} +
 # =========================================================
 # ARGUMENT PARSING
 # =========================================================
 SKIP_BASH=0
 SKIP_PERL=0
 TARGET_TEST=""
-
+GRATE_NAME=""
+GRATE_CMD=()
+SKIP_FILE=""
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --list) TARGET_TEST="--list"; shift ;;
-        --all) TARGET_TEST="--all"; shift ;;
-        --skip-bash) SKIP_BASH=1; shift ;;
-        --skip-perl) SKIP_PERL=1; shift ;;
-        *) TARGET_TEST="$1"; shift ;;
+        --list)
+            TARGET_TEST="--list"
+            shift ;;
+        --all)
+            TARGET_TEST="--all"
+            shift ;;
+        --skip-bash)
+            SKIP_BASH=1
+            shift ;;
+        --skip-perl)
+            SKIP_PERL=1
+            shift ;;
+        --grate)
+            # Take the next argument as the name
+            GRATE_NAME="$2"
+            shift 2 ;;
+        *)
+            TARGET_TEST="$1"
+            shift ;;
     esac
 done
+
+# Validation: Prevent --grate being used with --list
+if [[ "$TARGET_TEST" == "--list" && -n "$GRATE_NAME" ]]; then
+    echo "Error: --grate cannot be used with --list"
+    exit 1
+fi
+
+# Logic to set GRATE_CMD based on GRATE_NAME
+# 1. Define GRATE_CMD as an array using parentheses
+case "$GRATE_NAME" in
+    "chroot")
+        GRATE_CMD=("grates/chroot-grate.cwasm" "--chroot-dir" "/")
+        SKIP_FILE="skip_chroot.txt"
+	;;
+    "ipc")
+        GRATE_CMD=("grates/ipc-grate.cwasm")
+        SKIP_FILE="skip_ipc.txt"
+	;;
+    "witness")
+        GRATE_CMD=("grates/witness.cwasm")
+        SKIP_FILE="skip_witness.txt"
+	;;
+    "fs-routing-clamp")
+        # Every space-separated item becomes its own element in the array
+        GRATE_CMD=("grates/fs-routing-clamp.wasm" "--prefix" "/tmp" "%{" "grates/imfs-grate.cwasm" "%}")
+        SKIP_FILE="skip_fsrouting.txt"
+	;;
+    "")
+        # Empty array if no grate is specified
+        GRATE_CMD=()
+	SKIP_FILE="skip_list.txt"
+        ;;
+    *)
+        echo "Unknown grate: $GRATE_NAME"
+        exit 1
+        ;;
+esac
 
 if [[ "$TARGET_TEST" == "--list" ]]; then
     echo "Available Tests:"
@@ -82,6 +138,11 @@ TOTAL_PASS=0; TOTAL_FAIL=0; TOTAL_SKIP=0
 for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
     HOST_TEST_PATH="$LINDFS_TESTS/$CURRENT_TEST"
 
+    if grep -Fxq "$CURRENT_TEST" "$SKIP_FILE"; then
+        echo "Test $CURRENT_TEST is in the skip list. Skipping..."
+        continue
+    fi
+
     if [[ ! -f "$HOST_TEST_PATH" ]]; then
         echo "Error: Test '$CURRENT_TEST' not found in sandbox at $HOST_TEST_PATH"
         continue
@@ -100,8 +161,12 @@ for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
         fi
         
         T_BASE=$(basename "$CURRENT_TEST")
-        CMD=(lind_run usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
-    else
+        if [[ -n "$GRATE_CMD" ]]; then
+		CMD=(lind_run --enable-fpcast "${GRATE_CMD[@]}" usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
+        else
+		CMD=(lind_run --enable-fpcast usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
+	fi
+else
         if [[ "$SKIP_BASH" -eq 1 ]]; then
             printf "[\033[33mSKIP\033[0m] %s (Bash test skipped via flag)\n" "$CURRENT_TEST"
             ((TOTAL_SKIP++)) || true
@@ -109,8 +174,12 @@ for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
         fi
 
         sed -i 's/$srcdir/tests/g' "$HOST_TEST_PATH"
-        CMD=(lind-wasm --enable-fpcast bin/bash "$SANDBOX_PATH")
-    fi
+	if [[ -n "$GRATE_CMD" ]]; then
+   		CMD=(lind-wasm --enable-fpcast "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
+	else
+		CMD=(lind-wasm --enable-fpcast bin/bash "$SANDBOX_PATH")
+	fi	
+   fi
 
     echo "==================================================="
     echo "Executing: $CURRENT_TEST"
