@@ -218,6 +218,9 @@ declare -A EXT_PM_MAP=(
   ["ext/Socket/Socket.pm"]="Socket.pm"
   ["dist/Storable/Storable.pm"]="Storable.pm"
   ["dist/Data-Dumper/lib/Data/Dumper.pm"]="Data/Dumper.pm"
+  ["cpan/IO-Tty/Tty.pm"]="IO/Tty.pm"
+  ["cpan/IO-Tty/Pty.pm"]="IO/Pty.pm"
+  ["cpan/IO-Tty/Tty/Constant.pm"]="IO/Tty/Constant.pm"
 )
 for src_rel in "${!EXT_PM_MAP[@]}"; do
   src="$PERL_ROOT/$src_rel"
