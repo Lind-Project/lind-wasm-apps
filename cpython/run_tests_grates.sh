@@ -80,7 +80,7 @@ case "$GRATE_TYPE" in
     GRATE_CMD="grates/ipc-grate.cwasm"
     ;;
   witness)
-    GRATE_CMD="grates/witness.cwasm"
+    GRATE_CMD="grates/witness-grate.cwasm"
     ;;
   fs-routing-clamp)
     if [[ -z "$GRATE_ARG" ]]; then
@@ -88,7 +88,7 @@ case "$GRATE_TYPE" in
       echo ""
       usage
     fi
-    GRATE_CMD="grates/fs-routing-clamp.wasm ${GRATE_ARG}"
+    GRATE_CMD="grates/fs-routing-clamp.cwasm ${GRATE_ARG}"
     ;;
   *)
     echo "Error: Unknown argument '$1'."
@@ -174,5 +174,5 @@ cp "$PYTHON_BINARY" "$LINDFS_ROOT/python.wasm"
 # --- run tests ----------------------------------------------------------------
 echo "[cpython-test] running python test suite..."
 
-make test TESTOPTS="${SKIP_ARGS}"
+make test TESTOPTS="${SKIP_ARGS} --timeout=120"
 popd >/dev/null
