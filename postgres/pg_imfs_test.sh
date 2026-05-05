@@ -68,13 +68,15 @@ echo "[inner] Done!"
 
 # Preload shared libs into IMFS so exec'd binaries can find them
 # Use chroot-relative paths (grate runs inside lind-wasm's chroot)
+# Must use --env to pass env vars to WASM binary
 PRELOADS="/lib/libc.cwasm:/lib/libm.cwasm"
 
 echo "[*] Running everything inside grate..."
 echo "[*] PRELOADS: ${PRELOADS}"
-echo "[*] Command: lind-wasm --enable-fpcast /${GRATE_BIN} /bin/bash.cwasm -c '...'"
+echo "[*] Command: lind-wasm --enable-fpcast --env PRELOADS=... /${GRATE_BIN} /bin/bash.cwasm -c '...'"
 
-PRELOADS="$PRELOADS" lind-wasm --enable-fpcast \
+lind-wasm --enable-fpcast \
+    --env "PRELOADS=${PRELOADS}" \
     "/${GRATE_BIN}" \
     /bin/bash.cwasm -c "$INNER_SCRIPT"
 
