@@ -9,7 +9,8 @@ if ( $^O eq 'MSWin32' ) {
 use strict;
 use warnings;
 
-use IO::File;
+# IO::File removed: not used by this script and not on perl-cross's
+# bootstrap @INC, which makes Makefile.PL fail under miniperl.
 use File::Spec;
 use Config qw(%Config);
 
