@@ -67,7 +67,8 @@ echo "[inner] Done!"
 '
 
 # Preload shared libs into IMFS so exec'd binaries can find them
-PRELOADS="${LINDFS}/lib/libc.cwasm:${LINDFS}/lib/libm.cwasm"
+# Use chroot-relative paths (grate runs inside lind-wasm's chroot)
+PRELOADS="/lib/libc.cwasm:/lib/libm.cwasm"
 
 echo "[*] Running everything inside grate..."
 echo "[*] PRELOADS: ${PRELOADS}"
