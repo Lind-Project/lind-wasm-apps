@@ -37,6 +37,8 @@ validate_grate() {
     GRATE_BIN="grates/${name}-grate.cwasm"
 }
 
+EXTRA_ARGS=()
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --grate)
@@ -44,8 +46,8 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         *)
-            echo "[!] Unknown argument: $1"
-            exit 1
+            EXTRA_ARGS+=("$1")
+            shift
             ;;
     esac
 done
@@ -82,7 +84,10 @@ chmod +x "${RUN_SCRIPT}"
 echo "[*] Running inside Lind..."
 
 if [[ -n "${GRATE_BIN}" ]]; then
-    lind-wasm --enable-fpcast "${GRATE_BIN}" /bin/bash run_pg.sh
+    lind-wasm --enable-fpcast \
+        "${GRATE_BIN}" \
+        "${EXTRA_ARGS[@]}" \
+        /bin/bash "${RUN_SCRIPT}"
 else
     lind-wasm --enable-fpcast /bin/bash run_pg.sh
 fi
