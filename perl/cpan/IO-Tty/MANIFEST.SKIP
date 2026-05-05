@@ -1,0 +1,11 @@
+^.github/
+^.git/.*
+^MYMETA.*
+^MANIFEST.bak
+^.gitignore
+^conf/
+^xssubs.c
+^Tty/Constant.pm
+^Makefile$
+^IO-Tty-\d
+^IO-Tty\.ppd$
