@@ -66,10 +66,14 @@ wait $pg_pid 2>/dev/null || true
 echo "[inner] Done!"
 '
 
+# Preload shared libs into IMFS so exec'd binaries can find them
+PRELOADS="${LINDFS}/lib/libc.cwasm:${LINDFS}/lib/libm.cwasm"
+
 echo "[*] Running everything inside grate..."
+echo "[*] PRELOADS: ${PRELOADS}"
 echo "[*] Command: lind-wasm --enable-fpcast /${GRATE_BIN} /bin/bash.cwasm -c '...'"
 
-lind-wasm --enable-fpcast \
+PRELOADS="$PRELOADS" lind-wasm --enable-fpcast \
     "/${GRATE_BIN}" \
     /bin/bash.cwasm -c "$INNER_SCRIPT"
 
