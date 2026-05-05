@@ -87,7 +87,7 @@ if [[ -n "${GRATE_BIN}" ]]; then
     lind-wasm --enable-fpcast \
         "${GRATE_BIN}" \
         "${EXTRA_ARGS[@]}" \
-        /bin/bash "${RUN_SCRIPT}"
+        /bin/bash run_pg.sh
 else
     lind-wasm --enable-fpcast /bin/bash run_pg.sh
 fi
