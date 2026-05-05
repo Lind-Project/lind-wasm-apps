@@ -363,7 +363,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     "${PIE_HACL_MID[@]}" \
     "$BUILD_WASM/Modules/_decimal/libmpdec/libmpdec.a" \
     "${PIE_HACL_POST[@]}" \
-    "$SYSROOT/lib/wasm32-wasi/set_stack_pointer.o" \
     "$SYSROOT/lib/wasm32-wasi/crt1_shared.o" \
     "$SYSROOT/lib/wasm32-wasi/lind_utils.o" \
     -ldl -lwasi-emulated-signal -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lpthread -lm
