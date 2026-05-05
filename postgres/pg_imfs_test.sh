@@ -6,7 +6,6 @@ set -euo pipefail
 
 LINDFS="${LIND_WASM_ROOT}/lindfs"
 TMPDIR="${LINDFS}/tmp"
-RUN_SCRIPT="${LINDFS}/run_pg_imfs.sh"
 
 GRATE_NAME="${1:-imfs}"
 GRATE_BIN="grates/${GRATE_NAME}-grate.cwasm"
@@ -36,23 +35,19 @@ cleanup() {
     echo "[*] Cleanup..."
     sudo rm -f "${TMPDIR}/.s.PGSQL.5432"* 2>/dev/null || true
     sudo rm -rf "${TMPDIR}/pgdata" 2>/dev/null || true
-    sudo rm -f "${RUN_SCRIPT}" 2>/dev/null || true
 }
 
 trap cleanup EXIT INT TERM
 cleanup
 
-# Create inner script - runs entirely inside one grate session
+# Inner script content - runs entirely inside one grate session
 # This keeps IMFS state persistent across initdb -> postgres -> psql
-cat > "${RUN_SCRIPT}" << 'INNEREOF'
-#!/bin/bash
+# Using bash -c since IMFS can't see files on the real filesystem
+INNER_SCRIPT='
 set -e
 
 echo "[inner] Starting initdb..."
-/bin/initdb.cwasm -D /tmp/pgdata --no-locale \
-    -c max_parallel_workers=0 \
-    -c max_parallel_workers_per_gather=0 \
-    -c io_method=sync
+/bin/initdb.cwasm -D /tmp/pgdata --no-locale
 
 echo "[inner] initdb complete, starting postgres..."
 /bin/postgres.cwasm -D /tmp/pgdata &
@@ -69,15 +64,13 @@ kill $pg_pid 2>/dev/null || true
 wait $pg_pid 2>/dev/null || true
 
 echo "[inner] Done!"
-INNEREOF
-
-chmod +x "${RUN_SCRIPT}"
+'
 
 echo "[*] Running everything inside grate..."
-echo "[*] Command: lind-wasm --enable-fpcast /${GRATE_BIN} /bin/bash.cwasm /run_pg_imfs.sh"
+echo "[*] Command: lind-wasm --enable-fpcast /${GRATE_BIN} /bin/bash.cwasm -c '...'"
 
 lind-wasm --enable-fpcast \
     "/${GRATE_BIN}" \
-    /bin/bash.cwasm /run_pg_imfs.sh
+    /bin/bash.cwasm -c "$INNER_SCRIPT"
 
 echo "[*] Test finished!"
