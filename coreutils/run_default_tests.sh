@@ -21,6 +21,7 @@ file="$LINDFS_TESTS/test-lib.sh"
 sed -i 's|"$abs_top_builddir/src/mktemp"|bin/mktemp|g' "$file"
 sed -i 's|^test_dir_=\$(pwd)|test_dir_=/tmp|' "$LINDFS_TESTS/test-lib.sh"
 sed -i "s|my \$cwd = \$@ ? '\.' : Cwd::getcwd();|my \$cwd = '/tmp';|" "$LINDFS_TESTS/CuTmpdir.pm"
+sed -i 's|my \$subst_expr = \$expect->{RESULT_SUBST}->{$eo};|my $subst_expr = $expect->{RESULT_SUBST}->{$eo};\n          if ($eo eq '"'"'ERR'"'"' \&\& !defined $subst_expr)\n          {\n              $subst_expr = '"'"'s\|`\/bin\/([^`]+)\|`$1\|g; s\|^\/bin\/([^\/:]+):\|$1:\|g'"'"';\n            }|' "$LINDFS_TESTS/Coreutils.pm"
 find "$LINDFS_TESTS" -type f -executable ! -name "*.pm" ! -name "*.pl" -exec sed -i 's|\$abs_top_builddir/src/|/bin/|g' {} +
 # =========================================================
 # ARGUMENT PARSING
