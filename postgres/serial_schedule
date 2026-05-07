@@ -1,0 +1,355 @@
+# ----------
+# src/test/regress/parallel_schedule
+#
+# Most test scripts can be run after running just test_setup and possibly
+# create_index.  Exceptions to this rule are documented below.
+#
+# By convention, we put no more than twenty tests in any one parallel group;
+# this limits the number of connections needed to run the tests.
+# ----------
+
+# required setup steps
+test: test_setup
+
+# ----------
+# The first group of parallel tests
+# ----------
+test: boolean
+test: char
+test: name
+test: varchar
+test: text
+test: int2
+test: int4
+test: int8
+test: oid
+test: float4
+test: float8
+test: bit
+test: numeric
+test: txid
+test: uuid
+test: enum
+test: money
+test: rangetypes
+test: pg_lsn
+test: regproc
+
+# ----------
+# The second group of parallel tests
+# multirangetypes depends on rangetypes
+# multirangetypes shouldn't run concurrently with type_sanity
+# ----------
+test: strings
+test: md5
+test: numerology
+test: point
+test: lseg
+test: line
+test: box
+test: path
+test: polygon
+test: circle
+test: date
+test: time
+test: timetz
+test: timestamp
+test: timestamptz
+test: interval
+test: inet
+test: macaddr
+test: macaddr8
+test: multirangetypes
+
+# ----------
+# Another group of parallel tests
+# geometry depends on point, lseg, line, box, path, polygon, circle
+# horology depends on date, time, timetz, timestamp, timestamptz, interval
+# ----------
+test: geometry
+test: horology
+test: tstypes
+test: regex
+test: type_sanity
+test: opr_sanity
+test: misc_sanity
+test: comments
+test: expressions
+test: unicode
+test: xid
+test: mvcc
+test: database
+test: stats_import
+test: pg_ndistinct
+test: pg_dependencies
+test: oid8
+test: encoding
+test: euc_kr
+
+# ----------
+# Load huge amounts of data
+# We should split the data files into single files and then
+# execute two copy tests in parallel, to check that copy itself
+# is concurrent safe.
+# ----------
+test: copy
+test: copyselect
+test: copydml
+test: copyencoding
+test: insert
+test: insert_conflict
+
+# ----------
+# More groups of parallel tests
+# Note: many of the tests in later groups depend on create_index
+# ----------
+test: create_function_c
+test: create_misc
+test: create_operator
+test: create_procedure
+test: create_table
+test: create_type
+test: create_schema
+test: create_index
+test: create_index_spgist
+test: create_view
+test: index_including
+test: index_including_gist
+
+# ----------
+# Another group of parallel tests
+# ----------
+test: create_aggregate
+test: create_function_sql
+test: create_cast
+test: constraints
+test: triggers
+test: select
+test: inherit
+test: typed_table
+test: vacuum
+test: drop_if_exists
+test: updatable_views
+test: roleattributes
+test: create_am
+test: hash_func
+test: errors
+# test: infinite_recurse
+
+# ----------
+# sanity_check does a vacuum, affecting the sort order of SELECT *
+# results. So it should not run parallel to other tests.
+# ----------
+test: sanity_check
+
+# ----------
+# Another group of parallel tests
+# aggregates depends on create_aggregate
+# join depends on create_misc
+# ----------
+test: select_into
+test: select_distinct
+test: select_distinct_on
+test: select_implicit
+test: select_having
+test: subselect
+test: union
+test: case
+test: join
+# test: aggregates
+test: transactions
+test: random
+test: portals
+test: arrays
+test: btree_index
+test: hash_index
+test: update
+test: delete
+test: namespace
+test: prepared_xacts
+
+# ----------
+# Another group of parallel tests
+# ----------
+test: brin
+test: gin
+test: gist
+test: spgist
+test: privileges
+test: init_privs
+test: security_label
+test: collate
+test: matview
+test: lock
+test: replica_identity
+test: rowsecurity
+test: object_address
+test: tablesample
+test: groupingsets
+test: drop_operator
+test: password
+test: identity
+test: generated_stored
+test: join_hash
+
+# ----------
+# Additional BRIN tests
+# ----------
+test: brin_bloom
+test: brin_multi
+
+# ----------
+# Another group of parallel tests
+# ----------
+test: create_table_like
+test: alter_generic
+test: alter_operator
+test: misc
+test: async
+test: dbsize
+test: merge
+test: misc_functions
+test: nls
+test: sysviews
+test: tsrf
+test: tid
+test: tidscan
+test: tidrangescan
+test: collate.utf8
+test: collate.icu.utf8
+test: incremental_sort
+test: create_role
+test: without_overlaps
+test: generated_virtual
+
+# collate.linux.utf8 and collate.icu.utf8 tests cannot be run in parallel with each other
+# psql depends on create_am
+# amutils depends on geometry, create_index_spgist, hash_index, brin
+test: rules
+test: psql
+test: psql_crosstab
+test: psql_pipeline
+test: amutils
+test: stats_ext
+test: collate.linux.utf8
+test: collate.windows.win1252
+
+# ----------
+# Run these alone so they don't run out of parallel workers
+# select_parallel depends on create_misc
+# ----------
+# test: select_parallel
+test: write_parallel
+test: vacuum_parallel
+
+# Run this alone, because concurrent DROP TABLE would make non-superuser
+# "ANALYZE;" fail with "relation with OID $n does not exist".
+test: maintain_every
+
+# no relation related tests can be put in this group
+test: publication
+test: subscription
+
+# ----------
+# Another group of parallel tests
+# select_views depends on create_view
+# ----------
+test: select_views
+test: portals_p2
+test: foreign_key
+test: cluster
+test: dependency
+test: guc
+test: bitmapops
+test: combocid
+test: tsearch
+test: tsdicts
+test: foreign_data
+test: window
+test: xmlmap
+test: functional_deps
+test: advisory_lock
+test: indirect_toast
+test: equivclass
+test: stats_rewrite
+
+# ----------
+# Another group of parallel tests (JSON related)
+# ----------
+test: json
+test: jsonb
+test: json_encoding
+test: jsonpath
+test: jsonpath_encoding
+test: jsonb_jsonpath
+test: sqljson
+test: sqljson_queryfuncs
+test: sqljson_jsontable
+
+# ----------
+# Another group of parallel tests
+# with depends on create_misc
+# NB: temp.sql does reconnects which transiently uses 2 connections,
+# so keep this parallel group to at most 19 tests
+# ----------
+test: plancache
+test: limit
+test: plpgsql
+test: copy2
+test: temp
+test: domain
+test: rangefuncs
+test: prepare
+test: conversion
+test: truncate
+test: alter_table
+test: sequence
+test: polymorphism
+test: rowtypes
+test: returning
+test: largeobject
+test: with
+test: xml
+
+# ----------
+# Another group of parallel tests
+#
+# The stats test resets stats, so nothing else needing stats access can be in
+# this group.
+# ----------
+test: partition_merge
+test: partition_split
+test: partition_join
+test: partition_prune
+test: reloptions
+test: hash_part
+test: indexing
+test: partition_aggregate
+test: partition_info
+test: tuplesort
+test: explain
+test: compression
+test: compression_lz4
+test: memoize
+test: stats
+test: predicate
+test: numa
+test: eager_aggregate
+
+# event_trigger depends on create_am and cannot run concurrently with
+# any test that runs DDL
+# oidjoins is read-only, though, and should run late for best coverage
+test: oidjoins
+test: event_trigger
+
+# event_trigger_login cannot run concurrently with any other tests because
+# on-login event handling could catch connection of a concurrent test.
+test: event_trigger_login
+
+# this test also uses event triggers, so likewise run it by itself
+test: fast_default
+
+# run tablespace test at the end because it drops the tablespace created during
+# setup that other tests may use.
+test: tablespace
+
