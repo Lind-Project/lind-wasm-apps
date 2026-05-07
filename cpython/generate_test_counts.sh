@@ -17,7 +17,7 @@ fi
 
 echo "module,total_tests"
 
-for test in $($PYTHON -m test --list-tests 2>/dev/null | awk -F. '{print $1}' | sort -u); do
+for test in $($PYTHON -m test --list-tests 2>/dev/null | sort -u); do
     # Filter out blank lines
     # Note: lines like "1 test skipped:" are not excluded and will be counted
     count=$($PYTHON -m test --list-cases "$test" 2>/dev/null | grep -c '[^[:space:]]')
