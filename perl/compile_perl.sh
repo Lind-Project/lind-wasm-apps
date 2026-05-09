@@ -261,6 +261,15 @@ if [[ -x "$LIND_BOOT" ]]; then
     if [[ -f "$PERL_OPT_CWASM" ]]; then
       cp "$PERL_OPT_CWASM" "$STAGE_DIR/perl"
       echo "[perl] perl staged as $STAGE_DIR/perl"
+      # make install drops aux launchers (corelist, cpan, ...) into STAGE_DIR
+      # as copies of the unoptimized perl wasm — replace each with the
+      # epoch-injected cwasm so they pass lind-boot's epoch-export check.
+      for tool in corelist cpan enc2xs encguess h2ph h2xs instmodsh json_pp libnetcfg; do
+        if [[ -e "$STAGE_DIR/$tool" ]]; then
+          cp "$PERL_OPT_CWASM" "$STAGE_DIR/$tool"
+          echo "[perl] $tool restaged with optimized cwasm"
+        fi
+      done
     else
       echo "[perl] ERROR: No .cwasm binary generated." >&2
       exit 1
