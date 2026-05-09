@@ -128,9 +128,15 @@ export CONFIG_HEADER="/lib/config.h"
 export TMPDIR="/tmp"
 export abs_top_builddir="/"
 export abs_top_srcdir="/"
+export abs_srcdir="/tests"
 export PATH="/bin:/usr/local/bin:/usr/bin"
 export srcdir="/tests"
 export srcdir="/home/lind/lind-wasm/lindfs/tests"
+
+# lind-boot does not auto-inherit the host environment into the cage; the guest
+# environ is built only from --env flags. Forward the vars perl tests read.
+ENV_FORWARD=(--env abs_top_builddir --env abs_top_srcdir --env abs_srcdir
+             --env PATH --env CONFIG_HEADER --env TMPDIR --env built_programs)
 
 # Tracking variables for the summary
 TOTAL_PASS=0; TOTAL_FAIL=0; TOTAL_SKIP=0
@@ -163,9 +169,9 @@ for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
         
         T_BASE=$(basename "$CURRENT_TEST")
 	if [[ ${#GRATE_CMD[@]} -gt 0 ]]; then	
-		CMD=(lind_run --enable-fpcast "${GRATE_CMD[@]}" usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
+		CMD=(lind_run --enable-fpcast "${ENV_FORWARD[@]}" "${GRATE_CMD[@]}" usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
         else
-		CMD=(lind_run --enable-fpcast usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
+		CMD=(lind_run --enable-fpcast "${ENV_FORWARD[@]}" usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
 	fi
 else
         if [[ "$SKIP_BASH" -eq 1 ]]; then
