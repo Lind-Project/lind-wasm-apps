@@ -176,12 +176,11 @@ else
             ((TOTAL_SKIP++)) || true
             continue
         fi
-	head -c 32 /dev/urandom > ~/lind-wasm/lindfs/witness.seed
         sed -i 's/$srcdir/tests/g' "$HOST_TEST_PATH"
    	if [[ ${#GRATE_CMD[@]} -gt 0 ]]; then
 		CMD=(lind-wasm --enable-fpcast "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
 	else
-		CMD=(lind-wasm --enable-fpcast bin/bash -x "$SANDBOX_PATH")
+		CMD=(lind-wasm --enable-fpcast bin/bash "$SANDBOX_PATH")
 	fi	
    fi
 
