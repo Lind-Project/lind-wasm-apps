@@ -22,6 +22,9 @@ sed -i 's|"$abs_top_builddir/src/mktemp"|bin/mktemp|g' "$file"
 sed -i 's|^test_dir_=\$(pwd)|test_dir_=/tmp|' "$LINDFS_TESTS/test-lib.sh"
 sed -i "s|my \$cwd = \$@ ? '\.' : Cwd::getcwd();|my \$cwd = '/tmp';|" "$LINDFS_TESTS/CuTmpdir.pm"
 sed -i 's|my \$subst_expr = \$expect->{RESULT_SUBST}->{$eo};|my $subst_expr = $expect->{RESULT_SUBST}->{$eo};\n          if ($eo eq '"'"'ERR'"'"' \&\& !defined $subst_expr)\n          {\n              $subst_expr = '"'"'s\|`\/bin\/([^`]+)\|`$1\|g; s\|^\/bin\/([^\/:]+):\|$1:\|g'"'"';\n            }|' "$LINDFS_TESTS/Coreutils.pm"
+
+
+
 find "$LINDFS_TESTS" -type f -executable ! -name "*.pm" ! -name "*.pl" -exec sed -i 's|\$abs_top_builddir/src/|/bin/|g' {} +
 # =========================================================
 # ARGUMENT PARSING
@@ -173,12 +176,12 @@ else
             ((TOTAL_SKIP++)) || true
             continue
         fi
-
+	head -c 32 /dev/urandom > ~/lind-wasm/lindfs/witness.seed
         sed -i 's/$srcdir/tests/g' "$HOST_TEST_PATH"
    	if [[ ${#GRATE_CMD[@]} -gt 0 ]]; then
 		CMD=(lind-wasm --enable-fpcast "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
 	else
-		CMD=(lind-wasm --enable-fpcast bin/bash "$SANDBOX_PATH")
+		CMD=(lind-wasm --enable-fpcast bin/bash -x "$SANDBOX_PATH")
 	fi	
    fi
 
@@ -194,10 +197,10 @@ else
 
     echo "==================================================="
     if [[ "$EXIT_CODE" -eq 0 ]]; then
-        printf "Result: [\033[32mPASS\033[0m] (Exit 0)\n"
+        printf "Result: $SANDBOX_PATH [\033[32mPASS\033[0m] (Exit 0)\n"
         ((TOTAL_PASS++)) || true
     elif [[ "$EXIT_CODE" -eq 77 ]]; then
-        printf "Result: [\033[33mSKIP\033[0m] (Exit 77)\n"
+        printf "Result: $SANDBOX_PATH [\033[33mSKIP\033[0m] (Exit 77)\n"
         ((TOTAL_SKIP++)) || true
     else
         printf "Result: [\033[31mFAIL\033[0m] (Exit %d)\n" "$EXIT_CODE"
