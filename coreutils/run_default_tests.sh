@@ -182,9 +182,9 @@ else
 
         sed -i 's/$srcdir/tests/g' "$HOST_TEST_PATH"
    	if [[ ${#GRATE_CMD[@]} -gt 0 ]]; then
-		CMD=(lind-wasm --enable-fpcast "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
+		CMD=(lind-wasm --enable-fpcast "${ENV_FORWARD[@]}" "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
 	else
-		CMD=(lind-wasm --enable-fpcast bin/bash "$SANDBOX_PATH")
+		CMD=(lind-wasm --enable-fpcast "${ENV_FORWARD[@]}" bin/bash "$SANDBOX_PATH")
 	fi	
    fi
 
