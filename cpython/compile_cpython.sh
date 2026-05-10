@@ -245,7 +245,7 @@ if [[ "$BUILD_MODE" == "linux" ]]; then
 # and routes to the installed binary inside lind's virtual filesystem.
 shift
 unset PYTHONPATH _PYTHON_PROJECT_BASE _PYTHON_SYSCONFIGDATA_PATH _PYTHON_HOST_PLATFORM
-exec lind-wasm --preload env=/lib/libpython3.14.so${FPCAST_ARG} /usr/local/bin/python "\$@"
+exec lind-wasm --preload env=/lib/libz.so --preload env=/lib/libpython3.14.so${FPCAST_ARG} /usr/local/bin/python "\$@"
 WRAPPER
   chmod +x "$LIND_RUN_PYTHON"
 
