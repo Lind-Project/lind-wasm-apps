@@ -183,7 +183,6 @@ PATCHES_DIR="$SCRIPT_DIR/patches"
 LINUX_PATCHES=(
   "$PATCHES_DIR/lind-linux-utils.patch"
   "$PATCHES_DIR/lind-linux-os_helper.patch"
-  "$PATCHES_DIR/lind-linux-run_workers.patch"
 )
 PATCHES_APPLIED=0
 
