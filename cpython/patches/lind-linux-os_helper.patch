@@ -1,18 +1,13 @@
 --- a/test/support/os_helper.py
 +++ b/test/support/os_helper.py
-@@ -19,7 +19,14 @@
+@@ -19,7 +19,9 @@
 
  # Disambiguate TESTFN for parallel testing, while letting it remain a valid
  # module name.
 -TESTFN_ASCII = "{}_{}_tmp".format(TESTFN_ASCII, os.getpid())
-+# Use randint when getpid() returns 1 (lind-wasm cage ID) so parallel
-+# workers don't collide on the same filename.
-+_testfn_nounce = os.getpid()
-+if _testfn_nounce == 1:
-+    import random as _random
-+    _testfn_nounce = _random.randint(0, 1_000_000)
-+TESTFN_ASCII = "{}_{}_tmp".format(TESTFN_ASCII, _testfn_nounce)
-+del _testfn_nounce
++import random as _random
++TESTFN_ASCII = "{}_{}_tmp".format(TESTFN_ASCII, _random.randint(0, 1_000_000))
++del _random
 
  # TESTFN_UNICODE is a non-ascii filename
  TESTFN_UNICODE = TESTFN_ASCII + "-\xe0\xf2ɘŁğ"

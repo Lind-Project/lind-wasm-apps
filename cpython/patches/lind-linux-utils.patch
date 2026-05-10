@@ -1,13 +1,11 @@
 --- a/test/libregrtest/utils.py
 +++ b/test/libregrtest/utils.py
-@@ -451,7 +451,9 @@
+@@ -451,7 +451,4 @@
      # testing (see the -j option).
      # Emscripten and WASI have stubbed getpid(), Emscripten has only
      # millisecond clock resolution. Use randint() instead.
 -    if support.is_emscripten or support.is_wasi:
-+    # lind-wasm stubs getpid() to always return the cage ID (1); use
-+    # randint() there too to avoid work-dir collisions across workers.
-+    if support.is_emscripten or support.is_wasi or os.getpid() == 1:
-         nounce = random.randint(0, 1_000_000)
-     else:
-         nounce = os.getpid()
+-        nounce = random.randint(0, 1_000_000)
+-    else:
+-        nounce = os.getpid()
++    nounce = random.randint(0, 1_000_000)
