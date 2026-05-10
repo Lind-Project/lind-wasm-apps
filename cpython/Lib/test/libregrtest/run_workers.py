@@ -326,16 +326,8 @@ class WorkerThread(threading.Thread):
                 json_tmpfile.seek(0)
                 worker_json = json_tmpfile.read()
             elif json_file.file_type == JsonFileType.STDOUT:
-                # The JSON line may be followed by faulthandler/stderr output
-                # in the combined output_fd.  Find the last line starting with
-                # '{' rather than blindly taking the very last line.
-                rest, sep, worker_json = stdout.rpartition("\n{")
-                if sep:
-                    worker_json = "{" + worker_json
-                    stdout = rest.rstrip()
-                else:
-                    stdout, _, worker_json = stdout.rpartition("\n")
-                    stdout = stdout.rstrip()
+                stdout, _, worker_json = stdout.rpartition("\n")
+                stdout = stdout.rstrip()
             else:
                 with json_file.open(encoding='utf8') as json_fp:
                     worker_json = json_fp.read()
@@ -355,7 +347,7 @@ class WorkerThread(threading.Thread):
         except Exception as exc:
             # gh-101634: Catch UnicodeDecodeError if stdout cannot be
             # decoded from encoding
-            err_msg = f"Failed to parse worker process JSON: {exc} | worker_json={worker_json!r}"
+            err_msg = f"Failed to parse worker process JSON: {exc}"
             raise WorkerError(self.test_name, err_msg, stdout,
                               state=State.WORKER_BUG)
 

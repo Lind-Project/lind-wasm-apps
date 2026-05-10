@@ -19,14 +19,7 @@ TESTFN_ASCII = '@test'
 
 # Disambiguate TESTFN for parallel testing, while letting it remain a valid
 # module name.
-# Use randint when getpid() is stubbed to 1 (lind-wasm cage ID, Emscripten,
-# WASI) so parallel workers don't all collide on the same filename.
-_testfn_nounce = os.getpid()
-if _testfn_nounce == 1:
-    import random as _random
-    _testfn_nounce = _random.randint(0, 1_000_000)
-TESTFN_ASCII = "{}_{}_tmp".format(TESTFN_ASCII, _testfn_nounce)
-del _testfn_nounce
+TESTFN_ASCII = "{}_{}_tmp".format(TESTFN_ASCII, os.getpid())
 
 # TESTFN_UNICODE is a non-ascii filename
 TESTFN_UNICODE = TESTFN_ASCII + "-\xe0\xf2\u0258\u0141\u011f"

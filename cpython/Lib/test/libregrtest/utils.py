@@ -451,10 +451,7 @@ def get_work_dir(parent_dir: StrPath, worker: bool = False) -> StrPath:
     # testing (see the -j option).
     # Emscripten and WASI have stubbed getpid(), Emscripten has only
     # millisecond clock resolution. Use randint() instead.
-    # lind-wasm also stubs getpid() to always return the cage ID (1), so
-    # every run would collide on the same dir name; use randint() there too.
-    # PID 1 is init on real Linux and is never a Python process.
-    if support.is_emscripten or support.is_wasi or os.getpid() == 1:
+    if support.is_emscripten or support.is_wasi:
         nounce = random.randint(0, 1_000_000)
     else:
         nounce = os.getpid()

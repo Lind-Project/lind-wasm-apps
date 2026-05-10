@@ -1,0 +1,28 @@
+--- a/test/libregrtest/run_workers.py
++++ b/test/libregrtest/run_workers.py
+@@ -326,8 +326,15 @@
+                 json_tmpfile.seek(0)
+                 worker_json = json_tmpfile.read()
+             elif json_file.file_type == JsonFileType.STDOUT:
+-                stdout, _, worker_json = stdout.rpartition("\n")
+-                stdout = stdout.rstrip()
++                # Find the last line starting with '{': faulthandler/stderr
++                # output can be mixed into stdout after the JSON line.
++                rest, sep, worker_json = stdout.rpartition("\n{")
++                if sep:
++                    worker_json = "{" + worker_json
++                    stdout = rest.rstrip()
++                else:
++                    stdout, _, worker_json = stdout.rpartition("\n")
++                    stdout = stdout.rstrip()
+             else:
+                 with json_file.open(encoding='utf8') as json_fp:
+                     worker_json = json_fp.read()
+@@ -347,7 +354,7 @@
+         except Exception as exc:
+             # gh-101634: Catch UnicodeDecodeError if stdout cannot be
+             # decoded from encoding
+-            err_msg = f"Failed to parse worker process JSON: {exc}"
++            err_msg = f"Failed to parse worker process JSON: {exc} | worker_json={worker_json!r}"
+             raise WorkerError(self.test_name, err_msg, stdout,
+                               state=State.WORKER_BUG)
