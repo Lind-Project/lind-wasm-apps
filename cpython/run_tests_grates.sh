@@ -174,5 +174,5 @@ cp "$PYTHON_BINARY" "$LINDFS_ROOT/python.wasm"
 # --- run tests ----------------------------------------------------------------
 echo "[cpython-test] running python test suite..."
 
-make test TESTOPTS="${SKIP_ARGS} --timeout=120"
+make test TESTOPTS=" -v ${SKIP_ARGS} --timeout=120"
 popd >/dev/null

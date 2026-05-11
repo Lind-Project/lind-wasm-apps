@@ -70,6 +70,6 @@ cp "$PYTHON_BINARY" "$LINDFS_ROOT/python.wasm"
 
 # --- run tests ----------------------------------------------------------------
 echo "[cpython-test] running python test suite..."
-make test
+make test TESTOPTS=" -v --timeout=120"
 
 popd >/dev/null
