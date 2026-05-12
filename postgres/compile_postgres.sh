@@ -735,6 +735,8 @@ if [[ -f "$SNOWBALL_DIR/dict_snowball.c" ]]; then
     }
 
   # Also compile the libstemmer sources (snowball stemmer implementations)
+  # Headers are in src/include/snowball/libstemmer/, not with the .c files
+  SNOWBALL_INCLUDE="$PG_ROOT/src/include/snowball/libstemmer"
   if [[ -d "$SNOWBALL_DIR/libstemmer" ]]; then
     for src in "$SNOWBALL_DIR/libstemmer"/*.c; do
       if [[ -f "$src" ]]; then
@@ -743,7 +745,7 @@ if [[ -f "$SNOWBALL_DIR/dict_snowball.c" ]]; then
         echo "[postgres] [wasm]   compiling $basename_src (PIC)..."
         $CC_WASM $CFLAGS_WASM -fPIC \
           -I"$PG_ROOT/src/include" \
-          -I"$SNOWBALL_DIR/libstemmer" \
+          -I"$SNOWBALL_INCLUDE" \
           -c "$src" -o "$obj" || {
             echo "[postgres] WARNING: failed to compile $basename_src"
             continue
