@@ -1001,6 +1001,10 @@ for bin_name in "${STAGED_BINARIES[@]}"; do
         if [[ "$OPT_CWASM" != "$CLEAN_CWASM" && -f "$OPT_CWASM" ]]; then
           mv "$OPT_CWASM" "$CLEAN_CWASM"
         fi
+        # Ensure cwasm is executable
+        if [[ -f "$CLEAN_CWASM" ]]; then
+          chmod +x "$CLEAN_CWASM"
+        fi
       else
         echo "[postgres] WARNING: lind-boot --precompile failed for ${bin_name}."
       fi
