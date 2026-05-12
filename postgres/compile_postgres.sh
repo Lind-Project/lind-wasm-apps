@@ -32,7 +32,7 @@ MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
 STAGE_DIR="$APPS_BUILD/postgres"
 STAGE_BIN="$STAGE_DIR/bin"
 STAGE_SHARE="$STAGE_DIR/share"
-STAGE_LIBDIR="$STAGE_DIR/usr/local/pgsql/lib"  # matches postgres default $libdir
+STAGE_LIBDIR="$STAGE_DIR/lib"  # postgres LIBDIR is /lib (from pg_config)
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -736,6 +736,7 @@ if [[ -f "$SNOWBALL_DIR/dict_snowball.c" ]]; then
 
   # Also compile the libstemmer sources (snowball stemmer implementations)
   # Headers are in src/include/snowball/libstemmer/, not with the .c files
+  # These files don't include standard headers directly - force include them
   SNOWBALL_INCLUDE="$PG_ROOT/src/include/snowball/libstemmer"
   if [[ -d "$SNOWBALL_DIR/libstemmer" ]]; then
     for src in "$SNOWBALL_DIR/libstemmer"/*.c; do
@@ -744,6 +745,8 @@ if [[ -f "$SNOWBALL_DIR/dict_snowball.c" ]]; then
         basename_src=$(basename "$src")
         echo "[postgres] [wasm]   compiling $basename_src (PIC)..."
         $CC_WASM $CFLAGS_WASM -fPIC \
+          -include stdlib.h \
+          -include string.h \
           -I"$PG_ROOT/src/include" \
           -I"$SNOWBALL_INCLUDE" \
           -c "$src" -o "$obj" || {
