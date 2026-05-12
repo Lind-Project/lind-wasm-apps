@@ -32,6 +32,7 @@ MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
 STAGE_DIR="$APPS_BUILD/postgres"
 STAGE_BIN="$STAGE_DIR/bin"
 STAGE_SHARE="$STAGE_DIR/share"
+STAGE_LIBDIR="$STAGE_DIR/usr/local/pgsql/lib"  # matches postgres default $libdir
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 # Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
@@ -74,7 +75,7 @@ if [[ ! -d "$MERGED_SYSROOT" ]]; then
   exit 1
 fi
 
-mkdir -p "$STAGE_BIN" "$STAGE_SHARE"
+mkdir -p "$STAGE_BIN" "$STAGE_SHARE" "$STAGE_LIBDIR"
 
 # --- WASM-specific source patches -------------------------------------------
 
@@ -202,6 +203,12 @@ make -C src/backend generated-headers -j"$JOBS"
 
 echo "[postgres] [host] building generated parser sources..."
 make -C src/backend generated-parser-sources -j"$JOBS"
+
+# Generate snowball_create.sql (text search configuration SQL)
+echo "[postgres] [host] generating snowball_create.sql..."
+(cd src/backend/snowball && perl snowball_create.pl --input . --outdir .) || {
+  echo "[postgres] WARNING: failed to generate snowball_create.sql"
+}
 
 # Also build libpgport and libpgcommon natively — they're needed for the
 # generated header infrastructure to complete
@@ -531,7 +538,7 @@ make -C src/test/regress -j"$JOBS" \
 if [[ "$LIND_DYLINK" == "1" ]]; then
 echo "[postgres] [wasm] building plpgsql shared library..."
 PLPGSQL_DIR="$PG_ROOT/src/pl/plpgsql/src"
-PLPGSQL_LIB_DIR="$STAGE_DIR/lib"
+PLPGSQL_LIB_DIR="$STAGE_LIBDIR"
 mkdir -p "$PLPGSQL_LIB_DIR"
 
 # Generate plpgsql parser and error codes (uses host perl, already done in Pass 1)
@@ -615,7 +622,7 @@ fi  # end if [[ "$LIND_DYLINK" == "1" ]] (plpgsql section)
 if [[ "$LIND_DYLINK" == "1" ]]; then
 echo "[postgres] [wasm] building regress shared library..."
 REGRESS_DIR="$PG_ROOT/src/test/regress"
-REGRESS_LIB_DIR="$STAGE_DIR/lib"
+REGRESS_LIB_DIR="$STAGE_LIBDIR"
 mkdir -p "$REGRESS_LIB_DIR"
 
 # Build regress.o with PIC for shared library
@@ -702,6 +709,109 @@ else
 fi  # end regress.so section
 
 ###############################################################################
+# Build dict_snowball.so (text search snowball stemmer library)
+# Only built for dynamic linking mode since it requires dlopen support.
+###############################################################################
+
+if [[ "$LIND_DYLINK" == "1" ]]; then
+echo "[postgres] [wasm] building dict_snowball shared library..."
+SNOWBALL_DIR="$PG_ROOT/src/backend/snowball"
+SNOWBALL_LIB_DIR="$STAGE_LIBDIR"
+mkdir -p "$SNOWBALL_LIB_DIR"
+
+# Collect snowball source files
+SNOWBALL_SRCS="dict_snowball.c"
+SNOWBALL_OBJS=""
+
+# Build dict_snowball.o with PIC
+if [[ -f "$SNOWBALL_DIR/dict_snowball.c" ]]; then
+  echo "[postgres] [wasm]   compiling dict_snowball.c (PIC)..."
+  $CC_WASM $CFLAGS_WASM -fPIC \
+    -I"$PG_ROOT/src/include" \
+    -I"$SNOWBALL_DIR" \
+    -I"$SNOWBALL_DIR/libstemmer" \
+    -c "$SNOWBALL_DIR/dict_snowball.c" -o "$SNOWBALL_DIR/dict_snowball.o" || {
+      echo "[postgres] WARNING: failed to compile dict_snowball.c"
+    }
+
+  # Also compile the libstemmer sources (snowball stemmer implementations)
+  if [[ -d "$SNOWBALL_DIR/libstemmer" ]]; then
+    for src in "$SNOWBALL_DIR/libstemmer"/*.c; do
+      if [[ -f "$src" ]]; then
+        obj="${src%.c}.o"
+        basename_src=$(basename "$src")
+        echo "[postgres] [wasm]   compiling $basename_src (PIC)..."
+        $CC_WASM $CFLAGS_WASM -fPIC \
+          -I"$PG_ROOT/src/include" \
+          -I"$SNOWBALL_DIR/libstemmer" \
+          -c "$src" -o "$obj" || {
+            echo "[postgres] WARNING: failed to compile $basename_src"
+            continue
+          }
+        SNOWBALL_OBJS="$SNOWBALL_OBJS $obj"
+      fi
+    done
+  fi
+
+  # Link as shared WASM library
+  if [[ -f "$SNOWBALL_DIR/dict_snowball.o" ]]; then
+    echo "[postgres] [wasm] linking dict_snowball.wasm..."
+    SNOWBALL_WASM="$SNOWBALL_LIB_DIR/dict_snowball.wasm"
+    SNOWBALL_OPT="$SNOWBALL_LIB_DIR/dict_snowball.opt.wasm"
+
+    "$CLANG" \
+      --target=wasm32-unknown-wasi \
+      --sysroot="$MERGED_SYSROOT" \
+      -fPIC \
+      -Wl,-shared \
+      -Wl,--import-memory \
+      -Wl,--shared-memory \
+      -Wl,--export-dynamic \
+      -Wl,--experimental-pic \
+      -Wl,--unresolved-symbols=import-dynamic \
+      -Wl,--export=Pg_magic_func \
+      -Wl,--export=_PG_init \
+      -Wl,--export=dsnowball_init \
+      -Wl,--export=dsnowball_lexize \
+      -L"$MERGED_SYSROOT/lib/wasm32-wasi" \
+      -g -O2 \
+      "$SNOWBALL_DIR/dict_snowball.o" \
+      $SNOWBALL_OBJS \
+      -o "$SNOWBALL_WASM" || {
+        echo "[postgres] WARNING: failed to link dict_snowball.wasm"
+      }
+
+    if [[ -f "$SNOWBALL_WASM" ]]; then
+      echo "[postgres] [wasm] running wasm-opt on dict_snowball.wasm..."
+      "$LIND_WASM_OPT" --target=main --fpcast-emu \
+        "$SNOWBALL_WASM" -o "$SNOWBALL_OPT" || {
+          echo "[postgres] WARNING: wasm-opt failed for dict_snowball"
+        }
+
+      if [[ -f "$SNOWBALL_OPT" ]]; then
+        echo "[postgres] [wasm] adding exports to dict_snowball.opt.wasm..."
+        "$ADD_EXPORT_TOOL" "$SNOWBALL_OPT" "$SNOWBALL_OPT" \
+          __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+        "$ADD_EXPORT_TOOL" "$SNOWBALL_OPT" "$SNOWBALL_OPT" \
+          __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+        "$ADD_EXPORT_TOOL" "$SNOWBALL_OPT" "$SNOWBALL_OPT" \
+          __stack_pointer global __stack_pointer optional
+
+        # Stage the optimized wasm and create .so symlink
+        mv "$SNOWBALL_OPT" "$SNOWBALL_WASM"
+        ln -sf dict_snowball.wasm "$SNOWBALL_LIB_DIR/dict_snowball.so"
+        echo "[postgres] staged: $SNOWBALL_LIB_DIR/dict_snowball.so -> dict_snowball.wasm"
+      fi
+    fi
+  fi
+else
+  echo "[postgres] WARNING: dict_snowball.c not found at $SNOWBALL_DIR"
+fi
+else
+  echo "[postgres] skipping dict_snowball.so build (requires LIND_DYLINK=1)"
+fi  # end dict_snowball.so section
+
+###############################################################################
 # Build shared libraries for dylink mode
 ###############################################################################
 
@@ -709,7 +819,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[postgres] [dylink] converting static libraries to shared WASM modules..."
 
   # Shared library output directory
-  PG_SHARED_LIB_DIR="$STAGE_DIR/lib"
+  PG_SHARED_LIB_DIR="$STAGE_LIBDIR"
   mkdir -p "$PG_SHARED_LIB_DIR"
   mkdir -p "$STAGE_BIN" "$STAGE_SHARE"
 
