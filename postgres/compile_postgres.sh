@@ -608,6 +608,100 @@ else
 fi  # end if [[ "$LIND_DYLINK" == "1" ]] (plpgsql section)
 
 ###############################################################################
+# Build regress.so test helper library (for pg_regress C function tests)
+# Only built for dynamic linking mode since it requires dlopen support.
+###############################################################################
+
+if [[ "$LIND_DYLINK" == "1" ]]; then
+echo "[postgres] [wasm] building regress shared library..."
+REGRESS_DIR="$PG_ROOT/src/test/regress"
+REGRESS_LIB_DIR="$STAGE_DIR/lib"
+mkdir -p "$REGRESS_LIB_DIR"
+
+# Build regress.o with PIC for shared library
+if [[ -f "$REGRESS_DIR/regress.c" ]]; then
+  echo "[postgres] [wasm]   compiling regress.c (PIC)..."
+  $CC_WASM $CFLAGS_WASM -fPIC \
+    -I"$PG_ROOT/src/include" \
+    -I"$PG_ROOT/src/interfaces/libpq" \
+    -c "$REGRESS_DIR/regress.c" -o "$REGRESS_DIR/regress.o" || {
+      echo "[postgres] WARNING: failed to compile regress.c"
+    }
+
+  # Link as shared WASM library
+  if [[ -f "$REGRESS_DIR/regress.o" ]]; then
+    echo "[postgres] [wasm] linking regress.wasm..."
+    REGRESS_WASM="$REGRESS_LIB_DIR/regress.wasm"
+    REGRESS_OPT="$REGRESS_LIB_DIR/regress.opt.wasm"
+
+    "$CLANG" \
+      --target=wasm32-unknown-wasi \
+      --sysroot="$MERGED_SYSROOT" \
+      -fPIC \
+      -Wl,-shared \
+      -Wl,--import-memory \
+      -Wl,--shared-memory \
+      -Wl,--export-dynamic \
+      -Wl,--experimental-pic \
+      -Wl,--unresolved-symbols=import-dynamic \
+      -Wl,--export=Pg_magic_func \
+      -Wl,--export=_PG_init \
+      -Wl,--export=interpt_pp \
+      -Wl,--export=overpaid \
+      -Wl,--export=widget_in \
+      -Wl,--export=widget_out \
+      -Wl,--export=pt_in_widget \
+      -Wl,--export=reverse_name \
+      -Wl,--export=trigger_return_old \
+      -Wl,--export=int44in \
+      -Wl,--export=int44out \
+      -Wl,--export=test_canonicalize_path \
+      -Wl,--export=make_tuple_indirect \
+      -Wl,--export=regress_setenv \
+      -Wl,--export=wait_pid \
+      -Wl,--export=test_atomic_ops \
+      -Wl,--export=test_fdw_handler \
+      -Wl,--export=test_support_func \
+      -Wl,--export=test_opclass_options_func \
+      -Wl,--export=binary_coercible \
+      -L"$MERGED_SYSROOT/lib/wasm32-wasi" \
+      -g -O2 \
+      "$REGRESS_DIR/regress.o" \
+      -o "$REGRESS_WASM" || {
+        echo "[postgres] WARNING: failed to link regress.wasm"
+      }
+
+    if [[ -f "$REGRESS_WASM" ]]; then
+      echo "[postgres] [wasm] running wasm-opt on regress.wasm..."
+      "$LIND_WASM_OPT" --target=main --fpcast-emu \
+        "$REGRESS_WASM" -o "$REGRESS_OPT" || {
+          echo "[postgres] WARNING: wasm-opt failed for regress"
+        }
+
+      if [[ -f "$REGRESS_OPT" ]]; then
+        echo "[postgres] [wasm] adding exports to regress.opt.wasm..."
+        "$ADD_EXPORT_TOOL" "$REGRESS_OPT" "$REGRESS_OPT" \
+          __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+        "$ADD_EXPORT_TOOL" "$REGRESS_OPT" "$REGRESS_OPT" \
+          __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+        "$ADD_EXPORT_TOOL" "$REGRESS_OPT" "$REGRESS_OPT" \
+          __stack_pointer global __stack_pointer optional
+
+        # Stage the optimized wasm and create .so symlink
+        mv "$REGRESS_OPT" "$REGRESS_WASM"
+        ln -sf regress.wasm "$REGRESS_LIB_DIR/regress.so"
+        echo "[postgres] staged: $REGRESS_LIB_DIR/regress.so -> regress.wasm"
+      fi
+    fi
+  fi
+else
+  echo "[postgres] WARNING: regress.c not found at $REGRESS_DIR"
+fi
+else
+  echo "[postgres] skipping regress.so build (requires LIND_DYLINK=1)"
+fi  # end regress.so section
+
+###############################################################################
 # Build shared libraries for dylink mode
 ###############################################################################
 
@@ -824,9 +918,30 @@ cp "$PG_ROOT/src/backend/catalog/information_schema.sql" "$STAGE_SHARE/" 2>/dev/
 cp "$PG_ROOT/src/backend/catalog/sql_features.txt" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: sql_features.txt not found"
 cp "$PG_ROOT/src/backend/catalog/system_views.sql" "$STAGE_SHARE/" 2>/dev/null || echo "[postgres] WARNING: system_views.sql not found"
 
-# Stub snowball (text search extension not supported in WASM)
-echo "-- Snowball text search disabled for WASM" > "$STAGE_SHARE/snowball_create.sql"
-echo "[postgres] created stub snowball_create.sql"
+# Copy snowball stopwords files (required for text search configurations)
+if [[ -d "$PG_ROOT/src/backend/snowball/stopwords" ]]; then
+  cp "$PG_ROOT/src/backend/snowball/stopwords"/*.stop "$STAGE_SHARE/tsearch_data/" 2>/dev/null || true
+  echo "[postgres] copied snowball stopwords to tsearch_data/"
+fi
+
+# Copy tsearch dictionary sample files (used by some regression tests)
+if [[ -d "$PG_ROOT/src/backend/tsearch/dicts" ]]; then
+  cp "$PG_ROOT/src/backend/tsearch/dicts"/*.syn "$STAGE_SHARE/tsearch_data/" 2>/dev/null || true
+  cp "$PG_ROOT/src/backend/tsearch/dicts"/*.ths "$STAGE_SHARE/tsearch_data/" 2>/dev/null || true
+  cp "$PG_ROOT/src/backend/tsearch/dicts"/*.affix "$STAGE_SHARE/tsearch_data/" 2>/dev/null || true
+  cp "$PG_ROOT/src/backend/tsearch/dicts"/*.dict "$STAGE_SHARE/tsearch_data/" 2>/dev/null || true
+  echo "[postgres] copied tsearch dictionary samples to tsearch_data/"
+fi
+
+# Copy real snowball_create.sql (creates text search configs like 'english')
+if [[ -f "$PG_ROOT/src/backend/snowball/snowball_create.sql" ]]; then
+  cp "$PG_ROOT/src/backend/snowball/snowball_create.sql" "$STAGE_SHARE/"
+  echo "[postgres] copied snowball_create.sql"
+else
+  # Fallback: stub if real file not generated
+  echo "-- Snowball text search (stub)" > "$STAGE_SHARE/snowball_create.sql"
+  echo "[postgres] created stub snowball_create.sql (real file not found)"
+fi
 
 # plpgsql extension files (dynamically loaded via dlopen)
 cp "$PG_ROOT/src/pl/plpgsql/src/plpgsql.control" "$STAGE_SHARE/extension/" 2>/dev/null || echo "[postgres] WARNING: plpgsql.control not found"
