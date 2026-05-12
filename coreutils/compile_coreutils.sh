@@ -42,7 +42,7 @@ LIND_DYLINK="${LIND_DYLINK:-0}"
 ARTIFACT_MODE="${ARTIFACT_MODE:-full}"
 FORCE_CLEAN="${FORCE_CLEAN:-0}"
 FORCE_CONFIGURE="${FORCE_CONFIGURE:-0}"
-CACHE_REVISION="2"
+CACHE_REVISION="3"
 STATE_DIR="$BUILD_ROOT/.state"
 CONFIG_SIG_FILE="$STATE_DIR/config.sig"
 ##################
@@ -296,6 +296,11 @@ ac_cv_func_symlinkat=no
 ac_cv_func_readlinkat=no
 ac_cv_func_inotify_init=no
 ac_cv_search_crypt=no
+
+# Lind chroot/routing grates may not implement fd-based cwd restoration.
+# Build coreutils as if fchdir is unavailable so gnulib uses path-based
+# save/restore fallbacks instead of emitting direct fchdir calls.
+ac_cv_func_fchdir=no
 EOF
 export CONFIG_SITE="$CONFIG_SITE_FILE"
 
