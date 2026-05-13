@@ -28,6 +28,7 @@ Usage: $0
 Runs Postgres through fs-routing-clamp with:
   data directory: ${DATA_DIR}
   socket dir:     ${SOCK_DIR}
+  test runner:    pg_regress serial_schedule
   LindFS:         ${LINDFS}
 EOF
 }
@@ -73,11 +74,35 @@ if [[ ! -f "${LINDFS}/${IMFS_GRATE_BIN}" ]]; then
     exit 1
 fi
 
+for bin in initdb postgres psql pg_regress; do
+    if [[ ! -f "${LINDFS}/bin/${bin}.cwasm" ]]; then
+        echo "[!] Missing Lind binary: ${LINDFS}/bin/${bin}.cwasm"
+        echo "[!] Run make install-postgres from lind-wasm-apps."
+        exit 1
+    fi
+done
+
+if [[ ! -f "${LINDFS}/regress/serial_schedule" ]]; then
+    echo "[!] Missing pg_regress schedule: ${LINDFS}/regress/serial_schedule"
+    echo "[!] Run make install-postgres from lind-wasm-apps."
+    exit 1
+fi
+
 mkdir -p "${LINDFS}${SOCK_DIR}"
 
 cat > "${RUN_SCRIPT}" <<EOF
 #!/bin/bash
 set -e
+
+pg_pid=""
+
+cleanup_inner() {
+    if [ -n "\${pg_pid}" ]; then
+        kill "\${pg_pid}" 2>/dev/null || true
+        wait "\${pg_pid}" 2>/dev/null || true
+    fi
+}
+trap cleanup_inner EXIT INT TERM
 
 /bin/initdb.cwasm -D "${DATA_DIR}" \\
     -c max_parallel_workers=0 \\
@@ -90,10 +115,12 @@ pg_pid=\$!
 
 sleep 5
 
-/bin/psql.cwasm -h "${SOCK_DIR}" -p 5432 -d postgres -c "SELECT 1;"
+/bin/psql.cwasm -h "${SOCK_DIR}" -p 5432 -d postgres -c "CREATE DATABASE regression;"
 
-kill "\${pg_pid}"
-wait "\${pg_pid}" || true
+cd /regress
+/bin/pg_regress.cwasm --use-existing --host="${SOCK_DIR}" --port=5432 \\
+    --bindir=/bin --inputdir=/regress --expecteddir=/regress \\
+    --schedule=/regress/serial_schedule --max-concurrent-tests=1
 EOF
 
 chmod +x "${RUN_SCRIPT}"
@@ -101,6 +128,7 @@ chmod +x "${RUN_SCRIPT}"
 echo "[*] Running Postgres inside Lind..."
 echo "[*] DATA_DIR=${DATA_DIR}"
 echo "[*] SOCK_DIR=${SOCK_DIR}"
+echo "[*] REGRESS_SCHEDULE=/regress/serial_schedule"
 echo "[*] LINDFS=${LINDFS}"
 
 lind-wasm --enable-fpcast \
