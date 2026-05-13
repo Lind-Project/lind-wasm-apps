@@ -53,6 +53,14 @@ sleep 3
 lind-wasm --enable-fpcast /bin/psql.cwasm -h /tmp -p 5432 -d postgres -c "SELECT 1;"
 ```
 
+For fs-routing-clamp + IMFS testing, `postgres/run_pg_imfs_clamp.sh` keeps the
+data directory separate from the Unix socket directory and creates the LindFS
+socket directory before launch:
+
+```bash
+postgres/run_pg_imfs_clamp.sh
+```
+
 ## pgbench (Optional)
 
 ```bash
