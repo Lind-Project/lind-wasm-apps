@@ -113,12 +113,15 @@ trap cleanup_inner EXIT INT TERM
 /bin/postgres.cwasm -D "${DATA_DIR}" &
 pg_pid=\$!
 
+echo "[*] Waiting for Postgres startup..."
 sleep 5
 
-/bin/psql.cwasm -h "${SOCK_DIR}" -p 5432 -d postgres -c "CREATE DATABASE regression;"
+echo "[*] Creating regression database..."
+PGCONNECT_TIMEOUT=10 /bin/psql.cwasm -h "${SOCK_DIR}" -p 5432 -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE regression;"
 
+echo "[*] Running pg_regress..."
 cd /regress
-/bin/pg_regress.cwasm --use-existing --host="${SOCK_DIR}" --port=5432 \\
+PGCONNECT_TIMEOUT=10 /bin/pg_regress.cwasm --use-existing --host="${SOCK_DIR}" --port=5432 \\
     --bindir=/bin --inputdir=/regress --expecteddir=/regress \\
     --schedule=/regress/serial_schedule --max-concurrent-tests=1
 EOF
