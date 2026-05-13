@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
+set -x
 ###############################################################################
 # CPython test suite runner for lind-wasm
 #
@@ -60,7 +60,69 @@ if [[ "$BUILD_MODE" == "linux" ]]; then
   fi
 
   echo "[cpython-test] running python test suite (linux mode)..."
-  make test "$@"
+  
+  SKIP_MODULES_FILE="$SCRIPT_DIR/cpython_skip_modules.txt"
+  SKIP_TESTS_FILE="$SCRIPT_DIR/cpython_skip_tests.txt"
+  SKIP_MODULES_PASSED_SKIPPED="$SCRIPT_DIR/cpython_settled_modules.txt"
+  SKIP_ARGS=()
+
+  # Ensure all skip files exist (empty is fine)
+  touch "$SKIP_MODULES_FILE" "$SKIP_TESTS_FILE" "$SKIP_MODULES_PASSED_SKIPPED"
+  # -x args from cpython_skip_modules.txt
+  if [[ -f "$SKIP_MODULES_FILE" ]]; then
+      while IFS= read -r line || [[ -n "$line" ]]; do
+          line="${line%%#*}"               # strip inline comments
+          line="${line//[[:space:]]/}"     # strip whitespace
+          [[ -z "$line" ]] && continue
+          SKIP_ARGS+=(-x "$line")
+      done < "$SKIP_MODULES_FILE"
+  fi
+  
+  # -x args from cpython_skip_modules.txt
+  if [[ -f "$SKIP_MODULES_PASSED_SKIPPED" ]]; then
+      while IFS= read -r line || [[ -n "$line" ]]; do
+          line="${line%%#*}"               # strip inline comments
+          line="${line//[[:space:]]/}"     # strip whitespace
+          [[ -z "$line" ]] && continue
+          if [[ "$line" == *.* ]]; then
+              SKIP_ARGS+=(-i "${line}.*")     # dotted: filter all tests under this submodule
+          else
+              SKIP_ARGS+=(-x "$line")          # top-level: regrtest-native exclude
+          fi
+      done < "$SKIP_MODULES_PASSED_SKIPPED"
+  fi
+
+  # -i args from cpython_skip_tests.txt
+  if [[ -f "$SKIP_TESTS_FILE" ]]; then
+      while IFS= read -r line || [[ -n "$line" ]]; do
+          line="${line%%#*}"
+          line="${line//[[:space:]]/}"
+          [[ -z "$line" ]] && continue
+          SKIP_ARGS+=(-i "$line")
+      done < "$SKIP_TESTS_FILE"
+  fi
+ 
+  # Count of tokens (should be ~298: 4×2 + 145×2)
+  #echo "count: ${#SKIP_ARGS[@]}"
+
+  # One token per line, numbered (easiest to scan)
+  #printf '%s\n' "${SKIP_ARGS[@]}" | nl
+
+  # Joined as a single line (what python actually sees, modulo argv splitting)
+  #echo "${SKIP_ARGS[*]}"
+  echo "newly settled modules in this run:"
+  wc -l $SKIP_MODULES_PASSED_SKIPPED
+  modules=$(awk '!/^\s*(#|$)/' "$SKIP_MODULES_FILE" | wc -l)
+  settled=$(awk '!/^\s*(#|$)/' "$SKIP_MODULES_PASSED_SKIPPED" | wc -l)
+tests=$(awk '!/^\s*(#|$)/' "$SKIP_TESTS_FILE" | wc -l)
+  #modules=$(grep -vcE '^\s*(#|$)' "$SKIP_MODULES_FILE")
+  #tests=$(grep -vcE '^\s*(#|$)' "$SKIP_TESTS_FILE")
+  echo "modules: $modules"
+  echo "settled: $settled"
+  echo "tests:   $tests"
+  echo "expected tokens: $(( (modules + tests + settled) * 2 ))"
+
+  make test "$@" TESTOPTS=" -v ${SKIP_ARGS[*]} "
 else
   # wasi mode: temporarily patch HOSTRUNNER and restore on exit.
   cp Makefile Makefile.bak
@@ -94,9 +156,9 @@ else
     cleanup
   }
   trap cleanup_wasm EXIT INT TERM
-
+ 
   echo "[cpython-test] running python test suite (wasi mode)..."
-  make test "$@"
+  make test "$@" TESTOPTS=" -v ${SKIP_ARGS}"
 fi
 
 popd >/dev/null
