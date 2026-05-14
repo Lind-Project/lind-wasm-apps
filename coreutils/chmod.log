@@ -1,0 +1,440 @@
+===================================================
+Executing: chgrp/basic
+Sandbox Path: /tests/chgrp/basic
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chgrp/basic: skipping test: requires membership in two groups
+this test requires that you be a member of more than one group,
+but running `id -G' either failed or found just one.  If you really
+are a member of at least two groups, then rerun this test with
+COREUTILS_GROUPS set in your environment to the space-separated list
+of group names or numbers.  E.g.,
+
+  env COREUTILS_GROUPS=users cdrom make check
+
+
+===================================================
+Result: /tests/chgrp/basic [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chgrp/default-no-deref
+Sandbox Path: /tests/chgrp/default-no-deref
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chgrp/default-no-deref: skipping test: requires membership in two groups
+this test requires that you be a member of more than one group,
+but running `id -G' either failed or found just one.  If you really
+are a member of at least two groups, then rerun this test with
+COREUTILS_GROUPS set in your environment to the space-separated list
+of group names or numbers.  E.g.,
+
+  env COREUTILS_GROUPS=users cdrom make check
+
+
+===================================================
+Result: /tests/chgrp/default-no-deref [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chgrp/deref
+Sandbox Path: /tests/chgrp/deref
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chgrp/deref: skipping test: requires membership in two groups
+this test requires that you be a member of more than one group,
+but running `id -G' either failed or found just one.  If you really
+are a member of at least two groups, then rerun this test with
+COREUTILS_GROUPS set in your environment to the space-separated list
+of group names or numbers.  E.g.,
+
+  env COREUTILS_GROUPS=users cdrom make check
+
+
+===================================================
+Result: /tests/chgrp/deref [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chgrp/no-x
+Sandbox Path: /tests/chgrp/no-x
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chgrp/no-x: skipping test: requires membership in two groups
+this test requires that you be a member of more than one group,
+but running `id -G' either failed or found just one.  If you really
+are a member of at least two groups, then rerun this test with
+COREUTILS_GROUPS set in your environment to the space-separated list
+of group names or numbers.  E.g.,
+
+  env COREUTILS_GROUPS=users cdrom make check
+
+
+===================================================
+Result: /tests/chgrp/no-x [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chgrp/posix-H
+Sandbox Path: /tests/chgrp/posix-H
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chgrp/posix-H: skipping test: requires membership in two groups
+this test requires that you be a member of more than one group,
+but running `id -G' either failed or found just one.  If you really
+are a member of at least two groups, then rerun this test with
+COREUTILS_GROUPS set in your environment to the space-separated list
+of group names or numbers.  E.g.,
+
+  env COREUTILS_GROUPS=users cdrom make check
+
+
+===================================================
+Result: /tests/chgrp/posix-H [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chgrp/recurse
+Sandbox Path: /tests/chgrp/recurse
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chgrp/recurse: skipping test: requires membership in two groups
+this test requires that you be a member of more than one group,
+but running `id -G' either failed or found just one.  If you really
+are a member of at least two groups, then rerun this test with
+COREUTILS_GROUPS set in your environment to the space-separated list
+of group names or numbers.  E.g.,
+
+  env COREUTILS_GROUPS=users cdrom make check
+
+
+===================================================
+Result: /tests/chgrp/recurse [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chmod/c-option
+Sandbox Path: /tests/chmod/c-option
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chmod/c-option: skipping test: this directory has the setgid bit set
+===================================================
+Result: /tests/chmod/c-option [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chmod/equal-x
+Sandbox Path: /tests/chmod/equal-x
+===================================================
+after `chmod =x f':
+---------- 1 501 20 0 Jan  1  1970 f
+after `chmod =xX f':
+---------- 1 501 20 0 Jan  1  1970 f
+after `chmod =Xx f':
+---------- 1 501 20 0 Jan  1  1970 f
+after `chmod =x,=X f':
+---------- 1 501 20 0 Jan  1  1970 f
+after `chmod =X,=x f':
+---------- 1 501 20 0 Jan  1  1970 f
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: chmod/equals
+Sandbox Path: /tests/chmod/equals
+===================================================
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: chmod/inaccessible
+Sandbox Path: /tests/chmod/inaccessible
+===================================================
+===================================================
+Result: /tests/chmod/inaccessible [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: chmod/no-x
+Sandbox Path: /tests/chmod/no-x
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chmod/no-x: skipping test: must be run as non-root
+===================================================
+Result: /tests/chmod/no-x [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chmod/octal
+Sandbox Path: /tests/chmod/octal
+===================================================
+===================================================
+Result: /tests/chmod/octal [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: chmod/setgid
+Sandbox Path: /tests/chmod/setgid
+===================================================
+/bin/env: test: Operation not permitted
+/bin/env: test: Operation not permitted
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chmod/setgid: skipping test: cannot create setgid directories
+===================================================
+Result: /tests/chmod/setgid [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chmod/silent
+Sandbox Path: /tests/chmod/silent
+===================================================
+===================================================
+Result: /tests/chmod/silent [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: chmod/thru-dangling
+Sandbox Path: /tests/chmod/thru-dangling
+===================================================
+--- /tmp/_lind_cmp_a.3	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/_lind_cmp_b.3	1970-01-01 00:00:00.000000000 +0000
+@@ -1 +1 @@
+-chmod: cannot access `dangle': No such file or directory
++chmod: cannot operate on dangling symlink `dangle'
+/bin/chmod: cannot access `/tmp/cu-thru-dangling.y0bfDcV23u/dangle': No such file or directory
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: chmod/umask-x
+Sandbox Path: /tests/chmod/umask-x
+===================================================
+===================================================
+Result: /tests/chmod/umask-x [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: chmod/usage
+Sandbox Path: /tests/chmod/usage
+===================================================
+/bin/chmod: --: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: f: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: -w: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: f: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: f: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: f: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: f: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: f: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: f: new permissions are rw-rw-rw-, not r--r--r--
+/bin/chmod: f: new permissions are rw-rw-rw-, not r--r--r--
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: chown/basic
+Sandbox Path: /tests/chown/basic
+===================================================
+/bin/chown: changing ownership of `f': Function not implemented
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: chown/deref
+Sandbox Path: /tests/chown/deref
+===================================================
+/bin/ls: cannot access dangle: No such file or directory
+--- /tmp/_lind_cmp_a.3	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/_lind_cmp_b.3	1970-01-01 00:00:00.000000000 +0000
+@@ -1,2 +1 @@
+-/bin/chown
+-Try `chown --help' for more information.
++chown: cannot dereference `dangle'
+/bin/chmod: cannot access `/tmp/cu-deref.1KK3egSd6e/dangle': No such file or directory
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: chown/preserve-root
+Sandbox Path: /tests/chown/preserve-root
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/chown/preserve-root: skipping test: must be run as non-root
+===================================================
+Result: /tests/chown/preserve-root [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: chown/separator
+Sandbox Path: /tests/chown/separator
+===================================================
+===================================================
+Result: /tests/chown/separator [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/abuse
+Sandbox Path: /tests/cp/abuse
+===================================================
+--- /tmp/_lind_cmp_a.3	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/_lind_cmp_b.3	1970-01-01 00:00:00.000000000 +0000
+@@ -1 +1 @@
+-cp: cannot stat `a/1': No such file or directory
++cp: will not copy `b/1' through just-created symlink `c/1'
+--- /tmp/_lind_cmp_a.3	1970-01-01 00:00:00.000000000 +0000
++++ /tmp/_lind_cmp_b.3	1970-01-01 00:00:00.000000000 +0000
+@@ -1 +1 @@
+-cp: will not overwrite just-created `c/1' with `b/1'
++cp: will not copy `b/1' through just-created symlink `c/1'
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: cp/acl
+Sandbox Path: /tests/cp/acl
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/cp/acl: skipping test: This test requires getfacl and setfacl.
+===================================================
+Result: /tests/cp/acl [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: cp/backup-1
+Sandbox Path: /tests/cp/backup-1
+===================================================
+tests/test-lib.sh: line 431: 11: Bad file descriptor
+/usr/local/bin/diff: standard output: Bad file descriptor
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: cp/backup-dir
+Sandbox Path: /tests/cp/backup-dir
+===================================================
+===================================================
+Result: /tests/cp/backup-dir [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/backup-is-src
+Sandbox Path: /tests/cp/backup-is-src
+===================================================
+===================================================
+Result: /tests/cp/backup-is-src [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/cp-HL
+Sandbox Path: /tests/cp/cp-HL
+===================================================
+/bin/cp: cannot stat `src-dir/slink': No such file or directory
+/bin/chmod: cannot access `/tmp/cu-cp-HL.gFHLkEhFEZ/src-dir/slink': No such file or directory
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: cp/cp-a-selinux
+Sandbox Path: /tests/cp/cp-a-selinux
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/cp/cp-a-selinux: skipping test: this system (or maybe just the current file system) lacks SELinux support
+===================================================
+Result: /tests/cp/cp-a-selinux [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: cp/cp-deref
+Sandbox Path: /tests/cp/cp-deref
+===================================================
+===================================================
+Result: /tests/cp/cp-deref [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/cp-i
+Sandbox Path: /tests/cp/cp-i
+===================================================
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: cp/cp-mv-backup
+Sandbox Path: /tests/cp/cp-mv-backup
+===================================================
+===================================================
+Result: /tests/cp/cp-mv-backup [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/cp-mv-enotsup-xattr
+Sandbox Path: /tests/cp/cp-mv-enotsup-xattr
+===================================================
+/tests/cp/cp-mv-enotsup-xattr: line 38: mkfs: command not found
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/cp/cp-mv-enotsup-xattr: skipping test: failed to create ext2 file system
+/tests/cp/cp-mv-enotsup-xattr: line 31: umount: command not found
+===================================================
+Result: /tests/cp/cp-mv-enotsup-xattr [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: cp/cp-parents
+Sandbox Path: /tests/cp/cp-parents
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/cp/cp-parents: skipping test: this directory has the setgid bit set
+===================================================
+Result: /tests/cp/cp-parents [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: cp/deref-slink
+Sandbox Path: /tests/cp/deref-slink
+===================================================
+===================================================
+Result: /tests/cp/deref-slink [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/dir-rm-dest
+Sandbox Path: /tests/cp/dir-rm-dest
+===================================================
+===================================================
+Result: /tests/cp/dir-rm-dest [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/dir-slash
+Sandbox Path: /tests/cp/dir-slash
+===================================================
+===================================================
+Result: /tests/cp/dir-slash [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/dir-vs-file
+Sandbox Path: /tests/cp/dir-vs-file
+===================================================
+===================================================
+Result: /tests/cp/dir-vs-file [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/existing-perm-race
+Sandbox Path: /tests/cp/existing-perm-race
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/cp/existing-perm-race: skipping test: requires membership in two groups
+this test requires that you be a member of more than one group,
+but running `id -G' either failed or found just one.  If you really
+are a member of at least two groups, then rerun this test with
+COREUTILS_GROUPS set in your environment to the space-separated list
+of group names or numbers.  E.g.,
+
+  env COREUTILS_GROUPS=users cdrom make check
+
+
+===================================================
+Result: /tests/cp/existing-perm-race [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: cp/fail-perm
+Sandbox Path: /tests/cp/fail-perm
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/cp/fail-perm: skipping test: must be run as non-root
+===================================================
+Result: /tests/cp/fail-perm [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: cp/file-perm-race
+Sandbox Path: /tests/cp/file-perm-race
+===================================================
+/bin/cp: reading `fifo': Bad file descriptor
+/tests/cp/file-perm-race: line 48: echo: write error: Bad file descriptor
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: cp/into-self
+Sandbox Path: /tests/cp/into-self
+===================================================
+===================================================
+Result: /tests/cp/into-self [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/link
+Sandbox Path: /tests/cp/link
+===================================================
+===================================================
+Result: /tests/cp/link [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/link-heap
+Sandbox Path: /tests/cp/link-heap
+===================================================
+tests/test-lib.sh: line 53: 9: Bad file descriptor
+/tests/cp/link-heap: skipping test: expensive: disabled by default
+This test is relatively expensive, so it is disabled by default.
+To run it anyway, rerun make check with the RUN_EXPENSIVE_TESTS
+environment variable set to yes.  E.g.,
+
+  env RUN_EXPENSIVE_TESTS=yes make check
+
+===================================================
+Result: /tests/cp/link-heap [[33mSKIP[0m] (Exit 77)
+===================================================
+Executing: cp/link-no-deref
+Sandbox Path: /tests/cp/link-no-deref
+===================================================
+/bin/cp: cannot stat `dangling-slink': No such file or directory
+/bin/chmod: cannot access `/tmp/cu-link-no-deref.fG0BlUseiw/dangling-slink': No such file or directory
+===================================================
+Result: [[31mFAIL[0m] (Exit 1)
+===================================================
+Executing: cp/link-preserve
+Sandbox Path: /tests/cp/link-preserve
+===================================================
+===================================================
+Result: /tests/cp/link-preserve [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/no-deref-link1
+Sandbox Path: /tests/cp/no-deref-link1
+===================================================
+===================================================
+Result: /tests/cp/no-deref-link1 [[32mPASS[0m] (Exit 0)
+===================================================
+Executing: cp/no-deref-link2
+Sandbox Path: /tests/cp/no-deref-link2
+===================================================
