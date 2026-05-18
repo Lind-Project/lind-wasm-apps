@@ -442,7 +442,7 @@ install-tinycc:
 install-cpython: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' cpython
 
-install-postgres: install-diffutils
+install-postgres: install-diffutils install-bash
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' postgres
 
 install-diffutils:
