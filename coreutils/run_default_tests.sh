@@ -110,8 +110,12 @@ if [[ -z "$TARGET_TEST" ]]; then
     echo "  $0 --all                  # Run all tests"
     echo "  $0 misc/help-version      # Run a specific test"
     echo "  Options:"
-    echo "    --skip-bash             # Skip all Bash tests"
-    echo "    --skip-perl             # Skip all Perl tests"
+    echo "    --grate chroot             # Run chroot grate"
+    echo "    --grate ipc	 	       # Run ipc grate"
+    echo "    --grate witness            # Run witness grate"
+    echo "    --grate fs-routing-clamp   # Run fs-routing-clamp with imfs grate"
+    echo "    --skip-bash                # Skip all Bash tests"
+    echo "    --skip-perl                # Skip all Perl tests"
     exit 1
 fi
 
