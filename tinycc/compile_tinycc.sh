@@ -24,9 +24,9 @@ MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
 STAGE_DIR="$APPS_BUILD/tinycc"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
-# Default LIND_WASM_ROOT to parent directory (layout: lind-wasm/lind-wasm-apps)
+# Default LIND_WASM_ROOT to parent directory (layout: lind-wasm-apps is parallel to lind-wasm)
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
-  LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
+  LIND_WASM_ROOT="$(cd "$APPS_ROOT/../lind-wasm" && pwd)"
 fi
 
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
