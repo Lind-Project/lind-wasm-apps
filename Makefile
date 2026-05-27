@@ -374,7 +374,7 @@ postgres: $(MERGE_BASE_STAMP) diffutils
 	'$(APPS_ROOT)/postgres/compile_postgres.sh'
 
 # ---------------- tinycc (WASM build) --------------------------------------
-tinycc: merge-sysroot
+tinycc: 
 	'$(APPS_ROOT)/tinycc/compile_tinycc.sh'
 
 # ---------------- diffutils (WASM build) --------------------------------------
