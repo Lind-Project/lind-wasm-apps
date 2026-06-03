@@ -24,7 +24,7 @@ APPS_OVERLAY="$APPS_BUILD/sysroot_overlay"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
-  LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
+  LIND_WASM_ROOT="$(cd "$APPS_ROOT/../lind-wasm" && pwd)"
 fi
 
 BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"

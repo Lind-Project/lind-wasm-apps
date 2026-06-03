@@ -263,7 +263,9 @@ public:
   static constexpr bool convert_to_timespec(TimeSpecT& dest, FileTimeT tp) {
     if (!is_representable(tp))
       return false;
-    return set_times_checked(&dest.tv_sec, &dest.tv_nsec, tp);
+    return set_times_checked(reinterpret_cast<long*>(&dest.tv_sec),
+                         reinterpret_cast<long*>(&dest.tv_nsec),
+                         tp);
   }
 };
 
