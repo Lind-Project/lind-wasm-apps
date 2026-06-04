@@ -109,6 +109,12 @@ CFLAGS_WASM="-O2 -g -pthread \
   -I$MERGED_SYSROOT/include/wasm32-wasi \
   -DWAIT_USE_POLL"
 
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM="$CFLAGS_WASM -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 # 256 MB max memory — PG allocates shared buffers even in single-user mode
 if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[postgres] Dynamic linking mode enabled (LIND_DYLINK=1)"
