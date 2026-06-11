@@ -559,10 +559,11 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   # Shared modules require the import-table and import-globals passes so that
   # lind-dylink can patch relocations at load time.
   "$WASM_OPT" \
-    --enable-bulk-memory --enable-threads \
+    --enable-bulk-memory --enable-threads --enable-exception-handling --enable-reference-types \
     --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
     --asyncify --pass-arg=asyncify-import-globals \
     --fpcast-emu --pass-arg=relocatable-fpcast \
+    --translate-to-exnref \
     --debuginfo -O2 \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 else
