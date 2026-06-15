@@ -94,6 +94,12 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
 
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
+fi
+
 if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[coreutils] Dynamic linking mode enabled (LIND_DYLINK=1)"
   CFLAGS_WASM+=(-fPIC)
@@ -220,10 +226,12 @@ run_wasm_opt_replace() {
   cp "$src" "$raw"
   if [[ "$LIND_DYLINK" == "1" ]]; then
     if "$WASM_OPT" \
-        --enable-bulk-memory --enable-threads \
+        --enable-bulk-memory --enable-threads --enable-exception-handling --enable-reference-types \
         --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
         --asyncify --pass-arg=asyncify-import-globals \
-        --fpcast-emu --debuginfo \
+        --fpcast-emu \
+        --translate-to-exnref \
+        --debuginfo \
         "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else
@@ -621,10 +629,11 @@ for w in "${wasm_files[@]}"; do
   opt_file="${w%.wasm}.opt.wasm"
   if [[ "$LIND_DYLINK" == "1" ]]; then
     run_limited "$JOBS" "$WASM_OPT" \
-      --enable-bulk-memory --enable-threads \
+      --enable-bulk-memory --enable-threads --enable-exception-handling --enable-reference-types \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
       --asyncify --pass-arg=asyncify-import-globals \
       --fpcast-emu \
+      --translate-to-exnref \
       --debuginfo \
       "$w" -o "$opt_file"
   else
