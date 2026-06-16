@@ -200,7 +200,7 @@ if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
 fi
 
 # do precompile
-$LIND_WASM_ROOT/scripts/lind_compile --precompile-only "$DYNAMIC_LIB_OPT" || { echo "[gnulib] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.." >&2; exit 1; }
+$LIND_WASM_ROOT/scripts/bin/lind_compile --precompile-only "$DYNAMIC_LIB_OPT" || { echo "[gnulib] ERROR: lind_compile failed on '$DYNAMIC_LIB_OPT_CWASM'; Exiting.." >&2; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT_CWASM" ]]; then
   echo "[gnulib] ERROR: Failed to generate '$DYNAMIC_LIB_OPT_CWASM'; Exiting.." >&2

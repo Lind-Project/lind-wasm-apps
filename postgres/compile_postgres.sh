@@ -40,7 +40,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/lind-wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
