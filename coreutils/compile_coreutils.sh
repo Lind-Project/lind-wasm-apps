@@ -29,6 +29,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -225,21 +226,14 @@ run_wasm_opt_replace() {
   local tmp="${out}.tmp"
   cp "$src" "$raw"
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    if "$WASM_OPT" \
-        --enable-bulk-memory --enable-threads --enable-exception-handling --enable-reference-types \
-        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-        --asyncify --pass-arg=asyncify-import-globals \
-        --fpcast-emu \
-        --translate-to-exnref \
-        --debuginfo \
-        "$raw" -o "$tmp"; then
+    if "$LIND_WASM_OPT" --target=main --fpcast-emu "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else
       rm -f "$tmp"
       return 1
     fi
   else
-    if "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
+    if "$LIND_WASM_OPT" --static "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else
       rm -f "$tmp"
@@ -614,8 +608,8 @@ if (( ${#wasm_files[@]} == 0 )); then
   exit 1
 fi
 
-if [[ ! -x "$WASM_OPT" ]]; then
-  echo "[coreutils] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifacts."
+if [[ ! -x "$LIND_WASM_OPT" ]]; then
+  echo "[coreutils] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifacts."
   exit 1
 fi
 
@@ -628,16 +622,9 @@ echo "[coreutils] Step 1: Converting .wasm to .opt.wasm..."
 for w in "${wasm_files[@]}"; do
   opt_file="${w%.wasm}.opt.wasm"
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    run_limited "$JOBS" "$WASM_OPT" \
-      --enable-bulk-memory --enable-threads --enable-exception-handling --enable-reference-types \
-      --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-      --asyncify --pass-arg=asyncify-import-globals \
-      --fpcast-emu \
-      --translate-to-exnref \
-      --debuginfo \
-      "$w" -o "$opt_file"
+    run_limited "$JOBS" "$LIND_WASM_OPT" --target=main --fpcast-emu "$w" -o "$opt_file"
   else
-    run_limited "$JOBS" "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$w" -o "$opt_file"
+    run_limited "$JOBS" "$LIND_WASM_OPT" --static "$w" -o "$opt_file"
   fi
 done
 wait_for_background_jobs
