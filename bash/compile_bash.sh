@@ -41,6 +41,7 @@ AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
 RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
@@ -548,8 +549,8 @@ fi
 # output for debugging as `bash.raw.wasm`, but write the runnable module to the
 # traditional `bash.wasm` path. Full mode still adds the extra alias and cwasm.
 ##################
-if [[ ! -x "$WASM_OPT" ]]; then
-  echo "[bash] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact." >&2
+if [[ ! -x "$LIND_WASM_OPT" ]]; then
+  echo "[bash] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifact." >&2
   exit 1
 fi
 
@@ -558,16 +559,10 @@ echo "[bash] running wasm-opt to produce runnable bash.wasm..."
 if [[ "$LIND_DYLINK" == "1" ]]; then
   # Shared modules require the import-table and import-globals passes so that
   # lind-dylink can patch relocations at load time.
-  "$WASM_OPT" \
-    --enable-bulk-memory --enable-threads --enable-exception-handling --enable-reference-types \
-    --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-    --asyncify --pass-arg=asyncify-import-globals \
-    --fpcast-emu --pass-arg=relocatable-fpcast \
-    --translate-to-exnref \
-    --debuginfo -O2 \
+  "$LIND_WASM_OPT" --target=main --fpcast-emu \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 else
-  "$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
+  "$LIND_WASM_OPT" --static --fpcast-emu \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 fi
 
