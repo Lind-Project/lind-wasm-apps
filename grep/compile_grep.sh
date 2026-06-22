@@ -68,12 +68,6 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
 
-# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
-# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
-if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
-  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
-fi
-
 # ----------------------------------------------------------------------
 # 3) Branch Logic: Dynamic vs Static Settings
 # ----------------------------------------------------------------------

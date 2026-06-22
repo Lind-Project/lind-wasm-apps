@@ -28,7 +28,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/lind-wasm-opt}"
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -93,12 +93,6 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include"
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
-
-# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
-# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
-if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
-  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
-fi
 
 if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[coreutils] Dynamic linking mode enabled (LIND_DYLINK=1)"
@@ -225,14 +219,19 @@ run_wasm_opt_replace() {
   local tmp="${out}.tmp"
   cp "$src" "$raw"
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    if "$LIND_WASM_OPT" --target=main --fpcast-emu "$raw" -o "$tmp"; then
+    if "$WASM_OPT" \
+        --enable-bulk-memory --enable-threads \
+        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+        --asyncify --pass-arg=asyncify-import-globals \
+        --fpcast-emu --debuginfo \
+        "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else
       rm -f "$tmp"
       return 1
     fi
   else
-    if "$LIND_WASM_OPT" --static "$raw" -o "$tmp"; then
+    if "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else
       rm -f "$tmp"
@@ -607,8 +606,8 @@ if (( ${#wasm_files[@]} == 0 )); then
   exit 1
 fi
 
-if [[ ! -x "$LIND_WASM_OPT" ]]; then
-  echo "[coreutils] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifacts."
+if [[ ! -x "$WASM_OPT" ]]; then
+  echo "[coreutils] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifacts."
   exit 1
 fi
 
@@ -621,9 +620,15 @@ echo "[coreutils] Step 1: Converting .wasm to .opt.wasm..."
 for w in "${wasm_files[@]}"; do
   opt_file="${w%.wasm}.opt.wasm"
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    run_limited "$JOBS" "$LIND_WASM_OPT" --target=main --fpcast-emu "$w" -o "$opt_file"
+    run_limited "$JOBS" "$WASM_OPT" \
+      --enable-bulk-memory --enable-threads \
+      --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+      --asyncify --pass-arg=asyncify-import-globals \
+      --fpcast-emu \
+      --debuginfo \
+      "$w" -o "$opt_file"
   else
-    run_limited "$JOBS" "$LIND_WASM_OPT" --static "$w" -o "$opt_file"
+    run_limited "$JOBS" "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 "$w" -o "$opt_file"
   fi
 done
 wait_for_background_jobs
