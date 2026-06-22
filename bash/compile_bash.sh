@@ -40,6 +40,7 @@ LLVM_BIN_DIR="$(dirname "$CLANG")"
 AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
 RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
@@ -548,8 +549,13 @@ fi
 # output for debugging as `bash.raw.wasm`, but write the runnable module to the
 # traditional `bash.wasm` path. Full mode still adds the extra alias and cwasm.
 ##################
-if [[ ! -x "$LIND_WASM_OPT" ]]; then
-  echo "[bash] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifact." >&2
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  if [[ ! -x "$LIND_WASM_OPT" ]]; then
+    echo "[bash] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifact." >&2
+    exit 1
+  fi
+elif [[ ! -x "$WASM_OPT" ]]; then
+  echo "[bash] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact." >&2
   exit 1
 fi
 
@@ -561,7 +567,13 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   "$LIND_WASM_OPT" --target=main --fpcast-emu \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 else
-  "$LIND_WASM_OPT" --static --fpcast-emu \
+  # NOTE: static bash deliberately does NOT use `lind-wasm-opt --static`.
+  # lind-wasm-opt forces `--translate-to-exnref`, which breaks bash's
+  # longjmp-based control flow (while/until/break/continue/return and the
+  # `[ ]` test builtin) and regressed `make test APP=bash` from 157/162 to
+  # 132/162. The manual flag set below (no exnref translation) is the
+  # proven-working static build. See PR #266 discussion.
+  "$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 fi
 
