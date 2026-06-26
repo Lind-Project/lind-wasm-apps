@@ -17,15 +17,16 @@ rm -rf "$LINDFS_TESTS/tmp"
 mkdir -p "$LINDFS/tmp"
 
 cp -r $SCRIPT_DIR/tests $LINDFS
+
+# Path related fixes to test config files and test files to adapt to run within the lind-wasm ecosystem
 file="$LINDFS_TESTS/test-lib.sh"
 sed -i 's|"$abs_top_builddir/src/mktemp"|bin/mktemp|g' "$file"
 sed -i 's|^test_dir_=\$(pwd)|test_dir_=/tmp|' "$LINDFS_TESTS/test-lib.sh"
 sed -i "s|my \$cwd = \$@ ? '\.' : Cwd::getcwd();|my \$cwd = '/tmp';|" "$LINDFS_TESTS/CuTmpdir.pm"
-sed -i 's|my \$subst_expr = \$expect->{RESULT_SUBST}->{$eo};|my $subst_expr = $expect->{RESULT_SUBST}->{$eo};\n          if ($eo eq '"'"'ERR'"'"' \&\& !defined $subst_expr)\n          {\n              $subst_expr = '"'"'s\|`\/bin\/([^`]+)\|`$1\|g; s\|^\/bin\/([^\/:]+):\|$1:\|g'"'"';\n            }|' "$LINDFS_TESTS/Coreutils.pm"
-
-
-
+cp $SCRIPT_DIR/tests/Coreutils.pm $SCRIPT_DIR/tests/Coreutils.pm.bkup
+cp $SCRIPT_DIR/patch_files/Coreutils.pm $SCRIPT_DIR/tests
 find "$LINDFS_TESTS" -type f -executable ! -name "*.pm" ! -name "*.pl" -exec sed -i 's|\$abs_top_builddir/src/|/bin/|g' {} +
+
 # =========================================================
 # ARGUMENT PARSING
 # =========================================================
@@ -109,8 +110,12 @@ if [[ -z "$TARGET_TEST" ]]; then
     echo "  $0 --all                  # Run all tests"
     echo "  $0 misc/help-version      # Run a specific test"
     echo "  Options:"
-    echo "    --skip-bash             # Skip all Bash tests"
-    echo "    --skip-perl             # Skip all Perl tests"
+    echo "    --grate chroot             # Run chroot grate"
+    echo "    --grate ipc	 	       # Run ipc grate"
+    echo "    --grate witness            # Run witness grate"
+    echo "    --grate fs-routing-clamp   # Run fs-routing-clamp with imfs grate"
+    echo "    --skip-bash                # Skip all Bash tests"
+    echo "    --skip-perl                # Skip all Perl tests"
     exit 1
 fi
 
@@ -224,6 +229,8 @@ if [[ "$TARGET_TEST" == "--all" ]]; then
     echo "==================================================="
 fi
 
+# Restore Coreutils.pm
+cp $SCRIPT_DIR/tests/Coreutils.pm.bkup $SCRIPT_DIR/tests/Coreutils.pm
 if [[ "$TOTAL_FAIL" -gt 0 ]]; then
     exit 1
 else
