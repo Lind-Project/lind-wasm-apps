@@ -16,7 +16,7 @@ LINDFS_ROOT="${LINDFS_ROOT:-$LIND_WASM_ROOT/lindfs}"
 LIND_DYLINK="${LIND_DYLINK:-0}"
 BUILD_WASM="$SCRIPT_DIR/build-wasm"
 
-LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
+LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
 
 # --- verify build exists -----------------------------------------------------
 if [[ ! -f "$BUILD_WASM/Makefile" ]]; then

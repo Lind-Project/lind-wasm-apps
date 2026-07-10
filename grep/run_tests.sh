@@ -19,7 +19,7 @@ APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIND_WASM_ROOT="${LIND_WASM_ROOT:-$(cd "$APPS_ROOT/.." && pwd)}"
 STAGE_DIR="$APPS_ROOT/build/grep/usr/local/bin"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
-LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
+LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
 GREP_BIN="/usr/local/bin/grep"
 TEST_DIR="/tests/grep"
 

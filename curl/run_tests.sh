@@ -29,9 +29,9 @@ fi
 LIND_DYLINK="${LIND_DYLINK:-0}"
 
 if [[ "$LIND_DYLINK" == "1" ]]; then
-        LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run --preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so"
+        LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run --preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so"
 else
-        LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
+        LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
 fi
 
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
