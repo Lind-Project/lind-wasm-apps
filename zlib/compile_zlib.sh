@@ -40,6 +40,10 @@ else
   ZLIB_CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g"
 fi
 
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  ZLIB_CFLAGS="$ZLIB_CFLAGS -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 CC="$CC_WASI" AR="$AR" RANLIB="$RANLIB" \
 CFLAGS="$ZLIB_CFLAGS" \
 LDFLAGS="--sysroot=$BASE_SYSROOT" \

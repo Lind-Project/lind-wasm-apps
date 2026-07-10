@@ -43,6 +43,10 @@ else
   CONFIG_ARGS="--disable-shared --enable-static"
 fi
 
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  EXTRA_CFLAGS="$EXTRA_CFLAGS -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 CC="$CC_WASI" AR="$AR" RANLIB="$RANLIB" \
 CFLAGS="--sysroot=$BASE_SYSROOT -O2 -g $EXTRA_CFLAGS" \
 LDFLAGS="--sysroot=$BASE_SYSROOT" \

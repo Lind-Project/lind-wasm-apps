@@ -61,6 +61,10 @@ mkdir -p "$STAGE_DIR"
 # patterns for the i386 code generator).
 CFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$MERGED_SYSROOT -pthread -matomics -mbulk-memory -fno-pie -fvisibility=default -fno-builtin"
 
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM="$CFLAGS_WASM -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 LDFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$MERGED_SYSROOT -static -Wl,--import-memory,--export-memory,--shared-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
 
 echo "[tinycc] using CLANG       = $CLANG"

@@ -66,6 +66,10 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
 
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
+fi
+
 LDFLAGS_WASM=(
   "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
   -L"$MERGED_SYSROOT/lib/wasm32-wasi"

@@ -45,6 +45,9 @@ else
   SSL_PIC_FLAG=""
 fi
 
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  SSL_CFLAGS="$SSL_CFLAGS -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
 # Pass the conditional variables into the build environment
 CC="$CC_WASI" AR="$AR" RANLIB="$RANLIB" \
 CFLAGS="$SSL_CFLAGS" \

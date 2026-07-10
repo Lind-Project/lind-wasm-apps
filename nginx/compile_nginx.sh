@@ -113,6 +113,10 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
     -I$MERGED_SYSROOT/include/wasm32-wasi \
     -D_GNU_SOURCE"
 
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM="$CFLAGS_WASM -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 if [[ "$LIND_DYLINK" == "1" ]]; then
     echo "[nginx] Dynamic linking mode enabled (LIND_DYLINK=1)"
     CFLAGS_WASM+=" -fPIC"

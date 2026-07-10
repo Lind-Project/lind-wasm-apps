@@ -92,6 +92,11 @@ pushd "$BUILD_WASM" >/dev/null
 # CPython uses -O0 because the build system relies on specific code generation
 # behavior that breaks with optimization.
 
+CPYTHON_EH_CFLAGS=""
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CPYTHON_EH_CFLAGS=" -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 if [[ ! -f "Makefile" ]]; then
   echo "[cpython] configuring wasm build..."
   ../configure \
@@ -102,7 +107,7 @@ if [[ ! -f "Makefile" ]]; then
     -pthread \
     --target=wasm32-unknown-wasi \
     --sysroot $SYSROOT \
-    -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC" \
+    -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC $CPYTHON_EH_CFLAGS" \
     ac_cv_func_working_mktime=yes \
     ac_cv_func_mmap_fixed_mapped=yes \
     bash_cv_func_sigsetjmp=no \

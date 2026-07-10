@@ -92,7 +92,10 @@ CFLAGS_WASM=(
   "${WASM_COMPAT_INC[@]}"
   -I"$MERGED_SYSROOT/include"
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
-)
+
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
+fi)
 
 if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[coreutils] Dynamic linking mode enabled (LIND_DYLINK=1)"

@@ -198,6 +198,10 @@ mkdir -p "$LM_BENCH_BIN_DIR"
 REAL_CC="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
 CFLAGS="-DNO_PORTMAPPER -O2 -g -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -I$MERGED_SYSROOT/include/tirpc"
 
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS="$CFLAGS -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[lmbench] Dynamic linking mode enabled (LIND_DYLINK=1)"
   CFLAGS+=" -fPIC"

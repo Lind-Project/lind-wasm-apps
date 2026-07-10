@@ -106,6 +106,10 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
 
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
+fi
+
 # ----------------------------------------------------------------------
 # Branch Logic: Dynamic vs Static Settings
 # ----------------------------------------------------------------------
