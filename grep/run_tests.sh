@@ -80,7 +80,7 @@ echo
 echo "[test] Running sanity tests..."
 
 # Test: basic pattern match
-OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+OUTPUT=$(sudo "$LIND_RUN" --enable-fpcast $GREP_BIN "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
 EXPECTED=$'hello world\nhello again'
 if [[ "$OUTPUT" == "$EXPECTED" ]]; then
   pass "basic pattern match"
@@ -89,7 +89,7 @@ else
 fi
 
 # Test: case-insensitive
-OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN -i "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+OUTPUT=$(sudo "$LIND_RUN" --enable-fpcast $GREP_BIN -i "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
 LINE_COUNT=$(echo "$OUTPUT" | wc -l | tr -d ' ')
 if [[ "$LINE_COUNT" -eq 4 ]]; then
   pass "case-insensitive (-i)"
@@ -98,7 +98,7 @@ else
 fi
 
 # Test: count matches
-OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN -c "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+OUTPUT=$(sudo "$LIND_RUN" --enable-fpcast $GREP_BIN -c "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
 if [[ "$OUTPUT" == "2" ]]; then
   pass "count matches (-c)"
 else
@@ -106,7 +106,7 @@ else
 fi
 
 # Test: stdin pipe
-OUTPUT=$(echo "test123" | sudo "$LIND_RUN" $GREP_BIN -oE "[0-9]+" 2>/dev/null || true)
+OUTPUT=$(echo "test123" | sudo "$LIND_RUN" --enable-fpcast $GREP_BIN -oE "[0-9]+" 2>/dev/null || true)
 if [[ "$OUTPUT" == "123" ]]; then
   pass "stdin pipe with regex (-oE)"
 else
@@ -114,7 +114,7 @@ else
 fi
 
 # Test: no match returns non-zero (grep exits 1 when no match)
-sudo "$LIND_RUN" $GREP_BIN "zzzznotfound" "$TEST_DIR/hello.txt" >/dev/null 2>&1 && RC=$? || RC=$?
+sudo "$LIND_RUN" --enable-fpcast $GREP_BIN "zzzznotfound" "$TEST_DIR/hello.txt" >/dev/null 2>&1 && RC=$? || RC=$?
 if [[ "$RC" -ne 0 ]]; then
   pass "no match returns non-zero exit"
 else
