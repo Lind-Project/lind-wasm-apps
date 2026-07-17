@@ -23,7 +23,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -149,8 +149,8 @@ make -C "$DIFFUTILS_ROOT" -j"$JOBS" V=1
 # ----------------------------------------------------------------------
 BINARIES=(cmp diff diff3 sdiff)
 
-if [[ ! -x "$WASM_OPT" ]]; then
-  echo "[diffutils] ERROR: wasm-opt not found at '$WASM_OPT'" >&2
+if [[ ! -x "$LIND_WASM_OPT" ]]; then
+  echo "[diffutils] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'" >&2
   exit 1
 fi
 
@@ -172,8 +172,8 @@ for bin in "${BINARIES[@]}"; do
 
   cp "$SRC_BIN" "$BIN_WASM"
 
-  echo "[diffutils] running wasm-opt on $bin..."
-  "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
+  echo "[diffutils] running lind-wasm-opt on $bin..."
+  "$LIND_WASM_OPT" --static \
     "$BIN_WASM" -o "$BIN_OPT_WASM"
 
   if [[ ! -f "$BIN_OPT_WASM" ]]; then

@@ -22,7 +22,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -234,12 +234,12 @@ cp "$SED_BIN" "$SED_WASM"
 # ----------------------------------------------------------------------
 # 9) wasm-opt (best-effort)
 # ----------------------------------------------------------------------
-if [[ -x "$WASM_OPT" ]]; then
-  echo "[sed] running wasm-opt…"
-  "$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
+if [[ -x "$LIND_WASM_OPT" ]]; then
+  echo "[sed] running lind-wasm-opt…"
+  "$LIND_WASM_OPT" --static \
     "$SED_WASM" -o "$SED_OPT_WASM" || true
 else
-  echo "[sed] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.." >&2
+  echo "[sed] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; skipping optimization. Exiting.." >&2
   exit 1
 fi
 
