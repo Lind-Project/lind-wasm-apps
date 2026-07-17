@@ -29,7 +29,7 @@ APPS_LMBENCH_CANON_ROOT="$APPS_BUILD/lmbench"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 MAX_WASM_MEMORY="${MAX_WASM_MEMORY:-67108864}"
 ENABLE_WASI_THREADS="${ENABLE_WASI_THREADS:-1}"
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 ##################
@@ -125,23 +125,14 @@ run_wasm_opt_replace() {
   local tmp="${out}.tmp"
   cp "$src" "$raw"
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    # dylink-aware wasm-opt: epoch-import and asyncify-import-globals
-    # are needed because epoch counter and asyncify globals live in the
-    # host (libc module), not in the main module.
-    if "$WASM_OPT" \
-        --fpcast-emu \
-        --enable-bulk-memory --enable-threads \
-        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-        --asyncify --pass-arg=asyncify-import-globals \
-        -O2 --debuginfo \
-        "$raw" -o "$tmp"; then
+    if "$LIND_WASM_OPT" --target=main --fpcast-emu "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else
       rm -f "$tmp"
       return 1
     fi
   else
-    if "$WASM_OPT" --fpcast-emu --epoch-injection --asyncify --debuginfo -O2 "$raw" -o "$tmp"; then
+    if "$LIND_WASM_OPT" --static --fpcast-emu "$raw" -o "$tmp"; then
       mv "$tmp" "$out"
     else
       rm -f "$tmp"
@@ -197,6 +188,12 @@ mkdir -p "$LM_BENCH_BIN_DIR"
 
 REAL_CC="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT"
 CFLAGS="-DNO_PORTMAPPER -O2 -g -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -I$MERGED_SYSROOT/include/tirpc"
+
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS+=" -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
 
 if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[lmbench] Dynamic linking mode enabled (LIND_DYLINK=1)"
@@ -410,8 +407,8 @@ fi
 # issue #127 further requires the final staged executable name to be backed by
 # the generated `.cwasm` artifact.
 ##################
-if [[ ! -x "$WASM_OPT" ]]; then
-  echo "[lmbench] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifacts."
+if [[ ! -x "$LIND_WASM_OPT" ]]; then
+  echo "[lmbench] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifacts."
   exit 1
 fi
 
