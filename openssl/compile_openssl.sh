@@ -17,7 +17,7 @@ if [[ ! -r "$BASE_SYSROOT/include/wasm32-wasi/stdio.h" ]]; then
 fi
 
 LIND_DYLINK="${LIND_DYLINK:-0}"
-LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 
 CC_WASI="$LLVM_BIN/clang --target=wasm32-unknown-wasi --sysroot=$BASE_SYSROOT"
 AR="$LLVM_BIN/llvm-ar"
@@ -108,7 +108,12 @@ fi
 "$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM"  __stack_pointer global __stack_pointer optional || { echo "[openssl] ERROR: add-export-tool stack pointer failed" >&2; exit 1; }
 
 
-"$LIND_WASM_OPT" --target=library --fpcast-emu "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[openssl] ERROR: lind-wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
+# Same flag set as `lind-wasm-opt --target=library --fpcast-emu`, invoked raw
+# because the wrapper cannot pass --pass-arg=max-func-params: libssl's record-
+# layer constructors (tls_new_record_layer et al.) take 32 params, above the
+# fpcast-emu default of 18. fpcast is required so exit handlers registered by
+# OPENSSL_cleanup match the fpcast-built libc.cwasm table convention.
+"$WASM_OPT" --enable-bulk-memory --enable-threads --enable-exception-handling --enable-reference-types --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module --asyncify --pass-arg=asyncify-import-globals --fpcast-emu --pass-arg=relocatable-fpcast --pass-arg=max-func-params@32 --translate-to-exnref -O2 --debuginfo "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[openssl] ERROR: wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
   echo "[openssl] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'; Exiting.." >&2
@@ -160,7 +165,12 @@ fi
 "$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM"  __stack_pointer global __stack_pointer optional || { echo "[openssl] ERROR: add-export-tool stack pointer failed" >&2; exit 1; }
 
 
-"$LIND_WASM_OPT" --target=library --fpcast-emu "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[openssl] ERROR: lind-wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
+# Same flag set as `lind-wasm-opt --target=library --fpcast-emu`, invoked raw
+# because the wrapper cannot pass --pass-arg=max-func-params: libssl's record-
+# layer constructors (tls_new_record_layer et al.) take 32 params, above the
+# fpcast-emu default of 18. fpcast is required so exit handlers registered by
+# OPENSSL_cleanup match the fpcast-built libc.cwasm table convention.
+"$WASM_OPT" --enable-bulk-memory --enable-threads --enable-exception-handling --enable-reference-types --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module --asyncify --pass-arg=asyncify-import-globals --fpcast-emu --pass-arg=relocatable-fpcast --pass-arg=max-func-params@32 --translate-to-exnref -O2 --debuginfo "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[openssl] ERROR: wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
   echo "[openssl] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'; Exiting.." >&2
