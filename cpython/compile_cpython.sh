@@ -153,7 +153,7 @@ else
 
   if [[ -x "$LIND_WASM_OPT" ]]; then
     echo "[cpython] running lind-wasm-opt..."
-    "$LIND_WASM_OPT" --static \
+    "$LIND_WASM_OPT" --static --fpcast-emu \
       "$PYTHON_WASM" -o "$PYTHON_OPT_WASM"
   else
     echo "[cpython] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'" >&2
@@ -239,7 +239,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   "$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __stack_pointer global __stack_pointer optional \
     || { echo "[cpython] ERROR: add-export-tool stack pointer failed" >&2; exit 1; }
 
-  "$LIND_WASM_OPT" --target=library \
+  "$LIND_WASM_OPT" --target=library --fpcast-emu \
     "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" \
     || { echo "[cpython] ERROR: lind-wasm-opt failed on shared libpython" >&2; exit 1; }
 
@@ -308,7 +308,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   fi
 
   echo "[cpython] running lind-wasm-opt on PIE python..."
-  "$LIND_WASM_OPT" --target=main \
+  "$LIND_WASM_OPT" --target=main --fpcast-emu \
     "$PYTHON_WASM" -o "$PYTHON_OPT_WASM" \
     || { echo "[cpython] ERROR: lind-wasm-opt failed on PIE python" >&2; exit 1; }
 
