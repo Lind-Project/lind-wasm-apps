@@ -26,6 +26,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -236,8 +237,15 @@ if [[ -x "$LIND_WASM_OPT" ]]; then
   echo "[curl] running lind-wasm-opt…"
   if [[ "$LIND_DYLINK" == "1" ]]; then
     # --fpcast-emu: dylink mains must match the fpcast-built libc.cwasm table
-    # convention.
-    "$LIND_WASM_OPT" --target=main --fpcast-emu \
+    # convention. Raw wasm-opt (same flags as `lind-wasm-opt --target=main
+    # --fpcast-emu`) because curl links OpenSSL's 32-param record-layer ctors
+    # into the main module and the wrapper cannot raise max-func-params.
+    "$WASM_OPT" --enable-bulk-memory --enable-threads \
+      --enable-exception-handling --enable-reference-types \
+      --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
+      --asyncify --pass-arg=asyncify-import-globals \
+      --fpcast-emu --pass-arg=relocatable-fpcast --pass-arg=max-func-params@32 \
+      --translate-to-exnref -O2 --debuginfo \
       "$CURL_WASM" -o "$CURL_OPT_WASM"
   else
     "$LIND_WASM_OPT" --static \
