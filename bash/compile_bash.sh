@@ -567,12 +567,9 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   "$LIND_WASM_OPT" --target=main --fpcast-emu \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 else
-  # NOTE: static bash deliberately does NOT use `lind-wasm-opt --static`.
-  # lind-wasm-opt forces `--translate-to-exnref`, which breaks bash's
-  # longjmp-based control flow (while/until/break/continue/return and the
-  # `[ ]` test builtin) and regressed `make test APP=bash` from 157/162 to
-  # 132/162. The manual flag set below (no exnref translation) is the
-  # proven-working static build. See PR #266 discussion.
+  # Static bash uses raw wasm-opt, NOT `lind-wasm-opt --static`: the wrapper's
+  # `--translate-to-exnref` breaks bash's longjmp control flow (loops, break,
+  # continue, return, `[ ]`). See PR #266.
   "$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 fi

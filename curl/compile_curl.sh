@@ -236,10 +236,8 @@ cp "$CURL_BIN" "$CURL_WASM"
 if [[ -x "$LIND_WASM_OPT" ]]; then
   echo "[curl] running lind-wasm-opt…"
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    # --fpcast-emu: dylink mains must match the fpcast-built libc.cwasm table
-    # convention. Raw wasm-opt (same flags as `lind-wasm-opt --target=main
-    # --fpcast-emu`) because curl links OpenSSL's 32-param record-layer ctors
-    # into the main module and the wrapper cannot raise max-func-params.
+    # Raw wasm-opt (= `lind-wasm-opt --target=main --fpcast-emu`) + max-func-params@32:
+    # curl links OpenSSL's 32-param record-layer ctors into the main module.
     "$WASM_OPT" --enable-bulk-memory --enable-threads \
       --enable-exception-handling --enable-reference-types \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
