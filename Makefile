@@ -140,15 +140,18 @@ $(TOOL_ENV): | dirs
 	  AR='$(LLVM_BIN_DIR)/llvm-ar'
 	  RANLIB='$(LLVM_BIN_DIR)/llvm-ranlib'
 	  NM='$(LLVM_BIN_DIR)/llvm-nm'
+	  LD='$(LLVM_BIN_DIR)/wasm-ld'
 	  [[ -x "$$CLANG"  ]] || { echo "ERROR: expected clang at $$CLANG"; exit 1; }
 	  [[ -x "$$AR"     ]] || { echo "ERROR: expected llvm-ar at $$AR"; exit 1; }
 	  [[ -x "$$RANLIB" ]] || { echo "ERROR: expected llvm-ranlib at $$RANLIB"; exit 1; }
 	  [[ -x "$$NM"     ]] || { echo "ERROR: expected llvm-nm at $$NM"; exit 1; }
+	  [[ -x "$$LD"     ]] || { echo "ERROR: expected wasm-ld at $$LD"; exit 1; }
 	  {
 	    echo "export CLANG='$$CLANG'"
 	    echo "export AR='$$AR'"
 	    echo "export RANLIB='$$RANLIB'"
 	    echo "export NM='$$NM'"
+	    echo "export LD='$$LD'"
 	  } > '$(TOOL_ENV)'
 	  echo "[*] preflight OK"
 	  "$$CLANG" --version | head -n1

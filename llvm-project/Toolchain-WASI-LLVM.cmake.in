@@ -25,18 +25,19 @@ set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
 # WASI uses glibc headers — define __linux__ so LLVM uses <endian.h>,
 # Linux-style struct fields, etc.  (WASI is not Linux, but its glibc
 # sysroot matches the Linux ABI for these purposes.)
-set(CMAKE_C_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -D__linux__" CACHE STRING "" FORCE)
+set(CMAKE_C_FLAGS "-Os @EXTRA_CFLAGS@ -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -D__linux__" CACHE STRING "" FORCE)
 
 # WASM C++ flags — use libc++, no exceptions/RTTI/unwind to reduce binary size
-set(CMAKE_CXX_FLAGS "-Os -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -D__linux__ -nostdinc++ -isystem $LIBCXX_INCLUDE -include $SCRIPT_DIR/fix_std_maxmin.h" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS "-Os @EXTRA_CXXFLAGS@ -pthread -matomics -mbulk-memory -fno-exceptions -fno-unwind-tables -fno-rtti -D__linux__ -nostdinc++ -isystem @LIBCXX_INCLUDE@ -include @SCRIPT_DIR@/fix_std_maxmin.h" CACHE STRING "" FORCE)
 
 # Linker flags
 set(CMAKE_EXE_LINKER_FLAGS "\
-  -L$MERGED_SYSROOT/lib/wasm32-wasi \
-  -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
+  -L@MERGED_SYSROOT@/lib/wasm32-wasi \
+  -L@MERGED_SYSROOT@/usr/lib/wasm32-wasi \
   -Wl,--export=__stack_pointer,--export=__stack_low \
   -Wl,--import-memory,--export-memory \
   -Wl,--max-memory=67108864 \
+  @EXE_LINKER_EXTRA@ \
   -lm " CACHE STRING "" FORCE)
 
 # Don't pass -rpath to the linker

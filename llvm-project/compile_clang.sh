@@ -39,6 +39,28 @@ fi
 
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
+BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
+LIND_DYLINK="${LIND_DYLINK:-0}"
+
+# In dylink mode clang's own executable becomes a wasm PIE that imports
+# libc++/libc++abi at runtime (via --preload) instead of statically embedding
+# them — mirrors bash/compile_bash.sh's DYLINK branch. LLVM/clang's own ~70
+# component libraries stay statically embedded either way (not attempting
+# LLVM_LINK_LLVM_DYLIB/CLANG_LINK_CLANG_DYLIB here — that uses CMake's native
+# -shared machinery, which doesn't speak lind's wasm-dylink ABI).
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  EXTRA_CFLAGS="-fPIC"
+  EXTRA_CXXFLAGS="-fPIC"
+  EXE_LINKER_EXTRA="-nostdlib++ -Wl,-pie -Wl,--import-table -Wl,--allow-undefined -Wl,--unresolved-symbols=import-dynamic -Wl,--export=__wasm_call_ctors -Wl,--export-if-defined=__wasm_init_tls -Wl,--export=__tls_base $LIND_WASM_ROOT/src/glibc/build/lind_debug.o"
+  LLVM_ENABLE_PIC_FLAG="ON"
+  CXX_STANDARD_LIBS="-lc -lcompiler_rt"
+else
+  EXTRA_CFLAGS=""
+  EXTRA_CXXFLAGS=""
+  EXE_LINKER_EXTRA=""
+  LLVM_ENABLE_PIC_FLAG="OFF"
+  CXX_STANDARD_LIBS="-lc++ -lc++abi -lc -lcompiler_rt"
+fi
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 CMAKE="${CMAKE:-cmake}"
@@ -141,9 +163,21 @@ echo "[clang] building compiler-rt…"
 
 "$SCRIPT_DIR/compile_compiler-rt.sh"
 
+# The cross-build's CMAKE_EXE_LINKER_FLAGS only searches $MERGED_SYSROOT (not
+# the overlay compile_compiler-rt.sh writes to), and CMAKE_C/CXX_STANDARD_LIBRARIES
+# below links "-lcompiler_rt" while LLVM's build produces libclang_rt.builtins-*.a —
+# merge the overlay in and alias the name so the link step can find it.
+mkdir -p "$MERGED_SYSROOT/lib/wasm32-wasi"
+rsync -a "$APPS_BUILD/sysroot_overlay/usr/lib/wasm32-wasi/" "$MERGED_SYSROOT/lib/wasm32-wasi/"
+if [[ ! -f "$MERGED_SYSROOT/lib/wasm32-wasi/libcompiler_rt.a" ]]; then
+  cp "$MERGED_SYSROOT/lib/wasm32-wasi/libclang_rt.builtins-wasm32.a" "$MERGED_SYSROOT/lib/wasm32-wasi/libcompiler_rt.a"
+fi
+
 # ----------------------------------------------------------------------
 # 4) Generate CMake toolchain file for wasm32-wasi cross-compilation
 # ----------------------------------------------------------------------
+CROSS_BUILD="$APPS_BUILD/llvm-cross-build"
+BUILD_DIR="$CROSS_BUILD"
 mkdir -p "$BUILD_DIR"
 
 TOOLCHAIN_FILE="$BUILD_DIR/Toolchain-WASI-LLVM.cmake"
@@ -154,7 +188,13 @@ sed -e "s|@CLANG@|$CLANG|g" \
     -e "s|@LD@|$LD|g" \
     -e "s|@RANLIB@|$RANLIB|g" \
     -e "s|@BASE_SYSROOT@|$BASE_SYSROOT|g" \
-    "$SCRIPT_DIR/Toolchain-WASI.cmake.in" > "$TOOLCHAIN_FILE"
+    -e "s|@LIBCXX_INCLUDE@|$LIBCXX_INCLUDE|g" \
+    -e "s|@MERGED_SYSROOT@|$MERGED_SYSROOT|g" \
+    -e "s|@SCRIPT_DIR@|$SCRIPT_DIR|g" \
+    -e "s|@EXTRA_CFLAGS@|$EXTRA_CFLAGS|g" \
+    -e "s|@EXTRA_CXXFLAGS@|$EXTRA_CXXFLAGS|g" \
+    -e "s|@EXE_LINKER_EXTRA@|$EXE_LINKER_EXTRA|g" \
+    "$SCRIPT_DIR/Toolchain-WASI-LLVM.cmake.in" > "$TOOLCHAIN_FILE"
 
 echo "[clang] generated toolchain file: $TOOLCHAIN_FILE"
 
@@ -165,6 +205,7 @@ echo "[clang] configuring cross-build…"
 
 "$CMAKE" -B "$CROSS_BUILD" -S "$LLVM_SRC" \
   -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
+  -DCMAKE_INSTALL_PREFIX="$CROSS_BUILD/install" \
   -DCMAKE_BUILD_TYPE=Release \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_HOST_TRIPLE="wasm32-unknown-wasi" \
@@ -172,7 +213,7 @@ echo "[clang] configuring cross-build…"
   -DLLVM_TARGETS_TO_BUILD="X86" \
   -DLLVM_NATIVE_TOOL_DIR="$NATIVE_BUILD/bin" \
   -DLLVM_ENABLE_THREADS=OFF \
-  -DLLVM_ENABLE_PIC=OFF \
+  -DLLVM_ENABLE_PIC=$LLVM_ENABLE_PIC_FLAG \
   -DLLVM_ENABLE_LIBCXX=ON \
   -DLLVM_BUILD_SHARED_LIBS=OFF \
   -DLLVM_BUILD_TOOLS=OFF \
@@ -191,7 +232,7 @@ echo "[clang] configuring cross-build…"
   -DCMAKE_SKIP_RPATH=ON \
   -DCMAKE_SKIP_INSTALL_RPATH=ON \
   -DCMAKE_C_STANDARD_LIBRARIES="-lc -lcompiler_rt" \
-  -DCMAKE_CXX_STANDARD_LIBRARIES="-lc++ -lc++abi -lc -lcompiler_rt" \
+  -DCMAKE_CXX_STANDARD_LIBRARIES="$CXX_STANDARD_LIBS" \
   -DHAVE_LIBRT=0 \
   -DHAVE_LIBATOMIC=1 \
   -DHAVE_CXX_ATOMICS_WITHOUT_LIB=ON \

@@ -28,6 +28,9 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
+LIND_DYLINK="${LIND_DYLINK:-0}"
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
 
@@ -186,3 +189,88 @@ echo "[libcxx] build complete. Outputs:"
 echo "  headers: $APPS_OVERLAY/usr/include/c++/"
 echo "  libs:    $APPS_OVERLAY/usr/lib/wasm32-wasi/"
 ls -lh "$APPS_OVERLAY/usr/lib/wasm32-wasi/libc++"* || true
+
+if [[ "$LIND_DYLINK" != "1" ]]; then
+  exit 0
+fi
+
+# ----------------------------------------------------------------------
+# 7) Convert static archives to wasm dylink shared modules (LIND_DYLINK=1)
+#
+# Mirrors openssl/compile_openssl.sh and zlib/compile_zlib.sh: re-link the
+# static .a (built PIC above) as a wasm shared object, export the TLS/global
+# reloc entry points lind's dlopen-style loader expects, run it through the
+# import-flavored epoch+asyncify wasm-opt passes, then AOT-precompile.
+# ----------------------------------------------------------------------
+if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+  echo "[libcxx] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'." >&2
+  exit 1
+fi
+if [[ ! -x "$WASM_OPT" ]]; then
+  echo "[libcxx] ERROR: wasm-opt not found at '$WASM_OPT'." >&2
+  exit 1
+fi
+
+LIND_DEBUG_O="$LIND_WASM_ROOT/src/glibc/build/lind_debug.o"
+if [[ ! -f "$LIND_DEBUG_O" ]]; then
+  echo "[libcxx] ERROR: required dylink CRT object '$LIND_DEBUG_O' not found." >&2
+  exit 1
+fi
+
+mkdir -p "$APPS_OVERLAY/lib"
+
+convert_to_dylib() {
+  local NAME="$1"
+  local STATIC_LIB="$APPS_OVERLAY/usr/lib/wasm32-wasi/lib${NAME}.a"
+  local LIB_WASM="$APPS_OVERLAY/usr/lib/wasm32-wasi/lib${NAME}.wasm"
+  local LIB_OPT="$APPS_OVERLAY/usr/lib/wasm32-wasi/lib${NAME}.opt.wasm"
+  local LIB_OPT_CWASM="$APPS_OVERLAY/usr/lib/wasm32-wasi/lib${NAME}.opt.cwasm"
+  local STAGED_LIB="$APPS_OVERLAY/lib/lib${NAME}.so"
+
+  echo "[libcxx] converting lib${NAME}.a -> lib${NAME}.so ..."
+
+  "$CLANG" \
+    --target=wasm32-unknown-wasi \
+    -fPIC \
+    --sysroot "$BASE_SYSROOT" \
+    -fvisibility=default \
+    -Wl,--import-memory \
+    -Wl,--shared-memory \
+    -Wl,--export-dynamic \
+    -Wl,--experimental-pic \
+    -Wl,--unresolved-symbols=import-dynamic \
+    -Wl,-shared \
+    -Wl,--whole-archive \
+    "$STATIC_LIB" \
+    -Wl,--no-whole-archive \
+    "$LIND_DEBUG_O" \
+    -g -O0 -o "$LIB_WASM" || { echo "[libcxx] ERROR: clang link failed for lib${NAME}" >&2; exit 1; }
+
+  "$ADD_EXPORT_TOOL" "$LIB_WASM" "$LIB_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional \
+    || { echo "[libcxx] ERROR: add-export-tool tls failed for lib${NAME}" >&2; exit 1; }
+  "$ADD_EXPORT_TOOL" "$LIB_WASM" "$LIB_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional \
+    || { echo "[libcxx] ERROR: add-export-tool global failed for lib${NAME}" >&2; exit 1; }
+  "$ADD_EXPORT_TOOL" "$LIB_WASM" "$LIB_WASM" __stack_pointer global __stack_pointer optional \
+    || { echo "[libcxx] ERROR: add-export-tool stack pointer failed for lib${NAME}" >&2; exit 1; }
+
+  "$WASM_OPT" --enable-bulk-memory --enable-threads --epoch-injection --pass-arg=epoch-import \
+    --asyncify --pass-arg=asyncify-import-globals -O2 --debuginfo "$LIB_WASM" -o "$LIB_OPT" \
+    || { echo "[libcxx] ERROR: wasm-opt failed for lib${NAME}" >&2; exit 1; }
+
+  "$LIND_WASM_ROOT/scripts/bin/lind_compile" --precompile-only "$LIB_OPT" \
+    || { echo "[libcxx] ERROR: lind_compile failed for lib${NAME}" >&2; exit 1; }
+
+  if [[ ! -f "$LIB_OPT_CWASM" ]]; then
+    echo "[libcxx] ERROR: precompile produced no '$LIB_OPT_CWASM'" >&2
+    exit 1
+  fi
+
+  cp "$LIB_OPT_CWASM" "$STAGED_LIB"
+  echo "[libcxx] lib${NAME}.so staged at $STAGED_LIB"
+}
+
+convert_to_dylib "c++abi"
+convert_to_dylib "c++"
+
+echo "[libcxx] dynamic libs: $APPS_OVERLAY/lib/"
+ls -lh "$APPS_OVERLAY/lib/libc++"* || true
