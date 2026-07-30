@@ -42,12 +42,12 @@ resolve_lind_wasm_root() {
         return 0
     fi
 
-    if [[ -f "$APPS_ROOT/../scripts/lind_run" && -f "$APPS_ROOT/../Makefile" ]]; then
+    if [[ -f "$APPS_ROOT/../scripts/bin/lind_run" && -f "$APPS_ROOT/../Makefile" ]]; then
         (cd "$APPS_ROOT/.." && pwd)
         return 0
     fi
 
-    if [[ -f "$APPS_ROOT/../lind-wasm/scripts/lind_run" && -f "$APPS_ROOT/../lind-wasm/Makefile" ]]; then
+    if [[ -f "$APPS_ROOT/../lind-wasm/scripts/bin/lind_run" && -f "$APPS_ROOT/../lind-wasm/Makefile" ]]; then
         (cd "$APPS_ROOT/../lind-wasm" && pwd)
         return 0
     fi
@@ -57,7 +57,7 @@ resolve_lind_wasm_root() {
 
 LIND_WASM_ROOT="${LIND_WASM_ROOT:-$(resolve_lind_wasm_root 2>/dev/null || true)}"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
-LIND_RUN="${LIND_RUN:-$LIND_WASM_ROOT/scripts/lind_run}"
+LIND_RUN="${LIND_RUN:-$LIND_WASM_ROOT/scripts/bin/lind_run}"
 BUILD_BIN_DIR="$APPS_ROOT/build/lmbench/bin"
 TEST_LIST_FILE="${TEST_LIST_FILE:-$SCRIPT_DIR/test-binaries.txt}"
 LOG_FILE="${LOG_FILE:-$SCRIPT_DIR/lmbench_test.log}"

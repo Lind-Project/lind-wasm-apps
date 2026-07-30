@@ -1002,7 +1002,7 @@ echo "[nginx] build complete. Outputs:"
 ls -lh "$NGINX_OUT_DIR"/*.wasm 2>/dev/null || true
 echo
 echo "To run nginx in Lind:"
-echo "  $LIND_WASM_ROOT/scripts/lind_run usr/sbin/nginx -c /etc/nginx/nginx.conf"
+echo "  $LIND_WASM_ROOT/scripts/bin/lind_run usr/sbin/nginx -c /etc/nginx/nginx.conf"
 echo
 echo "Or with the test config:"
-echo "  $LIND_WASM_ROOT/scripts/lind_run usr/sbin/nginx -c /etc/nginx/nginx-wasm.conf"
+echo "  $LIND_WASM_ROOT/scripts/bin/lind_run usr/sbin/nginx -c /etc/nginx/nginx-wasm.conf"

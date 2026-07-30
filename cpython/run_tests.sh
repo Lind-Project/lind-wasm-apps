@@ -28,6 +28,9 @@ LIND_DYLINK="${LIND_DYLINK:-0}"
 BUILD_MODE="${BUILD_MODE:-wasi}"
 BUILD_WASM="$SCRIPT_DIR/build-wasm"
 
+LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
+
+# --- verify build exists -----------------------------------------------------
 if [[ ! -f "$BUILD_WASM/Makefile" ]]; then
   echo "[cpython-test] ERROR: $BUILD_WASM/Makefile not found. Run 'make cpython' first." >&2
   exit 1

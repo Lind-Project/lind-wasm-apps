@@ -424,3 +424,13 @@ sanitize_path_
 
 # Initialize; all bourne shell scripts end with "Exit $fail".
 fail=0
+_lind_strip_bin_() { sed -E 's|`/bin/([^`]+)|`\1|g; s|^/bin/([^/:]+):|\1:|g' "$1"; }
+  compare() {
+    local _a=/tmp/_lind_cmp_a.$$ _b=/tmp/_lind_cmp_b.$$ _rc
+    _lind_strip_bin_ "$1" > "$_a"
+    _lind_strip_bin_ "$2" > "$_b"
+    diff -u "$_a" "$_b"
+    _rc=$?
+    rm -f "$_a" "$_b"
+    return $_rc
+  }

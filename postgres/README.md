@@ -27,6 +27,9 @@ make postgres
 cd $LIND_WASM_ROOT/../lind-wasm-apps
 make install-bash
 make install-postgres
+
+# Fix executable permissions (required for exec to work)
+chmod +x $LIND_WASM_ROOT/lindfs/bin/*
 ```
 
 ## Run
@@ -62,19 +65,19 @@ lind-wasm --enable-fpcast /bin/pgbench.cwasm -h /tmp -p 5432 -d postgres -c 8 -t
 
 ## pg_regress (Optional)
 
-Test files (`sql/`, `expected/`, `data/`, `parallel_schedule`) are installed automatically with `make install-postgres`.
+Test files (`sql/`, `expected/`, `data/`, `serial_schedule`) are installed automatically with `make install-postgres`.
 
 ```bash
-# Create regression database
+# 1. Create regression database
 lind-wasm --enable-fpcast /bin/psql.cwasm -h /tmp -p 5432 -d postgres -c "CREATE DATABASE regression;"
 
-# Run tests
+# 2. Run tests (parallel execution is not supported currently)
 lind-wasm --enable-fpcast /bin/pg_regress.cwasm --use-existing --host=/tmp --port=5432 \
   --bindir=/bin --inputdir=/regress --expecteddir=/regress \
-  --schedule=/regress/parallel_schedule --max-concurrent-tests=3
+  --schedule=/regress/serial_schedule --max-concurrent-tests=1
 ```
 
-**Tests to skip** (cause crashes or hangs): `infinite_recurse`, `select_parallel`, `write_parallel`, `vacuum_parallel`, `create_aggregate`, `partition_aggregate`, `eager_aggregate`, `aggregates`
+**Note:** The `serial_schedule` runs tests one at a time to avoid memory exhaustion and crashes that occur with parallel execution.
 
 ## Troubleshooting
 

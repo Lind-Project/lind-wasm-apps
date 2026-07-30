@@ -17,12 +17,16 @@ rm -rf "$LINDFS_TESTS/tmp"
 mkdir -p "$LINDFS/tmp"
 
 cp -r $SCRIPT_DIR/tests $LINDFS
+
+# Path related fixes to test config files and test files to adapt to run within the lind-wasm ecosystem
 file="$LINDFS_TESTS/test-lib.sh"
 sed -i 's|"$abs_top_builddir/src/mktemp"|bin/mktemp|g' "$file"
 sed -i 's|^test_dir_=\$(pwd)|test_dir_=/tmp|' "$LINDFS_TESTS/test-lib.sh"
 sed -i "s|my \$cwd = \$@ ? '\.' : Cwd::getcwd();|my \$cwd = '/tmp';|" "$LINDFS_TESTS/CuTmpdir.pm"
-sed -i 's|my \$subst_expr = \$expect->{RESULT_SUBST}->{$eo};|my $subst_expr = $expect->{RESULT_SUBST}->{$eo};\n          if ($eo eq '"'"'ERR'"'"' \&\& !defined $subst_expr)\n          {\n              $subst_expr = '"'"'s\|`\/bin\/([^`]+)\|`$1\|g; s\|^\/bin\/([^\/:]+):\|$1:\|g'"'"';\n            }|' "$LINDFS_TESTS/Coreutils.pm"
+cp $SCRIPT_DIR/tests/Coreutils.pm $SCRIPT_DIR/tests/Coreutils.pm.bkup
+cp $SCRIPT_DIR/patch_files/Coreutils.pm $SCRIPT_DIR/tests
 find "$LINDFS_TESTS" -type f -executable ! -name "*.pm" ! -name "*.pl" -exec sed -i 's|\$abs_top_builddir/src/|/bin/|g' {} +
+
 # =========================================================
 # ARGUMENT PARSING
 # =========================================================
@@ -106,8 +110,12 @@ if [[ -z "$TARGET_TEST" ]]; then
     echo "  $0 --all                  # Run all tests"
     echo "  $0 misc/help-version      # Run a specific test"
     echo "  Options:"
-    echo "    --skip-bash             # Skip all Bash tests"
-    echo "    --skip-perl             # Skip all Perl tests"
+    echo "    --grate chroot             # Run chroot grate"
+    echo "    --grate ipc	 	       # Run ipc grate"
+    echo "    --grate witness            # Run witness grate"
+    echo "    --grate fs-routing-clamp   # Run fs-routing-clamp with imfs grate"
+    echo "    --skip-bash                # Skip all Bash tests"
+    echo "    --skip-perl                # Skip all Perl tests"
     exit 1
 fi
 
@@ -128,9 +136,15 @@ export CONFIG_HEADER="/lib/config.h"
 export TMPDIR="/tmp"
 export abs_top_builddir="/"
 export abs_top_srcdir="/"
+export abs_srcdir="/tests"
 export PATH="/bin:/usr/local/bin:/usr/bin"
 export srcdir="/tests"
 export srcdir="/home/lind/lind-wasm/lindfs/tests"
+
+# lind-boot does not auto-inherit the host environment into the cage; the guest
+# environ is built only from --env flags. Forward the vars perl tests read.
+ENV_FORWARD=(--env abs_top_builddir --env abs_top_srcdir --env abs_srcdir
+             --env PATH --env CONFIG_HEADER --env TMPDIR --env built_programs)
 
 # Tracking variables for the summary
 TOTAL_PASS=0; TOTAL_FAIL=0; TOTAL_SKIP=0
@@ -163,9 +177,9 @@ for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
         
         T_BASE=$(basename "$CURRENT_TEST")
 	if [[ ${#GRATE_CMD[@]} -gt 0 ]]; then	
-		CMD=(lind_run --enable-fpcast "${GRATE_CMD[@]}" usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
+		CMD=(lind_run --enable-fpcast "${ENV_FORWARD[@]}" "${GRATE_CMD[@]}" usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
         else
-		CMD=(lind_run --enable-fpcast usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
+		CMD=(lind_run --enable-fpcast "${ENV_FORWARD[@]}" usr/local/bin/perl -w -I/lib -I/tests -MCoreutils -M"CuTmpdir qw($T_BASE)" -- "$SANDBOX_PATH")
 	fi
 else
         if [[ "$SKIP_BASH" -eq 1 ]]; then
@@ -173,12 +187,11 @@ else
             ((TOTAL_SKIP++)) || true
             continue
         fi
-
         sed -i 's/$srcdir/tests/g' "$HOST_TEST_PATH"
    	if [[ ${#GRATE_CMD[@]} -gt 0 ]]; then
-		CMD=(lind-wasm --enable-fpcast "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
+		CMD=(lind-wasm --enable-fpcast "${ENV_FORWARD[@]}" "${GRATE_CMD[@]}" bin/bash "$SANDBOX_PATH")
 	else
-		CMD=(lind-wasm --enable-fpcast bin/bash "$SANDBOX_PATH")
+		CMD=(lind-wasm --enable-fpcast "${ENV_FORWARD[@]}" bin/bash "$SANDBOX_PATH")
 	fi	
    fi
 
@@ -194,10 +207,10 @@ else
 
     echo "==================================================="
     if [[ "$EXIT_CODE" -eq 0 ]]; then
-        printf "Result: [\033[32mPASS\033[0m] (Exit 0)\n"
+        printf "Result: $SANDBOX_PATH [\033[32mPASS\033[0m] (Exit 0)\n"
         ((TOTAL_PASS++)) || true
     elif [[ "$EXIT_CODE" -eq 77 ]]; then
-        printf "Result: [\033[33mSKIP\033[0m] (Exit 77)\n"
+        printf "Result: $SANDBOX_PATH [\033[33mSKIP\033[0m] (Exit 77)\n"
         ((TOTAL_SKIP++)) || true
     else
         printf "Result: [\033[31mFAIL\033[0m] (Exit %d)\n" "$EXIT_CODE"
@@ -216,6 +229,8 @@ if [[ "$TARGET_TEST" == "--all" ]]; then
     echo "==================================================="
 fi
 
+# Restore Coreutils.pm
+cp $SCRIPT_DIR/tests/Coreutils.pm.bkup $SCRIPT_DIR/tests/Coreutils.pm
 if [[ "$TOTAL_FAIL" -gt 0 ]]; then
     exit 1
 else
