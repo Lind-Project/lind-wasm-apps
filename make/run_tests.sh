@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 # make/run_tests.sh
 # Sanity test suite for GNU make in Lind/wasm sandbox
@@ -13,7 +13,10 @@ fi
 
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 
+source "$SCRIPT_DIR/../scripts/test_lib.sh"
+
 mkdir -p "$LINDFS_ROOT/tests/make"
+trap 'rm -rf "$LINDFS_ROOT/tests/make"' EXIT
 
 PASS=0
 FAIL=0
@@ -39,6 +42,11 @@ assert_make() {
     local makefile="$3"
     local target="${4:-all}"
 
+    if is_skipped "$description"; then
+        log_skip "$description"
+        return
+    fi
+
     local mfname="Makefile$counter"
     local mfpath="$LINDFS_ROOT/tests/make/$mfname"
     counter=$((counter + 1))
@@ -55,10 +63,10 @@ assert_make() {
     TOTAL=$((TOTAL + 1))
 
     if [ "$expected" = "$actual" ]; then
-        echo -e "  ${GREEN}PASS${NC} $description"
+        echo -e "  ${GREEN}PASS:${NC} $description"
         PASS=$((PASS + 1))
     else
-        echo -e "  ${RED}FAIL${NC} $description"
+        echo -e "  ${RED}FAIL:${NC} $description"
         echo    "       expected: $(echo "$expected" | head -5)"
         echo    "       actual  : $(echo "$actual"   | head -5)"
         FAIL=$((FAIL + 1))
@@ -197,6 +205,7 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e " Total : $TOTAL"
 echo -e " ${GREEN}Pass${NC}  : $PASS"
 echo -e " ${RED}Fail${NC}  : $FAIL"
+echo -e " Skipped: $SKIPPED"
 echo ""
 if [ $FAIL -gt 0 ]; then
     echo -e "${RED}FAILED${NC} — $FAIL/$TOTAL tests failed"

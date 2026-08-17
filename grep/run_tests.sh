@@ -22,6 +22,9 @@ LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
 GREP_BIN="/usr/local/bin/grep"
 TEST_DIR="/tests/grep"
+TIMEOUT_SECS="${TIMEOUT_SECS:-10}"
+
+source "$SCRIPT_DIR/../scripts/test_lib.sh"
 
 PASS=0
 FAIL=0
@@ -65,6 +68,7 @@ echo "  OK: grep installed at $LINDFS_ROOT$GREP_BIN"
 echo
 echo "[test] Creating test fixtures..."
 mkdir -p "$LINDFS_ROOT/$TEST_DIR"
+trap 'rm -f "$LINDFS_ROOT/$TEST_DIR/hello.txt"' EXIT
 cat > "$LINDFS_ROOT/$TEST_DIR/hello.txt" <<'EOF'
 hello world
 Hello World
@@ -80,60 +84,74 @@ echo
 echo "[test] Running sanity tests..."
 
 # Test: basic pattern match
-OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
-EXPECTED=$'hello world\nhello again'
-if [[ "$OUTPUT" == "$EXPECTED" ]]; then
-  pass "basic pattern match"
+if is_skipped "basic pattern match"; then
+  log_skip "basic pattern match"
 else
-  fail "basic pattern match" "expected 2 lines, got: $OUTPUT"
+  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" $GREP_BIN "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+  EXPECTED=$'hello world\nhello again'
+  if [[ "$OUTPUT" == "$EXPECTED" ]]; then
+    pass "basic pattern match"
+  else
+    fail "basic pattern match" "expected 2 lines, got: $OUTPUT"
+  fi
 fi
 
 # Test: case-insensitive
-OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN -i "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
-LINE_COUNT=$(echo "$OUTPUT" | wc -l | tr -d ' ')
-if [[ "$LINE_COUNT" -eq 4 ]]; then
-  pass "case-insensitive (-i)"
+if is_skipped "case-insensitive (-i)"; then
+  log_skip "case-insensitive (-i)"
 else
-  fail "case-insensitive (-i)" "expected 4 lines, got $LINE_COUNT"
+  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" $GREP_BIN -i "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+  LINE_COUNT=$(echo "$OUTPUT" | wc -l | tr -d ' ')
+  if [[ "$LINE_COUNT" -eq 4 ]]; then
+    pass "case-insensitive (-i)"
+  else
+    fail "case-insensitive (-i)" "expected 4 lines, got $LINE_COUNT"
+  fi
 fi
 
 # Test: count matches
-OUTPUT=$(sudo "$LIND_RUN" $GREP_BIN -c "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
-if [[ "$OUTPUT" == "2" ]]; then
-  pass "count matches (-c)"
+if is_skipped "count matches (-c)"; then
+  log_skip "count matches (-c)"
 else
-  fail "count matches (-c)" "expected '2', got '$OUTPUT'"
+  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" $GREP_BIN -c "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+  if [[ "$OUTPUT" == "2" ]]; then
+    pass "count matches (-c)"
+  else
+    fail "count matches (-c)" "expected '2', got '$OUTPUT'"
+  fi
 fi
 
 # Test: stdin pipe
-OUTPUT=$(echo "test123" | sudo "$LIND_RUN" $GREP_BIN -oE "[0-9]+" 2>/dev/null || true)
-if [[ "$OUTPUT" == "123" ]]; then
-  pass "stdin pipe with regex (-oE)"
+if is_skipped "stdin pipe with regex (-oE)"; then
+  log_skip "stdin pipe with regex (-oE)"
 else
-  fail "stdin pipe with regex (-oE)" "expected '123', got '$OUTPUT'"
+  OUTPUT=$(echo "test123" | sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" $GREP_BIN -oE "[0-9]+" 2>/dev/null || true)
+  if [[ "$OUTPUT" == "123" ]]; then
+    pass "stdin pipe with regex (-oE)"
+  else
+    fail "stdin pipe with regex (-oE)" "expected '123', got '$OUTPUT'"
+  fi
 fi
 
 # Test: no match returns non-zero (grep exits 1 when no match)
-sudo "$LIND_RUN" $GREP_BIN "zzzznotfound" "$TEST_DIR/hello.txt" >/dev/null 2>&1 && RC=$? || RC=$?
-if [[ "$RC" -ne 0 ]]; then
-  pass "no match returns non-zero exit"
+if is_skipped "no match returns non-zero exit"; then
+  log_skip "no match returns non-zero exit"
 else
-  fail "no match returns non-zero exit" "expected non-zero, got $RC"
+  sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" $GREP_BIN "zzzznotfound" "$TEST_DIR/hello.txt" >/dev/null 2>&1 && RC=$? || RC=$?
+  if [[ "$RC" -ne 0 ]]; then
+    pass "no match returns non-zero exit"
+  else
+    fail "no match returns non-zero exit" "expected non-zero, got $RC"
+  fi
 fi
-
-# ----------------------------------------------------------------------
-# 5) Cleanup test fixtures
-# ----------------------------------------------------------------------
-echo
-echo "[test] Cleaning up test fixtures..."
-rm -f "$LINDFS_ROOT/$TEST_DIR/hello.txt"
 
 # ----------------------------------------------------------------------
 # Summary
 # ----------------------------------------------------------------------
+TOTAL=$((PASS + FAIL + SKIPPED))
 echo
 echo "=============================="
-echo " Results: $PASS passed, $FAIL failed"
+echo " Results: $TOTAL total, $PASS passed, $FAIL failed, $SKIPPED skipped"
 echo "=============================="
 
 if [[ "$FAIL" -gt 0 ]]; then
