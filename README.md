@@ -47,6 +47,7 @@ make test
 | gcc | `make gcc` | GCC cc1 compiler (cross-compiled) |
 | binutils | `make binutils` | GNU ld + as |
 | clang | `make clang` | LLVM/Clang compiler |
+| openblas | `make openblas` | OpenBLAS (BLAS + CBLAS; LAPACK disabled, no Fortran) |
 
 ## Building
 
@@ -141,7 +142,7 @@ make check-build
 APP=git make check-build
 ```
 
-Apps with test suites: bash, coreutils, curl, git, grep, lmbench, sed, tinycc, cpython.
+Apps with test suites: bash, coreutils, curl, git, grep, lmbench, sed, tinycc, cpython, openblas.
 
 ## Build System
 
