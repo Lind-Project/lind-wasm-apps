@@ -1,0 +1,2 @@
+usr/local/bin/openblas_utest
+usr/local/bin/openblas_utest_ext
