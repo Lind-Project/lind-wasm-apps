@@ -7,6 +7,12 @@
 *.exe
 *.out
 *.tmp
+
+# lind-wasm build artifacts (compile_openblas.sh)
+*.wasm
+*.cwasm
+utest/test_registry.c
+utest/test_extensions/test_registry_ext.c
 lapack-3.1.1
 lapack-3.1.1.tgz
 lapack-3.4.1

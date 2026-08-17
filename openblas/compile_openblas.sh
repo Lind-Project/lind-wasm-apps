@@ -2,10 +2,17 @@
 set -euo pipefail
 
 ###############################################################################
-# Cross-compile OpenBLAS as a library for wasm32-wasi (LindWasm) — static
-# archive plus, when LIND_DYLINK=1, a dylink .so wrapping the whole archive
-# (same recipe as zlib/openssl) — and cross-compile its own utest/ suite so
-# run_tests.sh can execute it.
+# Cross-compile OpenBLAS as a library for wasm32-wasi (LindWasm), and
+# cross-compile its own utest/ suite so run_tests.sh can execute it.
+#
+# LIND_DYLINK=1 (default) is the primary, supported configuration: builds
+# libopenblas.so (a dylink shared module, same recipe as zlib/openssl) as
+# the consumable artifact, and links openblas_utest/openblas_utest_ext as
+# dylink *executables* that import their BLAS/CBLAS symbols from
+# libopenblas.so at runtime via --preload — i.e. the tests genuinely
+# exercise the .so, not a separate statically-linked copy of the same code.
+# LIND_DYLINK=0 is a legacy static-only fallback: libopenblas.a only, test
+# binaries statically linked against it, no .so produced.
 #
 # Scope:
 #   - BLAS + CBLAS only. LAPACK is disabled (NO_LAPACK=1, NOFORTRAN=1) because
@@ -18,12 +25,6 @@ set -euo pipefail
 #     target family (BLAS kernels for RISCV64_GENERIC are plain C, unlike the
 #     bare "GENERIC" target which drags in host-architecture assumptions).
 #     BINARY=32 matches wasm32's 32-bit pointer size.
-#   - LIND_DYLINK=1 builds the objects with -fPIC and additionally stages
-#     libopenblas.so; LIND_DYLINK=0 (default) is static-only. The utest
-#     binaries always statically link the freshly-built libopenblas.a
-#     (PIC-compiled objects link fine into a plain static executable) —
-#     they are a self-contained validation tool, not the consumable
-#     dylink artifact.
 ###############################################################################
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,7 +41,7 @@ if [[ ! -r "$BASE_SYSROOT/include/wasm32-wasi/stdio.h" ]]; then
   echo "[openblas] ERROR: sysroot headers missing at $BASE_SYSROOT" >&2; exit 1
 fi
 
-LIND_DYLINK="${LIND_DYLINK:-0}"
+LIND_DYLINK="${LIND_DYLINK:-1}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 
 # lind-wasm's runtime unconditionally requires the main module to import a
@@ -50,11 +51,24 @@ JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 # (grep, tinycc, nginx, git, ...) carries it for the same reason, even
 # though OpenBLAS itself never spawns a thread (USE_THREAD=0 below).
 CC_WASI="$LLVM_BIN/clang --target=wasm32-unknown-wasi --sysroot=$BASE_SYSROOT -pthread -matomics -mbulk-memory"
+
+# ctest.h's assertion-failure path uses real setjmp/longjmp (ctest_main()
+# setjmp()s once per test, ASSERT_* longjmp()s back out on failure). This
+# glibc port's setjmp/longjmp only works when the *calling* code is compiled
+# with these flags — they make clang rewrite each call site into wasm
+# try/catch + saveSetjmp/__wasm_longjmp (see setjmp/wasm_eh_setjmp.c).
+# Without them, longjmp() unconditionally throws a wasm exception (see
+# setjmp/longjmp.c) that nothing was compiled to catch, so it propagates
+# uncaught and crashes the whole binary — this is what lind_compile's own
+# default dynamic/static builds always add, and what compile_openblas.sh was
+# previously missing entirely.
+SJLJ_FLAGS="-fwasm-exceptions -mllvm -wasm-enable-sjlj"
+
 AR="$LLVM_BIN/llvm-ar"
 RANLIB="$LLVM_BIN/llvm-ranlib"
 NM="$LLVM_BIN/llvm-nm"
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 OVERLAY="$REPO_ROOT/build/sysroot_overlay"
@@ -205,7 +219,7 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   "$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional || { echo "[openblas] ERROR: add-export-tool global failed" >&2; exit 1; }
   "$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __stack_pointer global __stack_pointer optional || { echo "[openblas] ERROR: add-export-tool stack pointer failed" >&2; exit 1; }
 
-  "$WASM_OPT" --enable-bulk-memory --enable-threads --epoch-injection --pass-arg=epoch-import --asyncify --pass-arg=asyncify-import-globals -O2 --debuginfo "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[openblas] ERROR: wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
+  "$LIND_WASM_OPT" --target=library "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[openblas] ERROR: lind-wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
 
   if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
     echo "[openblas] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'; Exiting.." >&2
@@ -308,7 +322,7 @@ UTEST_EXT_OBJS=$(make --no-print-directory -C utest "${OPENBLAS_MAKE_ARGS[@]}" -
 # Compile (but don't yet link) those objects so their real symbol tables
 # exist to read from. Same CFLAGS as the final 'all' build below, so make
 # won't consider them stale and won't recompile them a second time.
-make -j"$JOBS" -C utest "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS -DCTEST_ADD_TESTS_MANUALLY" $UTEST_OBJS $UTEST_EXT_OBJS \
+make -j"$JOBS" -C utest "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS -DCTEST_ADD_TESTS_MANUALLY $SJLJ_FLAGS" $UTEST_OBJS $UTEST_EXT_OBJS \
   || { echo "[openblas] ERROR: utest object build failed" >&2; exit 1; }
 
 extract_ctest_symbols() {
@@ -326,27 +340,24 @@ generate_ctest_registry "utest/test_registry.c" $(extract_ctest_symbols $UTEST_O
 # shellcheck disable=SC2046
 generate_ctest_registry "utest/test_extensions/test_registry_ext.c" $(extract_ctest_symbols $UTEST_EXT_OBJS)
 
-if ! grep -q 'test_registry.o' utest/Makefile 2>/dev/null; then
+if [[ "$LIND_DYLINK" != "1" ]] && ! grep -q 'test_registry.o' utest/Makefile 2>/dev/null; then
+  # Only needed for the legacy static path below, which links via OpenBLAS's
+  # own $(UTESTBIN)/$(UTESTEXTBIN) rules and therefore needs the registry
+  # objects folded into $(OBJS)/$(OBJS_EXT). The dylink path links these
+  # binaries itself and passes its object list explicitly.
   echo "[openblas] patching utest/Makefile (adding generated test registry objects)"
   sed -i '/^all : run_test/i OBJS += test_registry.o\nOBJS_EXT += $(DIR_EXT)/test_registry_ext.o\n' utest/Makefile
 fi
 
-# ---------------------------------------------------------------------------
-# Cross-compile OpenBLAS's own utest suite (binaries only; run_tests.sh runs
-# them for real under lind-wasm). CROSS=1 (already in OPENBLAS_MAKE_ARGS)
-# turns utest/Makefile's run_test rule into a build-only no-op.
-# ---------------------------------------------------------------------------
-make -C utest -j"$JOBS" "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS -DCTEST_ADD_TESTS_MANUALLY" all \
-  || { echo "[openblas] ERROR: utest build failed" >&2; exit 1; }
+# Always compile the two registry objects themselves now that their source
+# exists (harmless no-op for the legacy static path — 'all' below will see
+# them already up to date and just link).
+make -j"$JOBS" -C utest "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS -DCTEST_ADD_TESTS_MANUALLY $SJLJ_FLAGS" \
+  test_registry.o test_extensions/test_registry_ext.o \
+  || { echo "[openblas] ERROR: test registry object build failed" >&2; exit 1; }
 
-# ---------------------------------------------------------------------------
-# The linked utest binaries are raw wasm32 modules; lind-wasm's runtime needs
-# them instrumented with epoch injection + asyncify (same as every other
-# executable app in this repo — see grep/compile_grep.sh) and precompiled to
-# .cwasm via lind-boot before they can actually run.
-# ---------------------------------------------------------------------------
-if [[ ! -x "$WASM_OPT" ]]; then
-  echo "[openblas] ERROR: wasm-opt not found at '$WASM_OPT'" >&2
+if [[ ! -x "$LIND_WASM_OPT" ]]; then
+  echo "[openblas] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'" >&2
   exit 1
 fi
 if [[ ! -x "$LIND_BOOT" ]]; then
@@ -354,6 +365,90 @@ if [[ ! -x "$LIND_BOOT" ]]; then
   exit 1
 fi
 
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  # -------------------------------------------------------------------------
+  # Dylink executables: link openblas_utest/openblas_utest_ext WITHOUT
+  # libopenblas.a. BLAS/CBLAS symbols are left undefined and resolved as
+  # wasm imports at runtime by whatever the "env" module namespace provides
+  # — i.e. libopenblas.so, loaded via `lind_run --preload env=lib/libopenblas.so`
+  # (see run_tests.sh). This is the same recipe every dylink *executable* in
+  # this repo uses to consume a dependency .so (see git/compile_git.sh,
+  # grep/compile_grep.sh): -nostartfiles + -Wl,-pie + --import-table +
+  # --unresolved-symbols=import-dynamic + the crt1_shared.o/lind_utils.o CRT
+  # objects, with no -l<dep> anywhere — the dependency's .so is never named
+  # at link time at all, only at run time via --preload.
+  # -------------------------------------------------------------------------
+  ADD_EXPORT_TOOL="$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool"
+  DYLINK_CRT_OBJS=(
+    "$BASE_SYSROOT/lib/wasm32-wasi/crt1_shared.o"
+    "$BASE_SYSROOT/lib/wasm32-wasi/lind_utils.o"
+  )
+  for obj in "${DYLINK_CRT_OBJS[@]}"; do
+    if [[ ! -f "$obj" ]]; then
+      echo "[openblas] ERROR: required dylink CRT object '$obj' not found." >&2
+      exit 1
+    fi
+  done
+
+  LDFLAGS_DYLINK_EXE=(
+    -fPIC
+    -nostartfiles
+    -Wl,-pie
+    -Wl,--import-table
+    -Wl,--import-memory
+    -Wl,--export-memory
+    -Wl,--shared-memory
+    -Wl,--max-memory=67108864
+    -Wl,--allow-undefined
+    -Wl,--unresolved-symbols=import-dynamic
+    -Wl,--export=__wasm_call_ctors
+    -Wl,--export-if-defined=__wasm_init_tls
+    -Wl,--export=__tls_base
+  )
+
+  link_dylink_utest() {
+    local bin="$1"; shift
+    local wasm_out="$OPENBLAS_SRC/utest/$bin"
+    (
+      cd utest
+      # shellcheck disable=SC2086
+      $CC_WASI $SJLJ_FLAGS "${LDFLAGS_DYLINK_EXE[@]}" "${DYLINK_CRT_OBJS[@]}" $* -o "$bin"
+    ) || { echo "[openblas] ERROR: dylink link failed for $bin" >&2; exit 1; }
+
+    "$ADD_EXPORT_TOOL" "$wasm_out" "$wasm_out" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional \
+      || { echo "[openblas] ERROR: add-export-tool tls failed for $bin" >&2; exit 1; }
+    "$ADD_EXPORT_TOOL" "$wasm_out" "$wasm_out" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional \
+      || { echo "[openblas] ERROR: add-export-tool global failed for $bin" >&2; exit 1; }
+    "$ADD_EXPORT_TOOL" "$wasm_out" "$wasm_out" __stack_pointer global __stack_pointer optional \
+      || { echo "[openblas] ERROR: add-export-tool stack pointer failed for $bin" >&2; exit 1; }
+  }
+
+  link_dylink_utest openblas_utest $UTEST_OBJS test_registry.o
+  link_dylink_utest openblas_utest_ext $UTEST_EXT_OBJS test_extensions/test_registry_ext.o
+
+  LIND_WASM_OPT_MODE="--target=main"
+else
+  # ---------------------------------------------------------------------------
+  # Legacy static path: OpenBLAS's own utest/Makefile rules statically link
+  # $(OBJS)/$(OBJS_EXT) against ../libopenblas.a. CROSS=1 (already in
+  # OPENBLAS_MAKE_ARGS) turns the 'all' target's run_test rule into a
+  # build-only no-op, since these binaries can't run on the host.
+  # ---------------------------------------------------------------------------
+  make -C utest -j"$JOBS" "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS -DCTEST_ADD_TESTS_MANUALLY $SJLJ_FLAGS" all \
+    || { echo "[openblas] ERROR: utest build failed" >&2; exit 1; }
+
+  LIND_WASM_OPT_MODE="--static"
+fi
+
+# ---------------------------------------------------------------------------
+# The linked utest binaries are raw wasm32 modules; lind-wasm's runtime needs
+# them instrumented (epoch injection, asyncify, and — since SJLJ_FLAGS above
+# makes ctest.h's setjmp/longjmp use wasm exception-handling — conversion
+# from clang's legacy EH encoding to the standard exnref-based one Cranelift
+# actually supports) and precompiled to .cwasm via lind-boot before they can
+# run. lind-wasm-opt (not raw wasm-opt) encodes the exact flag set and pass
+# ordering this requires per target — see its source for details.
+# ---------------------------------------------------------------------------
 for bin in openblas_utest openblas_utest_ext; do
   src="$OPENBLAS_SRC/utest/$bin"
   if [[ ! -f "$src" ]]; then
@@ -362,8 +457,8 @@ for bin in openblas_utest openblas_utest_ext; do
   fi
 
   opt_wasm="$OPENBLAS_SRC/utest/$bin.opt.wasm"
-  "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo "$src" -o "$opt_wasm" \
-    || { echo "[openblas] ERROR: wasm-opt failed on $bin" >&2; exit 1; }
+  "$LIND_WASM_OPT" "$LIND_WASM_OPT_MODE" "$src" -o "$opt_wasm" \
+    || { echo "[openblas] ERROR: lind-wasm-opt failed on $bin" >&2; exit 1; }
 
   "$LIND_BOOT" --precompile "$opt_wasm" \
     || { echo "[openblas] ERROR: lind-boot --precompile failed on $bin" >&2; exit 1; }
