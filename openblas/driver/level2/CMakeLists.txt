@@ -202,6 +202,15 @@ if (BUILD_BFLOAT16)
   if (USE_THREAD)
     GenerateNamedObjects("sbgemv_thread.c" "" "gemv_thread_n" false "" "" false "BFLOAT16")
     GenerateNamedObjects("sbgemv_thread.c" "TRANSA" "gemv_thread_t" false "" "" false "BFLOAT16")
+    GenerateNamedObjects("sbgemv_thread.c" "BGEMM;BFLOAT16" "bgemv_thread_n" false "" "" true "")
+    GenerateNamedObjects("sbgemv_thread.c" "BGEMM;BFLOAT16;TRANSA" "bgemv_thread_t" false "" "" true "")
+  endif ()
+endif ()
+
+if (BUILD_HFLOAT16)
+  if (USE_THREAD)
+    GenerateNamedObjects("sbgemv_thread.c" "" "gemv_thread_n" false "" "" false "HFLOAT16")
+    GenerateNamedObjects("sbgemv_thread.c" "TRANSA" "gemv_thread_t" false "" "" false "HFLOAT16")
   endif ()
 endif ()
 
@@ -223,3 +232,7 @@ if (USE_THREAD)
 endif ()
 
 add_library(driver_level2 OBJECT ${OPENBLAS_SRC})
+
+if (USE_OPENMP)
+  target_link_libraries(driver_level2 OpenMP::OpenMP_C)
+endif()

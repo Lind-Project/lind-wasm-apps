@@ -178,12 +178,10 @@ ARCH_CSKY
 #endif
 
 #if defined(__EMSCRIPTEN__)
-ARCH_RISCV64
+ARCH_WASM
 OS_WINDOWS
 #endif
 
-
-#if defined(__wasi__) || (defined(__wasm32__) && !defined(__EMSCRIPTEN__))
-ARCH_RISCV64
-OS_WINDOWS
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+OS_IOS
 #endif

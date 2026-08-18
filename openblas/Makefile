@@ -1,6 +1,7 @@
 TOPDIR	= .
 include ./Makefile.system
 LNCMD = ln -fs
+OSNAME_DISPLAY ?= $(OSNAME)
 ifeq ($(FIXED_LIBNAME), 1)
 LNCMD = true
 endif
@@ -58,7 +59,7 @@ all :: tests
 	@echo
 	@echo " OpenBLAS build complete. ($(LIB_COMPONENTS))"
 	@echo
-	@echo "  OS               ... $(OSNAME)             "
+	@echo "  OS               ... $(OSNAME_DISPLAY)             "
 	@echo "  Architecture     ... $(ARCH)               "
 ifndef BINARY64
 	@echo "  BINARY           ... 32bit                 "
@@ -93,6 +94,11 @@ ifeq ($(NOFORTRAN), $(filter 0,$(NOFORTRAN)))
 	   echo "  Fortran compiler ... $(F_COMPILER)  (command line : $(FC))";\
 	fi
 endif
+
+ifeq ($(OSNAME), WINNT)
+	@-$(LNCMD) $(LIBNAME) $(LIBPREFIX).$(LIBSUFFIX)
+endif
+
 ifneq ($(OSNAME), AIX)
 	@echo -n "  Library Name     ... $(LIBNAME)"
 else
@@ -447,7 +453,7 @@ endif
 	@rm -f cblas.tmp cblas.tmp2
 	@touch $(NETLIB_LAPACK_DIR)/make.inc
 	@$(MAKE) -C $(NETLIB_LAPACK_DIR) clean
-	@rm -f $(NETLIB_LAPACK_DIR)/make.inc $(NETLIB_LAPACK_DIR)/lapacke/include/lapacke_mangling.h
+	@rm -f $(NETLIB_LAPACK_DIR)/make.inc
 	@$(MAKE) -C relapack clean
 	@rm -f *.grd Makefile.conf_last config_last.h
 	@(cd $(NETLIB_LAPACK_DIR)/TESTING && rm -f x* *.out testing_results.txt)

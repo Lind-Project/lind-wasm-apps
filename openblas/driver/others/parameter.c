@@ -67,6 +67,16 @@ BLASLONG sbgemm_p = DEFAULT_GEMM_P;
 #else
 BLASLONG sbgemm_p = SBGEMM_P;
 #endif
+#if SHGEMM_P == shgemm_p
+BLASLONG shgemm_p = DEFAULT_GEMM_P;
+#else
+BLASLONG shgemm_p = SHGEMM_P;
+#endif
+#if BGEMM_P == bgemm_p
+BLASLONG bgemm_p = DEFAULT_GEMM_P;
+#else
+BLASLONG bgemm_p = BGEMM_P;
+#endif
 #if SGEMM_P == sgemm_p
 BLASLONG sgemm_p = DEFAULT_GEMM_P;
 #else
@@ -93,6 +103,16 @@ BLASLONG sbgemm_q = DEFAULT_GEMM_Q;
 #else
 BLASLONG sbgemm_q = SBGEMM_Q;
 #endif
+#if SHGEMM_Q == shgemm_q
+BLASLONG shgemm_q = DEFAULT_GEMM_Q;
+#else
+BLASLONG shgemm_q = SHGEMM_Q;
+#endif
+#if BGEMM_Q == bgemm_q
+BLASLONG bgemm_q = DEFAULT_GEMM_Q;
+#else
+BLASLONG bgemm_q = BGEMM_Q;
+#endif
 #if SGEMM_Q == sgemm_q
 BLASLONG sgemm_q = DEFAULT_GEMM_Q;
 #else
@@ -118,6 +138,16 @@ BLASLONG zgemm_q = ZGEMM_Q;
 BLASLONG sbgemm_r = DEFAULT_GEMM_R;
 #else
 BLASLONG sbgemm_r = SBGEMM_R;
+#endif
+#if SHGEMM_R == shgemm_r
+BLASLONG shgemm_r = DEFAULT_GEMM_R;
+#else
+BLASLONG shgemm_r = SHGEMM_R;
+#endif
+#if BGEMM_R == bgemm_r
+BLASLONG bgemm_r = DEFAULT_GEMM_R;
+#else
+BLASLONG bgemm_r = BGEMM_R;
 #endif
 #if SGEMM_R == sgemm_r
 BLASLONG sgemm_r = DEFAULT_GEMM_R;
@@ -526,6 +556,10 @@ void blas_set_parameter(void){
 
 #ifdef BUILD_BFLOAT16
   sbgemm_r = (((BUFFER_SIZE - ((SBGEMM_P * SBGEMM_Q *  4 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (SBGEMM_Q *  4)) - 15) & ~15;
+  bgemm_r = (((BUFFER_SIZE - ((BGEMM_P * BGEMM_Q *  4 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (BGEMM_Q *  4)) - 15) & ~15;
+#endif
+#ifdef BUILD_HFLOAT16
+  shgemm_r = (((BUFFER_SIZE - ((SHGEMM_P * SHGEMM_Q *  4 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (SHGEMM_Q *  4)) - 15) & ~15;
 #endif
   sgemm_r = (((BUFFER_SIZE - ((SGEMM_P * SGEMM_Q *  4 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (SGEMM_Q *  4)) - 15) & ~15;
   dgemm_r = (((BUFFER_SIZE - ((DGEMM_P * DGEMM_Q *  8 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (DGEMM_Q *  8)) - 15) & ~15;
@@ -619,6 +653,7 @@ void blas_set_parameter(void){
   size = BITMASK(cpuid3, 16, 0xff);
 
   sbgemm_p = 192 * (size + 1);
+  shgemm_p = 192 * (size + 1);
   sgemm_p = 192 * (size + 1);
   dgemm_p =  96 * (size + 1);
   cgemm_p =  96 * (size + 1);
@@ -634,6 +669,10 @@ void blas_set_parameter(void){
 
 #ifdef BUILD_BFLOAT16
   sbgemm_r = (((BUFFER_SIZE - ((SBGEMM_P * SBGEMM_Q *  4 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (SBGEMM_Q *  4)) - 15) & ~15;
+  bgemm_r = (((BUFFER_SIZE - ((BGEMM_P * BGEMM_Q *  4 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (BGEMM_Q *  4)) - 15) & ~15;
+#endif
+#ifdef BUILD_HFLOAT16
+  shgemm_r = (((BUFFER_SIZE - ((SHGEMM_P * SHGEMM_Q *  4 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (SHGEMM_Q *  4)) - 15) & ~15;
 #endif
   sgemm_r = (((BUFFER_SIZE - ((SGEMM_P * SGEMM_Q *  4 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (SGEMM_Q *  4)) - 15) & ~15;
   dgemm_r = (((BUFFER_SIZE - ((DGEMM_P * DGEMM_Q *  8 + GEMM_OFFSET_A + GEMM_ALIGN) & ~GEMM_ALIGN)) / (DGEMM_Q *  8)) - 15) & ~15;
@@ -751,6 +790,17 @@ int get_L3_size() {
   return ((ret & 0xffff) + 1) * pow(2, ((ret >> 16) & 0xff)) * pow(2, ((ret >> 24) & 0x7f)) / 1024 / 1024; // MB
 }
 
+int get_cpu_prid() {
+  int ret = 0, id = 0x0;
+  __asm__ volatile (
+    "cpucfg %[ret], %[id]"
+    : [ret]"=r"(ret)
+    : [id]"r"(id)
+    : "memory"
+  );
+  return ret;
+}
+
 void blas_set_parameter(void){
 #if defined(LA464)
   int L3_size = get_L3_size();
@@ -829,6 +879,18 @@ void blas_set_parameter(void){
     }
   }
 #endif
+#elif defined(LA264)
+  int prid = get_cpu_prid();
+  if (prid == 0x0014b020) { //2k3000
+
+        zgemm_p = 128;
+        zgemm_q = 176;
+        zgemm_r = 360;
+  } else {
+        zgemm_p = 64;
+        zgemm_q = 120;
+        zgemm_r = 4096;
+  }
 #endif
 }
 #endif
@@ -837,6 +899,56 @@ void blas_set_parameter(void){
 
 void blas_set_parameter(void)
 {
+}
+
+#endif
+
+#if defined(ARCH_RISCV64)
+
+#include <stdio.h>
+
+/* RISC-V has no architectural cache-size query (cf. x86 CPUID / LoongArch
+   CPUCFG), so read the L2 (level 2, unified) size from Linux sysfs and fall
+   back to 512 KB. Returns the L2 size in kilobytes. */
+int get_L2_size(void) {
+  int size = 0;
+#if defined(OS_LINUX) || defined(OS_ANDROID)
+  int idx;
+  for (idx = 0; idx <= 4; idx++) {
+    char path[80]; FILE *fp; int level = 0; long val = 0; char unit = 0;
+    snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/level", idx);
+    fp = fopen(path, "r"); if (fp == NULL) continue;
+    if (fscanf(fp, "%d", &level) != 1) { fclose(fp); continue; }
+    fclose(fp); if (level != 2) continue;
+    snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/size", idx);
+    fp = fopen(path, "r"); if (fp == NULL) continue;
+    if (fscanf(fp, "%ld%c", &val, &unit) >= 1) {
+      if (unit == 'M' || unit == 'm') val *= 1024;
+      if (unit == 'G' || unit == 'g') val *= 1024 * 1024;
+      size = (int)val;
+    }
+    fclose(fp); if (size > 0) break;
+  }
+#endif
+  if (size <= 0) size = 512;
+  return size;
+}
+
+void blas_set_parameter(void) {
+#if defined(SGEMM_DEFAULT_P_BASE)
+  /* Scale each precision's packed-A dimension P from the detected L2, relative
+     to the size the active core's base blocking targets (RISCV_L2_REFERENCE_KB).
+     The bases come from the core's own param.h block, so this is not tied to any
+     single core; Q and R keep their param.h defaults. */
+  int l2    = get_L2_size();   /* KB */
+  int scale = l2 / RISCV_L2_REFERENCE_KB;
+  if (scale < 1) scale = 1;
+  if (scale > 4) scale = 4;
+  sgemm_p = SGEMM_DEFAULT_P_BASE * scale;
+  dgemm_p = DGEMM_DEFAULT_P_BASE * scale;
+  cgemm_p = CGEMM_DEFAULT_P_BASE * scale;
+  zgemm_p = ZGEMM_DEFAULT_P_BASE * scale;
+#endif
 }
 
 #endif

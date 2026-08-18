@@ -1,17 +1,17 @@
 ifndef SNRM2KERNEL
-SNRM2KERNEL = nrm2.c
+SNRM2KERNEL = ../arm/nrm2.c
 endif
 
 ifndef DNRM2KERNEL
-DNRM2KERNEL = nrm2.c
+DNRM2KERNEL = ../arm/nrm2.c
 endif
 
 ifndef CNRM2KERNEL
-CNRM2KERNEL = znrm2.c
+CNRM2KERNEL = ../arm/znrm2.c
 endif
 
 ifndef ZNRM2KERNEL
-ZNRM2KERNEL = znrm2.c
+ZNRM2KERNEL = ../arm/znrm2.c
 endif
 
 ifndef SCABS_KERNEL
@@ -43,4 +43,14 @@ ifndef ZGEMM_BETA
 ZGEMM_BETA = ../generic/zgemm_beta.c
 endif
 
+ifndef SROTMKERNEL
+SROTMKERNEL = ../generic/rotm.c
+endif
 
+ifndef DROTMKERNEL
+DROTMKERNEL = ../generic/rotm.c
+endif
+
+ifndef QROTMKERNEL
+QROTMKERNEL = ../generic/rotm.c
+endif

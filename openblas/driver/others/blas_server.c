@@ -119,11 +119,11 @@ static void * blas_thread_buffer[MAX_CPU_NUMBER];
 
 /* Local Variables */
 #if   defined(USE_PTHREAD_LOCK)
-static pthread_mutex_t  server_lock    = PTHREAD_MUTEX_INITIALIZER;
+volatile static pthread_mutex_t  server_lock    = PTHREAD_MUTEX_INITIALIZER;
 #elif defined(USE_PTHREAD_SPINLOCK)
-static pthread_spinlock_t  server_lock = 0;
+volatile static pthread_spinlock_t  server_lock = 0;
 #else
-static unsigned long server_lock       = 0;
+volatile static unsigned long server_lock       = 0;
 #endif
 
 #define THREAD_STATUS_SLEEP		2
@@ -146,8 +146,8 @@ typedef struct {
 } thread_status_t;
 
 #ifdef HAVE_C11
-#define	atomic_load_queue(p)		__atomic_load_n(p, __ATOMIC_RELAXED)
-#define	atomic_store_queue(p, v)	__atomic_store_n(p, v, __ATOMIC_RELAXED)
+#define	atomic_load_queue(p)		__atomic_load_n(p, __ATOMIC_ACQUIRE)
+#define	atomic_store_queue(p, v)	__atomic_store_n(p, v, __ATOMIC_RELEASE)
 #else
 #define	atomic_load_queue(p)		(blas_queue_t*)(*(volatile blas_queue_t**)(p))
 #define	atomic_store_queue(p, v)	(*(volatile blas_queue_t* volatile*)(p) = (v))
@@ -631,7 +631,13 @@ int blas_thread_init(void){
      exec_blas       ... returns after jobs are finished.
 */
 
+#if   defined(USE_PTHREAD_LOCK)
+static pthread_mutex_t   exec_queue_lock = PTHREAD_MUTEX_INITIALIZER;
+#elif defined(USE_PTHREAD_SPINLOCK)
+static pthread_spinlock_t exec_queue_lock = 0;
+#else
 static BLASULONG exec_queue_lock = 0;
+#endif
 
 int exec_blas_async(BLASLONG pos, blas_queue_t *queue){
 
@@ -652,7 +658,7 @@ int exec_blas_async(BLASLONG pos, blas_queue_t *queue){
   fprintf(STDERR, "Exec_blas_async is called. Position = %d\n", pos);
 #endif
 
-  blas_lock(&exec_queue_lock);
+  LOCK_COMMAND(&exec_queue_lock);
 
     while (queue) {
       queue -> position  = pos;
@@ -717,7 +723,7 @@ int exec_blas_async(BLASLONG pos, blas_queue_t *queue){
 
     }
 
-    blas_unlock(&exec_queue_lock);
+    UNLOCK_COMMAND(&exec_queue_lock);
 
 #ifdef SMP_DEBUG
     fprintf(STDERR, "Done(Number of threads = %2ld).\n", exec_count);

@@ -1,5 +1,5 @@
 /*********************************************************************/
-/* Copyright 2024 The OpenBLAS Project                               */
+/* Copyright 2024, 2025 The OpenBLAS Project                         */
 /* Copyright 2009, 2010 The University of Texas at Austin.           */
 /* All rights reserved.                                              */
 /*                                                                   */
@@ -54,8 +54,15 @@
 #define ERROR_NAME "DGEMM "
 #define GEMV BLASFUNC(dgemv)
 #elif defined(BFLOAT16)
+#ifdef BGEMM
+#define ERROR_NAME "BGEMM "
+#define GEMV BLASFUNC(bgemv)
+#else
 #define ERROR_NAME "SBGEMM "
 #define GEMV BLASFUNC(sbgemv)
+#endif
+#elif defined(HFLOAT16)
+#define ERROR_NAME "SHGEMM "
 #else
 #define ERROR_NAME "SGEMM "
 #define GEMV BLASFUNC(sgemv)
@@ -111,7 +118,7 @@ static int (*gemm[])(blas_arg_t *, BLASLONG *, BLASLONG *, IFLOAT *, IFLOAT *, B
 #endif
 };
 
-#if defined(SMALL_MATRIX_OPT) && !defined(GEMM3M) && !defined(XDOUBLE)
+#if defined(SMALL_MATRIX_OPT) && !defined(GEMM3M) && !defined(XDOUBLE) && !defined(HFLOAT16) && !defined(BGEMM)
 #define USE_SMALL_MATRIX_OPT 1
 #else
 #define USE_SMALL_MATRIX_OPT 0
@@ -177,6 +184,74 @@ static int init_amxtile_permission() {
 }
 #endif
 
+#ifdef DYNAMIC_ARCH
+extern char* gotoblas_corename(void);
+#endif
+
+#ifdef SMP
+#if defined(DYNAMIC_ARCH) || defined(NEOVERSEV1)
+static inline int get_gemm_optimal_nthreads_neoversev1(double MNK, int ncpu) {
+  return
+      MNK < 262144L    ? 1
+    : MNK < 1124864L   ? MIN(ncpu, 6)
+    : MNK < 7880599L   ? MIN(ncpu, 12)
+    : MNK < 17173512L  ? MIN(ncpu, 16)
+    : MNK < 33386248L  ? MIN(ncpu, 20)
+    : MNK < 57066625L  ? MIN(ncpu, 24)
+    : MNK < 91733851L  ? MIN(ncpu, 32)
+    : MNK < 265847707L ? MIN(ncpu, 40)
+    : MNK < 458314011L ? MIN(ncpu, 48)
+    : MNK < 729000000L ? MIN(ncpu, 56)
+    : ncpu;
+}
+#endif
+
+#if defined(DYNAMIC_ARCH) || defined(NEOVERSEV2)
+static inline int get_gemm_optimal_nthreads_neoversev2(double MNK, int ncpu) {
+  return
+      MNK < 125000L     ? 1
+    : MNK < 1092727L    ? MIN(ncpu, 6)
+    : MNK < 2628072L    ? MIN(ncpu, 8)
+    : MNK < 8000000L    ? MIN(ncpu, 12)
+    : MNK < 20346417L   ? MIN(ncpu, 16)
+    : MNK < 57066625L   ? MIN(ncpu, 24)
+    : MNK < 91125000L   ? MIN(ncpu, 28)
+    : MNK < 238328000L  ? MIN(ncpu, 40)
+    : MNK < 454756609L  ? MIN(ncpu, 48)
+    : MNK < 857375000L  ? MIN(ncpu, 56)
+    : MNK < 1073741824L ? MIN(ncpu, 64)
+    : ncpu;
+}
+#endif
+
+static inline int get_gemm_optimal_nthreads(double MNK) {
+  int ncpu = num_cpu_avail(3);
+#if defined(NEOVERSEV1) && !defined(COMPLEX) && !defined(DOUBLE) && !defined(BFLOAT16) && !defined(HFLOAT16)
+  return get_gemm_optimal_nthreads_neoversev1(MNK, ncpu);
+#elif defined(NEOVERSEV2) && !defined(COMPLEX) && !defined(DOUBLE) && !defined(BFLOAT16) && !defined(HFLOAT16)
+  return get_gemm_optimal_nthreads_neoversev2(MNK, ncpu);
+#elif defined(DYNAMIC_ARCH) && !defined(COMPLEX) && !defined(DOUBLE) && !defined(BFLOAT16) && !defined(HFLOAT16)
+  if (strcmp(gotoblas_corename(), "neoversev1") == 0) {
+    return get_gemm_optimal_nthreads_neoversev1(MNK, ncpu);
+  }
+  if (strcmp(gotoblas_corename(), "neoversev2") == 0) {
+    return get_gemm_optimal_nthreads_neoversev2(MNK, ncpu);
+  }
+#endif
+  if ( MNK <= (SMP_THRESHOLD_MIN  * (double) GEMM_MULTITHREAD_THRESHOLD) ) {
+    return 1;
+  }
+  else {
+    if (MNK/ncpu < SMP_THRESHOLD_MIN*(double)GEMM_MULTITHREAD_THRESHOLD) {
+      return MNK/(SMP_THRESHOLD_MIN*(double)GEMM_MULTITHREAD_THRESHOLD);
+    }
+    else {
+      return ncpu;
+    }
+  }
+}
+#endif
+
 #ifndef CBLAS
 
 void NAME(char *TRANSA, char *TRANSB,
@@ -191,6 +266,7 @@ void NAME(char *TRANSA, char *TRANSB,
 
   int transa, transb, nrowa, nrowb;
   blasint info;
+  int order = -1;
 
   char transA, transB;
   IFLOAT *buffer;
@@ -310,7 +386,7 @@ void CNAME(enum CBLAS_ORDER order, enum CBLAS_TRANSPOSE TransA, enum CBLAS_TRANS
   FLOAT *beta  = (FLOAT*) vbeta;
   FLOAT *a = (FLOAT*) va;
   FLOAT *b = (FLOAT*) vb;
-  FLOAT *c = (FLOAT*) vc;	   
+  FLOAT *c = (FLOAT*) vc;
 #endif
 
   blas_arg_t args;
@@ -348,17 +424,6 @@ void CNAME(enum CBLAS_ORDER order, enum CBLAS_TRANSPOSE TransA, enum CBLAS_TRANS
 #endif
 
   PRINT_DEBUG_CNAME;
-
-#if !defined(COMPLEX) && !defined(DOUBLE) && !defined(BFLOAT16) && defined(USE_SGEMM_KERNEL_DIRECT)
-#ifdef DYNAMIC_ARCH
- if (support_avx512() )
-#endif  
-  if (beta == 0 && alpha == 1.0 && order == CblasRowMajor && TransA == CblasNoTrans && TransB == CblasNoTrans && SGEMM_DIRECT_PERFORMANT(m,n,k)) {
-	SGEMM_DIRECT(m, n, k, a, lda, b, ldb, c, ldc);
-	return;
-  }
-
-#endif
 
 #ifndef COMPLEX
   args.alpha = (void *)&alpha;
@@ -476,6 +541,40 @@ void CNAME(enum CBLAS_ORDER order, enum CBLAS_TRANSPOSE TransA, enum CBLAS_TRANS
     return;
   }
 
+
+  if ((args.m == 0) || (args.n == 0)) return;
+#if !defined(COMPLEX) && !defined(DOUBLE) && !defined(BFLOAT16)  && !defined(HFLOAT16)
+#if defined(ARCH_x86) && (defined(USE_SGEMM_KERNEL_DIRECT)||defined(DYNAMIC_ARCH))
+#if defined(DYNAMIC_ARCH)
+  if (support_avx512() )
+#endif
+  if (order == CblasRowMajor && beta == 0 && alpha == 1.0 && TransA == CblasNoTrans && TransB == CblasNoTrans && SGEMM_DIRECT_PERFORMANT(m,n,k)) {
+        SGEMM_DIRECT(m, n, k, a, lda, b, ldb, c, ldc);
+        return;
+  }
+#endif
+#if defined(ARCH_ARM64) && (defined(USE_SGEMM_KERNEL_DIRECT)||defined(DYNAMIC_ARCH))
+#if defined(DYNAMIC_ARCH)
+if (strcmp(gotoblas_corename(), "armv9sme") == 0
+#if defined(__clang__)
+ || strcmp(gotoblas_corename(), "vortexm4") == 0
+#endif
+)
+// if (support_sme1())
+#endif
+  if (order == CblasRowMajor && k==lda && n==ldb && n==ldc && beta == 0 && alpha == 1.0 && TransA == CblasNoTrans && TransB == CblasNoTrans && SGEMM_DIRECT_PERFORMANT(m,n,k)) {
+        SGEMM_DIRECT(m, n, k, a, lda, b, ldb, c, ldc);
+        return;
+  }
+else
+ if (order == CblasRowMajor && k==lda && n==ldb && n==ldc && TransA == CblasNoTrans && TransB == CblasNoTrans && SGEMM_DIRECT_PERFORMANT(m,n,k)) {
+        SGEMM_DIRECT_ALPHA_BETA(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+        return;
+  }
+
+#endif
+#endif
+
 #endif
 
 #if defined(__linux__) && defined(__x86_64__) && defined(BFLOAT16)
@@ -499,7 +598,18 @@ void CNAME(enum CBLAS_ORDER order, enum CBLAS_TRANSPOSE TransA, enum CBLAS_TRANS
 	 args.m, args.n, args.k, args.lda, args.ldb, args.ldc);
 #endif
 
-#if defined(GEMM_GEMV_FORWARD) && !defined(GEMM3M) && !defined(COMPLEX) && (!defined(BFLOAT16) || defined(GEMM_GEMV_FORWARD_BF16))
+#if (!defined(BFLOAT16) || (!defined(BGEMM) && defined(SBGEMM_GEMV_FORWARD)) || (defined(BGEMM) && defined(BGEMM_GEMV_FORWARD)))
+#define BFLOAT16_GEMM_GEMV_FORWARD 1
+#else
+#define BFLOAT16_GEMM_GEMV_FORWARD 0
+#endif
+#if (!defined(HFLOAT16) || (!defined(HGEMM) && defined(SHGEMM_GEMV_FORWARD)) || (defined(HGEMM) && defined(HGEMM_GEMV_FORWARD)))
+#define HFLOAT16_GEMM_GEMV_FORWARD 1
+#else
+#define HFLOAT16_GEMM_GEMV_FORWARD 0
+#endif
+
+#if defined(GEMM_GEMV_FORWARD) && !defined(GEMM3M) && !defined(COMPLEX) && HFLOAT16_GEMM_GEMV_FORWARD && BFLOAT16_GEMM_GEMV_FORWARD
 #if defined(ARCH_ARM64)
   // The gemv kernels in arm64/{gemv_n.S,gemv_n_sve.c,gemv_t.S,gemv_t_sve.c}
   // perform poorly in certain circumstances. We use the following boolean
@@ -604,13 +714,7 @@ void CNAME(enum CBLAS_ORDER order, enum CBLAS_TRANSPOSE TransA, enum CBLAS_TRANS
 #endif
 
   MNK = (double) args.m * (double) args.n * (double) args.k;
-  if ( MNK <= (SMP_THRESHOLD_MIN  * (double) GEMM_MULTITHREAD_THRESHOLD)  )
-	args.nthreads = 1;
-  else {
-	args.nthreads = num_cpu_avail(3);
-	if (MNK/args.nthreads < SMP_THRESHOLD_MIN*(double)GEMM_MULTITHREAD_THRESHOLD)
-		args.nthreads = MNK/(SMP_THRESHOLD_MIN*(double)GEMM_MULTITHREAD_THRESHOLD);
-  }
+  args.nthreads = get_gemm_optimal_nthreads(MNK);
 
   args.common = NULL;
 

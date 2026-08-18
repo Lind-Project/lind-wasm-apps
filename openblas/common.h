@@ -1,5 +1,6 @@
 /*********************************************************************/
 /* Copyright 2009, 2010 The University of Texas at Austin.           */
+/* Copyright 2025 The OpenBLAS Project.                              */
 /* All rights reserved.                                              */
 /*                                                                   */
 /* Redistribution and use in source and binary forms, with or        */
@@ -75,6 +76,22 @@ extern "C" {
 #ifdef DOUBLE
 #define DOUBLE_DEFINED DOUBLE
 #undef  DOUBLE
+#endif
+#endif
+
+#ifndef ASSEMBLER
+#ifdef HAVE_C11
+#if defined(C_GCC) && ( __GNUC__ < 7)
+// workaround for GCC bug 65467
+#ifndef _Atomic
+#define _Atomic volatile
+#endif
+#endif
+#include <stdatomic.h>
+#else
+#ifndef _Atomic
+#define _Atomic volatile
+#endif
 #endif
 #endif
 
@@ -266,6 +283,14 @@ typedef uint16_t bfloat16;
 #define BFLOAT16CONVERSION 1
 #endif
 
+#ifdef BUILD_HFLOAT16
+  #ifndef hfloat16
+  typedef _Float16 hfloat16;
+  #endif
+#else
+  typedef uint16_t hfloat16;
+#endif
+
 #ifdef USE64BITINT
 typedef BLASLONG blasint;
 #if defined(OS_WINDOWS) && defined(__64BIT__)
@@ -309,8 +334,19 @@ typedef int blasint;
 #elif defined(BFLOAT16)
 #define IFLOAT	bfloat16
 #define XFLOAT IFLOAT
-#define FLOAT	float
+#ifdef BGEMM
+#define FLOAT	bfloat16
+#else
+#define FLOAT float
+#endif
 #define SIZE   2
+#define BASE_SHIFT 1
+#define ZBASE_SHIFT 2
+#elif defined(HFLOAT16)
+#define IFLOAT	hfloat16
+#define XFLOAT	IFLOAT
+#define FLOAT	float
+#define SIZE	2
 #define BASE_SHIFT 1
 #define ZBASE_SHIFT 2
 #else
@@ -342,18 +378,6 @@ typedef int blasint;
 #define MAX_CPU_NUMBER 2
 #endif
 
-#if defined(OS_SUNOS)
-#define YIELDING	thr_yield()
-#endif
-
-#if defined(OS_WINDOWS)
-#if defined(_MSC_VER) && !defined(__clang__)
-#define YIELDING    YieldProcessor()
-#else
-#define YIELDING	SwitchToThread()
-#endif
-#endif
-
 #if defined(ARMV7) || defined(ARMV6) || defined(ARMV8) || defined(ARMV5)
 #define YIELDING        __asm__ __volatile__ ("nop;nop;nop;nop;nop;nop;nop;nop; \n");
 #endif
@@ -378,13 +402,27 @@ typedef int blasint;
 #endif
 #endif
 
-
-#ifdef __EMSCRIPTEN__
+#if defined(ARCH_WASM)
+#ifndef YIELDING
 #define YIELDING
+#endif
+#endif
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#undef YIELDING // MSVC doesn't support assembly code
+#define YIELDING    	YieldProcessor()
 #endif
 
 #ifndef YIELDING
+#if defined(OS_SUNOS)
+#define YIELDING	thr_yield()
+
+#elif defined(OS_WINDOWS)
+#define YIELDING	SwitchToThread()
+
+#else // assume POSIX.1-2008
 #define YIELDING	sched_yield()
+#endif
 #endif
 
 /***
@@ -406,6 +444,12 @@ please https://github.com/xianyi/OpenBLAS/issues/246
 
 #ifdef QUAD_PRECISION
 #include "common_quad.h"
+#endif
+
+#ifndef ASSEMBLER
+#ifdef HAVE_C11
+#define BLAS_LOCK_DEFINED
+#endif
 #endif
 
 #ifdef ARCH_ALPHA
@@ -478,6 +522,10 @@ please https://github.com/xianyi/OpenBLAS/issues/246
 #include "common_csky.h"
 #endif
 
+#ifdef ARCH_WASM
+#include "common_wasm.h"
+#endif
+
 #ifndef ASSEMBLER
 #ifdef OS_WINDOWSSTORE
 typedef char env_var_t[MAX_PATH];
@@ -530,6 +578,27 @@ static __inline void blas_lock(volatile BLASULONG *address){
 }
 #define BLAS_LOCK_DEFINED
 #endif
+
+#ifdef HAVE_C11
+static __inline void blas_lock(volatile BLASULONG *address) {
+  BLASULONG expected = 0;
+  while (!atomic_compare_exchange_strong((volatile _Atomic BLASULONG *)address,
+             &expected, (BLASULONG)1)) {
+    expected = 0;
+    YIELDING;
+  }
+}
+#endif
+
+static __inline void blas_unlock(volatile BLASULONG *address){
+#ifdef HAVE_C11
+  atomic_store((volatile _Atomic BLASULONG *)address, (BLASULONG)0);
+#else
+  MB;
+  *address = 0;
+#endif
+}
+
 
 #ifndef RPCC_DEFINED
 #error "rpcc() implementation is missing for your platform"
@@ -702,6 +771,7 @@ void gotoblas_profile_init(void);
 void gotoblas_profile_quit(void);
 	
 int support_avx512(void);	
+int support_sme1(void);	
 
 #ifdef USE_OPENMP
 
@@ -713,19 +783,6 @@ __declspec(dllimport) int __cdecl omp_in_parallel(void);
 __declspec(dllimport) int __cdecl omp_get_num_procs(void);
 #endif
 
-#ifdef HAVE_C11
-#if defined(C_GCC) && ( __GNUC__ < 7) 
-// workaround for GCC bug 65467
-#ifndef _Atomic
-#define _Atomic volatile
-#endif
-#endif
-#include <stdatomic.h>
-#else
-#ifndef _Atomic
-#define _Atomic volatile
-#endif
-#endif
 
 #else
 #ifdef __ELF__
@@ -734,17 +791,13 @@ int omp_get_num_procs(void) __attribute__ ((weak));
 #endif
 #endif
 
-static __inline void blas_unlock(volatile BLASULONG *address){
-  MB;
-  *address = 0;
-}
 
 #ifdef OS_WINDOWSSTORE
 static __inline int readenv_atoi(char *env) {
 	return 0;
 }
 #else
-#ifdef OS_WINDOWS
+#if defined(OS_WINDOWS) && !defined(OS_CYGWIN_NT)
 static __inline int readenv_atoi(char *env) {
   env_var_t p;
   return readenv(p,env) ? 0 : atoi(p);
@@ -760,7 +813,7 @@ static __inline int readenv_atoi(char *env) {
 #endif
 #endif
 
-#if !defined(XDOUBLE) || !defined(QUAD_PRECISION)
+#if !defined(BFLOAT16) && (!defined(XDOUBLE) || !defined(QUAD_PRECISION))
 
 static __inline void compinv(FLOAT *b, FLOAT ar, FLOAT ai){
 
@@ -827,6 +880,26 @@ typedef struct {
 #endif
 
 #include "common_interface.h"
+
+/* Internal declaration of the public C XERBLA callback API. Keep this out of
+ * common_interface.h, whose contents are copied verbatim into f77blas.h and
+ * are not adjusted for SYMBOLPREFIX/SYMBOLSUFFIX by the CMake build. */
+#ifndef ASSEMBLER
+#ifdef __cplusplus
+extern "C" {
+#endif
+#ifndef OPENBLAS_XERBLA_HANDLER_DEFINED
+#define OPENBLAS_XERBLA_HANDLER_DEFINED
+typedef void (*openblas_xerbla_handler)(const char *name,
+                                        const blasint *info,
+                                        size_t name_length);
+#endif
+openblas_xerbla_handler openblas_set_xerbla(openblas_xerbla_handler handler);
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 #ifdef SANITY_CHECK
 #include "common_reference.h"
 #endif

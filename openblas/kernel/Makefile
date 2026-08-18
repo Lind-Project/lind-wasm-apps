@@ -24,7 +24,31 @@ ifdef NO_AVX2
  AVX2OPT=
 endif
 
+
 ifdef TARGET_CORE
+ifeq ($(TARGET_CORE), ARMV9SME)
+ override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE) -march=armv9-a+sve2+sme
+ ifdef OS_WINDOWS
+ ifeq ($(C_COMPILER), CLANG)
+   override CFLAGS += --aarch64-stack-hazard-size=0
+ endif
+ endif
+endif
+ifeq ($(TARGET_CORE), VORTEXM4)
+  ifeq ($(C_COMPILER), GCC)
+    override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE) -UHAVE_SME -march=armv8.4-a
+  else
+    override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE) -march=armv8.4-a+sme
+#   ifneq ($(APPLECLANG),1)
+#     override LDFLAGS += -lclang_rt_builtins-aarch64
+#   endif
+    ifdef OS_WINDOWS
+      ifeq ($(C_COMPILER), CLANG)
+        override CFLAGS += --aarch64-stack-hazard-size=0
+      endif
+    endif
+  endif
+endif
 ifeq ($(TARGET_CORE), SAPPHIRERAPIDS)
  override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE)
  ifeq (1, $(filter 1,$(GCCVERSIONGTEQ11) $(CLANGVERSIONGTEQ12)))
@@ -71,11 +95,11 @@ else ifeq ($(TARGET_CORE), ZEN)
  override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE) $(AVX2OPT)
 else ifeq ($(TARGET_CORE), LOONGSON3R4)
  override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE) $(MSA_FLAGS)
-else ifneq ($(filter NEOVERSEN2 NEOVERSEV1, $(TARGET_CORE)),)
+else ifneq ($(filter NEOVERSEN2 NEOVERSEV1 ARMV8SVE A64FX, $(TARGET_CORE)),)
  ifeq ($(C_COMPILER), PGI)
   override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE) -Msve_intrinsics
  else
-  override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE)
+  override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE) -march=armv8.4-a+sve+bf16
  endif
 else
  override CFLAGS += -DBUILD_KERNEL -DTABLE_NAME=gotoblas_$(TARGET_CORE)

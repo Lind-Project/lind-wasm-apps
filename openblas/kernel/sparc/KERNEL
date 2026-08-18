@@ -59,7 +59,8 @@ SNRM2KERNEL = snrm2.S
 endif
 
 ifndef DNRM2KERNEL
-DNRM2KERNEL = dnrm2.S
+#DNRM2KERNEL = dnrm2.S
+DNRM2KERNEL = ../arm/nrm2.c
 endif
 
 ifndef CNRM2KERNEL
@@ -75,3 +76,19 @@ DGEMM_BETA = ../generic/gemm_beta.c
 CGEMM_BETA = ../generic/zgemm_beta.c
 ZGEMM_BETA = ../generic/zgemm_beta.c
 
+ifndef SROTMKERNEL
+SROTMKERNEL = ../generic/rotm.c
+endif
+
+ifndef DROTMKERNEL
+DROTMKERNEL = ../generic/rotm.c
+endif
+
+ifndef QROTMKERNEL
+QROTMKERNEL = ../generic/rotm.c
+endif
+
+SSCALKERNEL = ../arm/scal.c
+DSCALKERNEL = ../arm/scal.c
+CSCALKERNEL = ../arm/zscal.c
+ZSCALKERNEL = ../arm/zscal.c
