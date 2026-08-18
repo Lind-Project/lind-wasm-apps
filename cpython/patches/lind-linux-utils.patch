@@ -1,0 +1,14 @@
+--- a/test/libregrtest/utils.py
++++ b/test/libregrtest/utils.py
+@@ -451,10 +451,7 @@
+     # testing (see the -j option).
+     # Emscripten and WASI have stubbed getpid(), Emscripten has only
+     # millisecond clock resolution. Use randint() instead.
+-    if support.is_emscripten or support.is_wasi:
+-        nounce = random.randint(0, 1_000_000)
+-    else:
+-        nounce = os.getpid()
++    nounce = random.randint(0, 1_000_000)
+ 
+     if worker:
+         work_dir = WORK_DIR_PREFIX + str(nounce)
