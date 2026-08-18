@@ -34,7 +34,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 SYSROOT="${SYSROOT:-$APPS_BUILD/sysroot_merged}"
-LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/lind-wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
@@ -524,6 +524,26 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
 
   cp "$PYTHON_OPT_CWASM" "$PYTHON_OUT_DIR/usr/local/bin/python"
   echo "[cpython] python staged as $PYTHON_OUT_DIR/usr/local/bin/python"
+fi
+
+###############################################################################
+# 6. Repoint make install's versioned python binary at the real artifact
+#    'make install' (altbininstall in Makefile.pre.in) unconditionally
+#    installs CPython's own statically-linked $(BUILDPYTHON) as
+#    usr/local/bin/pythonX.Y -- independent of LIND_DYLINK, and never
+#    touched by the lind-wasm-opt/lind-boot pipeline above. Left alone, it
+#    sits next to the real staged 'python' binary as dead, non-asyncified
+#    weight, and anything invoking 'python3'/'pythonX.Y' directly (or the
+#    pydoc3/idle3 wrapper scripts, whose shebang hardcodes pythonX.Y) would
+#    hit that broken binary instead of the working one. Replace it with a
+#    symlink to the real staged artifact so every name resolves the same.
+###############################################################################
+
+STALE_VERSIONED_PYTHON="$(find "$PYTHON_OUT_DIR/usr/local/bin" -maxdepth 1 -type f -name 'python3.[0-9]*' ! -name '*-config' 2>/dev/null | head -1)"
+if [[ -n "$STALE_VERSIONED_PYTHON" ]]; then
+  echo "[cpython] repointing $(basename "$STALE_VERSIONED_PYTHON") -> python (was $(stat -c%s "$STALE_VERSIONED_PYTHON") bytes, unoptimized 'make install' artifact)"
+  rm -f "$STALE_VERSIONED_PYTHON"
+  ln -s python "$STALE_VERSIONED_PYTHON"
 fi
 
 popd >/dev/null
