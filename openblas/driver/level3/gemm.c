@@ -59,6 +59,22 @@
 #define GEMM_Q 128
 #endif
 
+#ifdef DYNAMIC_ARCH
+#define DIVIDE_LIMIT gotoblas->divide_limit
+#define DIVIDE_RATE gotoblas->divide_rate
+#else
+#define DIVIDE_LIMIT GEMM_DIVIDE_LIMIT
+#define DIVIDE_RATE GEMM_DIVIDE_RATE
+#endif
+
+//#ifdef GEMM_DIVIDE_RATE
+//#define DIVIDE_RATE GEMM_DIVIDE_RATE
+//#endif
+
+//#ifdef GEMM_DIVIDE_LIMIT
+//#define DIVIDE_LIMIT GEMM_DIVIDE_LIMIT
+//#endif
+
 #ifdef THREADED_LEVEL3
 #include "level3_thread.c"
 #else

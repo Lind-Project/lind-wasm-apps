@@ -51,7 +51,7 @@
 #else
 #define X r7
 #define INCX r8
-#define FLAG r12
+#define FLAG r11
 #endif
 #endif
 
@@ -63,7 +63,7 @@
 #else
 #define X r7
 #define INCX r8
-#define FLAG r12
+#define FLAG r11
 #endif
 #endif
 
@@ -91,8 +91,12 @@
 	fcmpu	cr0, FZERO, ALPHA
 	bne-	cr0, LL(A1I1)
 
-	LDLONG  FLAG,    48+64+8(SP)
-	cmpwi   cr0, FLAG, 1
+#if defined(__FreeBSD__)
+    LDLONG  FLAG, 104(SP)
+#else
+    LDLONG  FLAG, 120(SP)
+#endif
+    cmpwi   cr0, FLAG, 1
 	beq-   cr0, LL(A1I1)
 
 	cmpwi	cr0, INCX, SIZE

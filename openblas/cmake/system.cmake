@@ -1,3 +1,30 @@
+###############################################################################
+# Copyright (c) 2025, The OpenBLAS Project
+# All rights reserved.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in
+#    the documentation and/or other materials provided with the
+#    distribution.
+# 3. Neither the name of the OpenBLAS project nor the names of
+#    its contributors may be used to endorse or promote products
+#    derived from this software without specific prior written permission.
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE OPENBLAS PROJECT OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+###############################################################################
 ##
 ## Author: Hank Anderson <hank@statease.com>
 ## Description: Ported from OpenBLAS/Makefile.system
@@ -21,7 +48,15 @@ endif()
 # Other files expect CORE, which is actually TARGET and will become TARGET_CORE for kernel build. Confused yet?
 # It seems we are meant to use TARGET as input and CORE internally as kernel.
 if(NOT DEFINED CORE AND DEFINED TARGET)
-  set(CORE ${TARGET})
+  if (${TARGET} STREQUAL "LOONGSON3R5")
+    set(CORE "LA464")
+  elseif (${TARGET} STREQUAL "LOONGSON2K1000")
+    set(CORE "LA264")
+  elseif (${TARGET} STREQUAL "LOONGSONGENERIC")
+    set(CORE "LA64_GENERIC)")
+  else ()
+    set(CORE ${TARGET})
+  endif()
 endif()
 
 # TARGET_CORE will override TARGET which is used in DYNAMIC_ARCH=1.
@@ -33,10 +68,10 @@ endif ()
 if (DEFINED BINARY AND DEFINED TARGET AND BINARY EQUAL 32)
   message(STATUS "Compiling a ${BINARY}-bit binary.")
   set(NO_AVX 1)
-  if (${TARGET} STREQUAL "HASWELL" OR ${TARGET} STREQUAL "SANDYBRIDGE" OR ${TARGET} STREQUAL "SKYLAKEX" OR ${TARGET} STREQUAL "COOPERLAKE" OR ${TARGET} STREQUAL "SAPPHIRERAPIDS")
+  if (${TARGET} STREQUAL "HASWELL" OR ${TARGET} STREQUAL "ZEN" OR ${TARGET} STREQUAL "SANDYBRIDGE" OR ${TARGET} STREQUAL "SKYLAKEX" OR ${TARGET} STREQUAL "COOPERLAKE" OR ${TARGET} STREQUAL "SAPPHIRERAPIDS")
     set(TARGET "NEHALEM")
   endif ()
-  if (${TARGET} STREQUAL "BULLDOZER" OR ${TARGET} STREQUAL "PILEDRIVER" OR ${TARGET} STREQUAL "ZEN")
+  if (${TARGET} STREQUAL "BULLDOZER" OR ${TARGET} STREQUAL "PILEDRIVER")
     set(TARGET "BARCELONA")
   endif ()
   if (${TARGET} STREQUAL "ARMV8" OR ${TARGET} STREQUAL "CORTEXA57" OR ${TARGET} STREQUAL "CORTEXA53" OR ${TARGET} STREQUAL "CORTEXA55")
@@ -281,12 +316,19 @@ if (DEFINED TARGET)
     set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -mcpu=power8 -mtune=power8 -mvsx -fno-fast-math")
   endif()
 
+if (${TARGET} STREQUAL Z13)
+    set (KERNEL_DEFINITIONS "${KERNEL_DEFINITIONS} -march=z13 -mzvector")
+endif()
+if (${TARGET} STREQUAL Z14)
+    set (KERNEL_DEFINITIONS "${KERNEL_DEFINITIONS} -march=z14 -mzvector")
+endif()
+
 if (${TARGET} STREQUAL NEOVERSEV1)
     if (${CMAKE_C_COMPILER_ID} STREQUAL "PGI" AND NOT NO_SVE)
-	set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -Msve_intrinsics -march=armv8.4-a+sve -mtune=neoverse-v1")
+	set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -Msve_intrinsics -march=armv8.4-a+sve+bf16 -mtune=neoverse-v1")
     else ()
     if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 10.4 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 10.4)
-      set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -march=armv8.4-a+sve -mtune=neoverse-v1")
+      set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -march=armv8.4-a+sve+bf16 -mtune=neoverse-v1")
     else ()
 	    message(FATAL_ERROR "Compiler ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_VERSION} does not support Neoverse V1.")
     endif()
@@ -303,6 +345,19 @@ if (${TARGET} STREQUAL NEOVERSEV1)
     endif()
     endif()
   endif()
+  if (${TARGET} STREQUAL NEOVERSEV2)
+    if (${CMAKE_C_COMPILER_ID} STREQUAL "PGI" AND NOT NO_SVE)
+	    set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -Msve-intrinsics -march=armv9-a+sve+sve2+bf16 -mtune=neoverse-v2")
+    else ()
+    if (CMAKE_C_COMPILER_VERSION VERSION_GREATER 13.0 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 13.0)
+      set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -mcpu=neoverse-v2")
+    elseif (CMAKE_C_COMPILER_VERSION VERSION_GREATER 10.4 OR CMAKE_C_COMPILER_VERSION VERSION_EQUAL 10.4)
+      set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -march=armv8.4-a+sve+bf16 -mtune=neoverse-v1")
+    else ()
+	    message(FATAL_ERROR "Compiler $${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_VERSION} does not support Neoverse V2.")
+    endif()
+    endif()
+  endif()
   if (${TARGET} STREQUAL ARMV8SVE)
     if (${CMAKE_C_COMPILER_ID} STREQUAL "PGI" AND NOT NO_SVE)
       set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -Msve-intrinsics -march=armv8.2-a+sve")
@@ -310,10 +365,23 @@ if (${TARGET} STREQUAL NEOVERSEV1)
       set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -march=armv8.2-a+sve")
     endif()
   endif()
+  if (${TARGET} STREQUAL ARMV9SME)
+      set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -march=armv9-a+sme -O3")
+	  if (${CMAKE_SYSTEM_NAME} STREQUAL Windows AND ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
+	  set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} --aarch64-stack-hazard-size=0")
+	  endif()
+  endif()
+  if (${TARGET} STREQUAL VORTEXM4)
+      set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -march=armv8.4-a+sme -O3")
+	  if (${CMAKE_SYSTEM_NAME} STREQUAL Windows AND ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
+	  set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} --aarch64-stack-hazard-size=0")
+	  endif()
+  endif()
   if (${TARGET} STREQUAL A64FX)
     if (${CMAKE_C_COMPILER_ID} STREQUAL "PGI" AND NOT NO_SVE)
       set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -Msve-intrinsics -march=armv8.2-a+sve -mtune=a64fx")
     else ()
+	  set (GCC_VERSION 0.0)
       execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
       if (${GCC_VERSION} VERSION_GREATER 10.4 OR ${GCC_VERSION} VERSION_EQUAL 10.4)
         set (KERNEL_DEFINITIONS  "${KERNEL_DEFINITIONS} -march=armv8.2-a+sve -mtune=a64fx")
@@ -322,6 +390,31 @@ if (${TARGET} STREQUAL NEOVERSEV1)
       endif()
     endif()
   endif()
+
+  if ((${TARGET} STREQUAL RISCV64_ZVL128B) OR (${TARGET} STREQUAL RISCV64_ZVL256B))
+    set (RISCV64_OPT "rv64imafdcv")
+    if (BUILD_BFLOAT16)
+      set (RISCV64_OPT "${RISCV64_OPT}_zvfbfwma")
+    endif()
+    if (BUILD_HFLOAT16)
+      set (RISCV64_OPT "${RISCV64_OPT}_zvfh_zfh")
+    endif()
+    if (${TARGET} STREQUAL RISCV64_ZVL256B)
+      set (KERNEL_DEFINITIONS "${KERNEL_DEFINITIONS} -march=${RISCV64_OPT}_zvl256b -mabi=lp64d")
+    endif()
+    if (${TARGET} STREQUAL RISCV64_ZVL128B)
+      set (KERNEL_DEFINITIONS "${KERNEL_DEFINITIONS} -march=${RISCV64_OPT}_zvl128b -mabi=lp64d")
+    endif()
+  endif()
+  if (${TARGET} STREQUAL RISCV64_GENERIC)
+      set (KERNEL_DEFINITIONS "${KERNEL_DEFINITIONS} -march=rv64imafdc -mabi=lp64d")
+    endif()
+    if (${TARGET} STREQUAL U74)
+      set (KERNEL_DEFINITIONS "${KERNEL_DEFINITIONS} -march=rv64imafdc_zba_zbb -mabi=lp64d -mtune=sifive-u74")
+    endif()
+    if (${TARGET} STREQUAL x280)
+      set (KERNEL_DEFINITIONS "${KERNEL_DEFINITIONS} -march=rv64imafdcv_zba_zbb_zfh_zvl512b -mabi=lp64d")
+    endif()
 
 endif()
 
@@ -361,6 +454,26 @@ else ()
   endif ()
 endif ()
 
+if (USE_OPENMP)
+  find_package(OpenMP COMPONENTS C REQUIRED)
+  set(CCOMMON_OPT "${CCOMMON_OPT} -DUSE_OPENMP")
+  if (NOT NOFORTRAN)
+    find_package(OpenMP COMPONENTS Fortran REQUIRED)
+    # Avoid mixed OpenMP linkage
+    get_target_property(OMP_C_LIBS OpenMP::OpenMP_C INTERFACE_LINK_LIBRARIES)
+    get_target_property(OMP_F_LIBS OpenMP::OpenMP_Fortran INTERFACE_LINK_LIBRARIES)
+    if (NOT OMP_C_LIBS STREQUAL OMP_F_LIBS)
+      message(NOTICE
+        "CMake detected different OpenMP libraries for C and Fortran:\n"
+        "C=${OMP_C_LIBS}\n"
+        "Fortran=${OMP_F_LIBS}\n"
+        "In case you encounter issues, please check that this is correct.\n"
+        "You may pass -DOpenMP_<lang>_LIB_NAMES and -DOpenMP_<libname>_LIBRARY to cmake to manually force the OpenMP library."
+      )
+    endif()
+  endif ()
+endif ()
+
 if (BINARY64)
   if (INTERFACE64)
     # CCOMMON_OPT += -DUSE64BITINT
@@ -395,20 +508,32 @@ if (X86_64 OR ${CORE} STREQUAL POWER10 OR ARM64 OR LOONGARCH64)
 endif ()
 if (ARM64)
   set(GEMM_GEMV_FORWARD TRUE)
+  set(SBGEMM_GEMV_FORWARD TRUE)
+  set(BGEMM_GEMV_FORWARD TRUE)
+endif ()
+if (POWER)
+  set(GEMM_GEMV_FORWARD TRUE)
+  set(SBGEMM_GEMV_FORWARD TRUE)
+endif ()
+if (RISCV64)
+  set(GEMM_GEMV_FORWARD TRUE)
 endif ()
 
-if (GEMM_GEMV_FORWARD AND NOT ONLY_CBLAS)
+if (GEMM_GEMV_FORWARD)
   set(CCOMMON_OPT "${CCOMMON_OPT} -DGEMM_GEMV_FORWARD")
 endif ()
-if (GEMM_GEMV_FORWARD_BF16 AND NOT ONLY_CBLAS)
-    set(CCOMMON_OPT "${CCOMMON_OPT} -DGEMM_GEMV_FORWARD_BF16")
+if (SBGEMM_GEMV_FORWARD)
+    set(CCOMMON_OPT "${CCOMMON_OPT} -DSBGEMM_GEMV_FORWARD")
+endif ()
+if (BGEMM_GEMV_FORWARD)
+    set(CCOMMON_OPT "${CCOMMON_OPT} -DBGEMM_GEMV_FORWARD")
 endif ()
 if (SMALL_MATRIX_OPT)
   set(CCOMMON_OPT "${CCOMMON_OPT} -DSMALL_MATRIX_OPT")
 endif ()
 
 if (DYNAMIC_ARCH)
-  if (X86 OR X86_64 OR ARM64 OR POWER OR RISCV64 OR LOONGARCH64)
+  if (X86 OR X86_64 OR ARM64 OR POWER OR RISCV64 OR LOONGARCH64 OR ZARCH)
     set(CCOMMON_OPT "${CCOMMON_OPT} -DDYNAMIC_ARCH")
     if (DYNAMIC_OLDER)
       set(CCOMMON_OPT "${CCOMMON_OPT} -DDYNAMIC_OLDER")
@@ -526,8 +651,8 @@ endif()
   
 set(LIBPREFIX "lib${LIBNAMEPREFIX}openblas")
 
-if (DEFINED LIBNAMESUFFIX)
-  set(LIBPREFIX "${LIBNAMEPREFIX}_${LIBNAMESUFFIX}")
+if (DEFINED LIBNAMESUFFIX AND NOT "${LIBNAMESUFFIX}" STREQUAL "")
+  set(LIBPREFIX "lib${LIBNAMEPREFIX}openblas${LIBNAMESUFFIX}")
 endif ()
 
 if (NOT DEFINED SYMBOLPREFIX)
@@ -615,11 +740,26 @@ endif()
 if (BUILD_BFLOAT16)
        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBUILD_BFLOAT16")
 endif()
+if (BUILD_HFLOAT16)
+       set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBUILD_HFLOAT16")
+endif()
 if(NOT MSVC)
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} ${CCOMMON_OPT}")
 endif()
 # TODO: not sure what PFLAGS is -hpa
 set(PFLAGS "${PFLAGS} ${CCOMMON_OPT} -I${TOPDIR} -DPROFILE ${COMMON_PROF}")
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+
+  if ("${F_COMPILER}" STREQUAL "FLANG")
+    if (${CMAKE_Fortran_COMPILER_VERSION} VERSION_LESS_EQUAL 3)
+      set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -fno-unroll-loops")
+    endif ()
+  endif ()
+    if (ARM64 AND CMAKE_Fortran_COMPILER_ID MATCHES "LLVMFlang.*" AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+      set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O2")
+    endif ()
+endif ()
+
 
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${FCOMMON_OPT}")
 # TODO: not sure what FPFLAGS is -hpa
@@ -632,20 +772,11 @@ if (LAPACK_STRLEN)
 endif()
 set(LAPACK_FPFLAGS "${LAPACK_FPFLAGS} ${FPFLAGS}")
 
-#Disable -fopenmp for LAPACK Fortran codes on Windows.
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-  set(FILTER_FLAGS "-fopenmp;-mp;-openmp;-xopenmp=parallel")
-  foreach (FILTER_FLAG ${FILTER_FLAGS})
-    string(REPLACE ${FILTER_FLAG} "" LAPACK_FFLAGS ${LAPACK_FFLAGS})
-    string(REPLACE ${FILTER_FLAG} "" LAPACK_FPFLAGS ${LAPACK_FPFLAGS})
-  endforeach ()
-endif ()
-
 if (CMAKE_Fortran_COMPILER)
   if ("${F_COMPILER}" STREQUAL "NAGFOR" OR "${F_COMPILER}" STREQUAL "CRAY" OR CMAKE_Fortran_COMPILER_ID MATCHES "LLVMFlang.*")
     set(FILTER_FLAGS "-msse3;-mssse3;-msse4.1;-mavx;-mavx2,-mskylake-avx512")
     if (CMAKE_Fortran_COMPILER_ID MATCHES "LLVMFlang.*")
-      message(STATUS "removing fortran flags")
+      message(STATUS "removing fortran flags not supported by the compiler")
       set(FILTER_FLAGS "${FILTER_FLAGS};-m32;-m64")
     endif ()
     foreach (FILTER_FLAG ${FILTER_FLAGS})
@@ -676,13 +807,6 @@ if (${CMAKE_C_COMPILER_ID} MATCHES "IntelLLVM" AND ${CMAKE_SYSTEM_NAME} STREQUAL
 	set(LAPACK_CFLAGS "${LAPACK_CFLAGS} -DNOCHANGE")
 endif ()
 
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-if ("${F_COMPILER}" STREQUAL "FLANG")
-if (${CMAKE_Fortran_COMPILER_VERSION} VERSION_LESS_EQUAL 3)
-  set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -fno-unroll-loops")
-endif ()
-endif ()
-endif ()
 
 if (NOT DEFINED SUFFIX)
   set(SUFFIX o)
@@ -756,6 +880,10 @@ set(USE_GEMM3M 0)
 if (DEFINED ARCH)
   if (X86 OR X86_64 OR ${ARCH} STREQUAL "ia64" OR MIPS64)
     set(USE_GEMM3M 1)
+  endif ()
+
+  if (EMSCRIPTEN)
+    set(USE_GEMM3M 0)
   endif ()
 
   if (${CORE} STREQUAL "generic")

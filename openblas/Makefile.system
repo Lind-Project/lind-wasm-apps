@@ -18,6 +18,10 @@ HOSTARCH := $(shell uname -m)
 ifeq ($(HOSTARCH), amd64)
 HOSTARCH=x86_64
 endif
+ifeq ($(HOSTARCH), i386)
+HOSTARCH=x86
+override BINARY=32
+endif
 
 # Catch conflicting usage of ARCH in some BSD environments
 ifeq ($(ARCH), amd64)
@@ -194,7 +198,7 @@ ifeq ($(TARGET_CORE), EXCAVATOR)
 GETARCH_FLAGS := -DFORCE_BARCELONA
 endif
 ifeq ($(TARGET_CORE), ZEN)
-GETARCH_FLAGS := -DFORCE_BARCELONA
+GETARCH_FLAGS := -DFORCE_NEHALEM
 endif
 endif
 
@@ -247,6 +251,11 @@ NO_PARALLEL_MAKE=0
 endif
 GETARCH_FLAGS	+= -DNO_PARALLEL_MAKE=$(NO_PARALLEL_MAKE)
 
+ifndef MAKE_NB_JOBS
+ifneq (,$(patsubst -j%,%,$(filter -j%,$(MAKEFLAGS))))
+MAKE_NB_JOBS=-1
+endif
+endif
 ifdef MAKE_NB_JOBS
 GETARCH_FLAGS += -DMAKE_NB_JOBS=$(MAKE_NB_JOBS)
 endif
@@ -270,19 +279,22 @@ SMALL_MATRIX_OPT = 1
 BUILD_BFLOAT16 = 1
 else ifeq ($(ARCH), arm64)
 SMALL_MATRIX_OPT = 1
+BUILD_BFLOAT16 = 1
 endif
 ifeq ($(ARCH), loongarch64)
 SMALL_MATRIX_OPT = 1
 endif
 ifeq ($(ARCH), arm64)
 GEMM_GEMV_FORWARD = 1
+SBGEMM_GEMV_FORWARD = 1
+BGEMM_GEMV_FORWARD = 1
 endif
 ifeq ($(ARCH), riscv)
 GEMM_GEMV_FORWARD = 1
 endif
 ifeq ($(ARCH), power)
 GEMM_GEMV_FORWARD = 1
-GEMM_GEMV_FORWARD_BF16 = 1
+SBGEMM_GEMV_FORWARD = 1
 endif
 
 ifeq ($(SMALL_MATRIX_OPT), 1)
@@ -292,8 +304,11 @@ ifneq ($(ONLY_CBLAS), 1)
 ifeq ($(GEMM_GEMV_FORWARD), 1)
 CCOMMON_OPT += -DGEMM_GEMV_FORWARD
 endif
-ifeq ($(GEMM_GEMV_FORWARD_BF16), 1)
-CCOMMON_OPT += -DGEMM_GEMV_FORWARD_BF16
+ifeq ($(SBGEMM_GEMV_FORWARD), 1)
+CCOMMON_OPT += -DSBGEMM_GEMV_FORWARD
+endif
+ifeq ($(BGEMM_GEMV_FORWARD), 1)
+CCOMMON_OPT += -DBGEMM_GEMV_FORWARD
 endif
 endif
 
@@ -325,6 +340,7 @@ HAVE_SSE5=
 HAVE_AVX=
 HAVE_AVX2=
 HAVE_FMA3=
+HAVE_SME=
 include $(TOPDIR)/Makefile_kernel.conf
 endif
 
@@ -392,6 +408,8 @@ GCCVERSIONGTEQ9 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 9)
 GCCVERSIONGTEQ10 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 10)
 GCCVERSIONGTEQ11 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 11)
 GCCVERSIONGTEQ12 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 12)
+GCCVERSIONGTEQ13 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 13)
+GCCVERSIONGTEQ14 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 14)
 # Note that the behavior of -dumpversion is compile-time-configurable for
 # gcc-7.x and newer. Use -dumpfullversion there
 ifeq ($(GCCVERSIONGTEQ7),1)
@@ -408,6 +426,9 @@ endif
 ifeq ($(C_COMPILER), CLANG)
 CLANGVERSIONGTEQ9 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 9)
 CLANGVERSIONGTEQ12 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \>= 12)
+ifeq ($(F_COMPILER), GFORTRAN)
+GCCVERSIONGT4 := $(shell expr `$(CC) -dumpversion | cut -f1 -d.` \> 4)
+endif
 endif
 
 #
@@ -418,9 +439,8 @@ ifeq ($(OSNAME), Darwin)
 ifndef MACOSX_DEPLOYMENT_TARGET
 ifeq ($(ARCH), arm64)
 export MACOSX_DEPLOYMENT_TARGET=11.0
-ifeq ($(C_COMPILER), GCC)
 export NO_SVE = 1
-endif
+# export NO_SME = 1
 else
 export MACOSX_DEPLOYMENT_TARGET=10.8
 endif
@@ -433,6 +453,9 @@ endif
 ifeq (x$(XCVER), x 15)
 CCOMMON_OPT += -Wl,-ld_classic
 FCOMMON_OPT += -Wl,-ld_classic
+endif
+ifeq ($(shell [ $(XCVER) -ge 16 ] && echo yes),yes)
+override CEXTRALIB := $(filter-out(-lto_library, $(CEXTRALIB))) 
 endif
 endif
 
@@ -458,7 +481,7 @@ EXTRALIB	+= -lm
 endif
 
 ifeq ($(OSNAME), $(filter $(OSNAME),FreeBSD OpenBSD NetBSD DragonFly))
-ifeq ($(ARCH), $(filter $(ARCH),arm arm64))
+ifeq ($(ARCH), $(filter $(ARCH),arm arm64 power))
 EXTRALIB	+= -lm
 endif
 endif
@@ -709,11 +732,33 @@ DYNAMIC_CORE += NEOVERSEN2
 DYNAMIC_CORE += ARMV8SVE
 DYNAMIC_CORE += A64FX
 endif
+ifneq ($(NO_SME), 1)
+DYNAMIC_CORE += ARMV9SME
+ifeq ($(OSNAME), Darwin)
+ifneq ($(C_COMPILER), GCC)
+DYNAMIC_CORE += VORTEXM4
+endif
+endif
+endif
 DYNAMIC_CORE += THUNDERX
 DYNAMIC_CORE += THUNDERX2T99
 DYNAMIC_CORE += TSV110
 DYNAMIC_CORE += EMAG8180
 DYNAMIC_CORE += THUNDERX3T110
+
+ifeq ($(OSNAME), Darwin)
+DYNAMIC_CORE =  ARMV8
+DYNAMIC_CORE += NEOVERSEN1
+ifneq ($(NO_SME), 1)
+DYNAMIC_CORE += ARMV9SME
+ifeq ($(OSNAME), Darwin)
+ifneq ($(C_COMPILER), GCC)
+DYNAMIC_CORE += VORTEXM4
+endif
+endif
+endif
+endif
+
 ifdef DYNAMIC_LIST
 override DYNAMIC_CORE = ARMV8 $(DYNAMIC_LIST)
 XCCOMMON_OPT = -DDYNAMIC_LIST -DDYN_ARMV8
@@ -874,7 +919,7 @@ NO_BINARY_MODE  = 1
 BINARY_DEFINED  = 1
 ifdef INTERFACE64
 ifneq ($(INTERFACE64), 0)
-ifeq ($(F_COMPILER), GFORTRAN)
+ifeq ($(F_COMPILER), $(filter $(F_COMPILER),GFORTRAN FLANGNEW))
 FCOMMON_OPT +=  -fdefault-integer-8
 endif
 ifeq ($(F_COMPILER), FLANG)
@@ -889,7 +934,7 @@ NO_BINARY_MODE  = 1
 BINARY_DEFINED  = 1
 ifdef INTERFACE64
 ifneq ($(INTERFACE64), 0)
-ifeq ($(F_COMPILER), GFORTRAN)
+ifeq ($(F_COMPILER), $(filter $(F_COMPILER),GFORTRAN FLANGNEW))
 FCOMMON_OPT +=  -fdefault-integer-8
 endif
 ifeq ($(F_COMPILER), FLANG)
@@ -904,7 +949,7 @@ NO_BINARY_MODE  = 1
 BINARY_DEFINED  = 1
 ifdef INTERFACE64
 ifneq ($(INTERFACE64), 0)
-ifeq ($(F_COMPILER), GFORTRAN)
+ifeq ($(F_COMPILER), $(filter $(F_COMPILER),GFORTRAN FLANGNEW))
 FCOMMON_OPT +=  -fdefault-integer-8
 endif
 ifeq ($(F_COMPILER), FLANG)
@@ -1180,6 +1225,13 @@ FCOMMON_OPT += -mabi=n32
 endif
 else ifeq ($(ARCH), $(filter $(ARCH),mips))
 FCOMMON_OPT += -mabi=32
+endif
+ifeq ($(ARCH), $(filter $(ARCH),loongarch64))
+ifdef INTERFACE64
+ifneq ($(INTERFACE64), 0)
+FCOMMON_OPT +=  -fdefault-integer-8
+endif
+endif
 endif
 else
 ifdef BINARY64
@@ -1472,6 +1524,10 @@ ifeq ($(NO_SVE), 1)
 CCOMMON_OPT     += -DNO_SVE
 endif
 
+ifeq ($(NO_SME), 1)
+CCOMMON_OPT     += -DNO_SME
+endif
+
 ifdef SMP
 CCOMMON_OPT	+= -DSMP_SERVER
 
@@ -1533,6 +1589,9 @@ endif
 ifeq ($(BUILD_BFLOAT16), 1)
 CCOMMON_OPT += -DBUILD_BFLOAT16
 endif
+ifeq ($(BUILD_HFLOAT16), 1)
+CCOMMON_OPT += -DBUILD_HFLOAT16
+endif
 ifeq ($(BUILD_SINGLE), 1)
 CCOMMON_OPT += -DBUILD_SINGLE=1
 endif
@@ -1593,7 +1652,11 @@ ifneq ($(C_COMPILER), SUN)
 CCOMMON_OPT     += -UASMNAME -UASMFNAME -UNAME -UCNAME -UCHAR_NAME -UCHAR_CNAME
 endif
 endif
+ifeq ( ,$(findstring pizfix,$(CEXTRALIB)))
 CCOMMON_OPT	+= -DASMNAME=$(FU)$(*F) -DASMFNAME=$(FU)$(*F)$(BU) -DNAME=$(*F)$(BU) -DCNAME=$(*F) -DCHAR_NAME=\"$(*F)$(BU)\" -DCHAR_CNAME=\"$(*F)\"
+else
+CCOMMON_OPT	+= -DASMNAME=$(FU)pizlonated_$(*F) -DASMFNAME=$(FU)pizlonated_$(*F)$(BU) -DNAME=$(*F)$(BU) -DCNAME=$(*F) -DCHAR_NAME=\"$(*F)$(BU)\" -DCHAR_CNAME=\"$(*F)\"
+endif
 
 ifeq ($(CORE), PPC440)
 CCOMMON_OPT	+= -DALLOC_QALLOC
@@ -1763,6 +1826,14 @@ ifndef LIBSUFFIX
 LIBSUFFIX = a
 endif
 
+ifndef EXE
+ifeq ($(OSNAME), $(filter $(OSNAME),WINNT CYGWIN_NT))
+EXE = .exe
+else
+EXE =
+endif
+endif
+
 ifneq ($(DYNAMIC_ARCH), 1)
 ifndef SMP
 LIBNAME		= $(LIBPREFIX)_$(LIBCORE)$(REVISION).$(LIBSUFFIX)
@@ -1869,17 +1940,23 @@ ifndef NO_MSA
   export HAVE_MSA
   export MSA_FLAGS
 endif
+export HAVE_SME
 export KERNELDIR
 export FUNCTION_PROFILE
 export TARGET_CORE
 export NO_AVX512
 export NO_AVX2
 export BUILD_BFLOAT16
+export BUILD_HFLOAT16
 export NO_LSX
 export NO_LASX
 
+export BGEMM_UNROLL_M
+export BGEMM_UNROLL_N
 export SBGEMM_UNROLL_M
 export SBGEMM_UNROLL_N
+export SHGEMM_UNROLL_M
+export SHGEMM_UNROLL_N
 export SGEMM_UNROLL_M
 export SGEMM_UNROLL_N
 export DGEMM_UNROLL_M

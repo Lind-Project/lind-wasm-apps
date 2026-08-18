@@ -68,6 +68,7 @@ static __inline int WhereAmI(void){
 }
 #endif
 
+#ifndef BLAS_LOCK_DEFINED
 static __inline void blas_lock(volatile BLASULONG *address){
 
   BLASULONG ret;
@@ -101,6 +102,7 @@ static __inline void blas_lock(volatile BLASULONG *address){
 }
 
 #define BLAS_LOCK_DEFINED
+#endif
 
 #if !defined(OS_DARWIN) && !defined (OS_ANDROID)
 static __inline BLASULONG rpcc(void){
@@ -114,9 +116,9 @@ static __inline BLASULONG rpcc(void){
   #else
   BLASULONG ret = 0;
   blasint shift;
- 
-  __asm__ __volatile__ ("isb; mrs %0,cntvct_el0":"=r"(ret));
-  __asm__ __volatile__ ("mrs %0,cntfrq_el0; clz %w0, %w0":"=&r"(shift));
+
+  __asm__ __volatile__ ("isb\n\tmrs %0,cntvct_el0":"=r"(ret));
+  __asm__ __volatile__ ("mrs %x0,cntfrq_el0\n\tclz %w0, %w0":"=&r"(shift));
 
   return ret << shift;
   #endif
@@ -175,7 +177,7 @@ REALNAME:
 #define HUGE_PAGESIZE   ( 4 << 20)
 
 #ifndef BUFFERSIZE
-#if defined(NEOVERSEN1) || defined(NEOVERSEN2) || defined(NEOVERSEV1) || defined(A64FX) || defined(ARMV8SVE)
+#if defined(NEOVERSEN1) || defined(NEOVERSEN2) || defined(NEOVERSEV1) || defined(A64FX) || defined(ARMV8SVE) || defined(ARMV9SME)
 #define BUFFER_SIZE     (32 << 22)
 #else
 #define BUFFER_SIZE     (32 << 20)

@@ -30,9 +30,11 @@ nofortran=0
 shift 2
 compiler="$*"
 compiler_bin="$1"
+shift
+compiler_args="$*"
 
 # f77 is too ambiguous
-[ "$compiler" = "f77" ] && compiler=''
+[ "$compiler_bin" = "f77" ] && compiler=''
 
 path=`split "$PATH" ':'`
 
@@ -50,7 +52,7 @@ if [ -z "$compiler" ]; then
     for list in $lists; do
         for p in $path; do
             if [ -x "$p/$list" ]; then
-                compiler=$list
+                compiler="$list $compiler_args"
                 compiler_bin=$list
                 break 2
             fi
@@ -90,7 +92,7 @@ else
 		vendor=FLANG
 		openmp='-fopenmp'
 		;;	
-            *GNU*|*GCC*)
+            *GCC*)
 
                 v="${data#*GCC: *\) }"
                 v="${v%%\"*}"
@@ -245,6 +247,13 @@ else
                 ;;
             *flang*)
                 vendor=FLANG
+        	data=`$compiler -v 2>&1 > /dev/null`
+        	v="${data#*version *}"
+                v="${v%%*.}"
+                major="${v%%.*}"
+                if [ "$major" -ge 17 ]; then
+                        vendor=FLANGNEW
+                fi
                 bu=_
                 openmp='-fopenmp'
                 ;;
@@ -334,13 +343,13 @@ linker_a=""
 
 if [ -n "$link" ]; then
 
-    link=`echo "$link" | sed 's/\-Y[[:space:]]P\,/\-Y/g'`
+    link=`echo " $link" | sed 's/ \-Y[[:space:]]P\,/ \-Y/g'`
 
-    link=`echo "$link" | sed 's/\-R[[:space:]]*/\-rpath\%/g'`
+    link=`echo "$link" | sed 's/ \-R[[:space:]]*/ \-rpath\%/g'`
 
-    link=`echo "$link" | sed 's/\-rpath[[:space:]]+/\-rpath\%/g'`
+    link=`echo "$link" | sed 's/ \-rpath[[:space:]]+/ \-rpath\%/g'`
 
-    link=`echo "$link" | sed 's/\-rpath-link[[:space:]]+/\-rpath-link\%/g'`
+    link=`echo "$link" | sed 's/ \-rpath-link[[:space:]]+/ \-rpath-link\%/g'`
 
     flags=`echo "$link" | tr "',\n" " "`
     # remove leading and trailing quotes from each flag.

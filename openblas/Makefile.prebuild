@@ -72,6 +72,11 @@ TARGET_FLAGS = -march=rv64imafdcv -mabi=lp64d
 endif
 
 ifeq ($(TARGET), RISCV64_GENERIC)
+TARGET_FLAGS = -march=rv64imafdc -mabi=lp64d
+endif
+
+ifeq ($(TARGET), U74)
+TARGET_FLAGS = -march=rv64imafdc_zba_zbb -mabi=lp64d
 endif
 
 all: getarch_2nd

@@ -3,12 +3,14 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_BINARY_DIR})
 
 list (REMOVE_ITEM FLOAT_TYPES "BFLOAT16")
+list (REMOVE_ITEM FLOAT_TYPES "HFLOAT16")
 
 set(LAPACK_SOURCES
   potrf/potrf_U_single.c
   potrf/potrf_L_single.c
   lauum/lauum_U_single.c
   lauum/lauum_L_single.c
+  laed3/laed3_single.c
 )
 
 # add a 'z' to filename for complex version
@@ -50,7 +52,7 @@ GenerateNamedObjects("laswp/generic/laswp_k_4.c" "" "laswp_plus" false "" ""  fa
 GenerateNamedObjects("laswp/generic/laswp_k_4.c" "MINUS" "laswp_minus" false "" ""  false 3)
 
 foreach (float_type ${FLOAT_TYPES})
-if (${float_type} STREQUAL "HALF")
+if (${float_type} STREQUAL "BFLOAT16")
  continue()
 endif()
 GenerateNamedObjects("getrf/getrf_single.c" "UNIT" "getrf_single" false "" "" false ${float_type})
@@ -78,6 +80,7 @@ if (USE_THREAD)
     lauum/lauum_L_parallel.c
     potrf/potrf_U_parallel.c
     potrf/potrf_L_parallel.c
+    laed3/laed3_parallel.c
   )
 
   # this has a z version
@@ -117,3 +120,7 @@ GenerateCombinationObjects("${UNIT_SOURCES}" "UNIT" "N" "" 4)
 GenerateCombinationObjects("${UNIT_SOURCES2}" "UNIT" "N" "" 0 "" "" 3)
 
 add_library(lapack OBJECT ${OPENBLAS_SRC})
+
+if (USE_OPENMP)
+  target_link_libraries(lapack OpenMP::OpenMP_C)
+endif()

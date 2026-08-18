@@ -14,8 +14,16 @@ foreach (GEMM_DEFINE ${GEMM_DEFINES})
   endif ()
   if (BUILD_BFLOAT16)
     GenerateNamedObjects("gemm.c" "${GEMM_DEFINE}" "gemm_${GEMM_DEFINE_LC}" 0 "" "" false "BFLOAT16")
+    GenerateNamedObjects("gemm.c" "${GEMM_DEFINE};BGEMM" "gemm_${GEMM_DEFINE_LC}" 0 "" "" false "BFLOAT16")
     if (USE_THREAD AND NOT USE_SIMPLE_THREADED_LEVEL3)
       GenerateNamedObjects("gemm.c" "${GEMM_DEFINE};THREADED_LEVEL3" "gemm_thread_${GEMM_DEFINE_LC}" 0 "" "" false "BFLOAT16")
+      GenerateNamedObjects("gemm.c" "${GEMM_DEFINE};THREADED_LEVEL3;BGEMM" "gemm_thread_${GEMM_DEFINE_LC}" 0 "" "" false "BFLOAT16")
+    endif ()
+  endif ()
+  if (BUILD_HFLOAT16)
+    GenerateNamedObjects("gemm.c" "${GEMM_DEFINE}" "gemm_${GEMM_DEFINE_LC}" 0 "" "" false "HFLOAT16")
+    if (USE_THREAD AND NOT USE_SIMPLE_THREADED_LEVEL3)
+      GenerateNamedObjects("gemm.c" "${GEMM_DEFINE};THREADED_LEVEL3" "gemm_thread_${GEMM_DEFINE_LC}" 0 "" "" false "HFLOAT16")
     endif ()
   endif ()
 endforeach ()
@@ -59,7 +67,7 @@ GenerateCombinationObjects("syr2k_kernel.c" "LOWER" "U" "" 2)
 if (USE_THREAD)
 
   # N.B. these do NOT have a float type (e.g. DOUBLE) defined!
-  GenerateNamedObjects("gemm_thread_m.c;gemm_thread_n.c;gemm_thread_mn.c;gemm_thread_variable.c;syrk_thread.c" "" "" 0 "" "" 1)
+  GenerateNamedObjects("gemm_thread_m.c;gemm_thread_n.c;gemm_thread_mn.c;gemm_thread_variable.c;syrk_thread.c;level3_thread_lock.c" "" "" 0 "" "" 1)
 
   if (NOT USE_SIMPLE_THREADED_LEVEL3)
     GenerateCombinationObjects("syrk_k.c" "LOWER;TRANS" "U;N" "THREADED_LEVEL3" 2 "syrk_thread")
@@ -171,3 +179,7 @@ endforeach ()
 #
 
 add_library(driver_level3 OBJECT ${OPENBLAS_SRC})
+
+if (USE_OPENMP)
+  target_link_libraries(driver_level3 OpenMP::OpenMP_C)
+endif()
