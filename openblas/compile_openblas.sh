@@ -155,6 +155,15 @@ OPENBLAS_MAKE_ARGS=(
   BUILD_COMPLEX=0
   BUILD_COMPLEX16=0
   BUILD_BFLOAT16=0
+  # Our OSNAME stays empty for wasm32/wasi (c_check has no OS_WINDOWS token;
+  # see the ctest.c patch above) — harmless everywhere except Makefile.system's
+  # EXE auto-suffix block (added in OpenBLAS 0.3.34): its
+  # `ifeq ($(OSNAME), $(filter $(OSNAME),WINNT CYGWIN_NT))` guard is spuriously
+  # true when OSNAME is empty, since $(filter) with an empty pattern list also
+  # returns empty — so it picks EXE=.exe. Force EXE= via the command line
+  # (which its `ifndef EXE` guard then honors) so utest/Makefile's
+  # openblas_utest$(EXE) doesn't turn into openblas_utest.exe.
+  EXE=
   CFLAGS="$OPENBLAS_CFLAGS"
   LDFLAGS="-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
 )
@@ -258,9 +267,12 @@ fi
 # ctest_main()'s caller (main(), in utest_main.c) was ever found — every
 # other file's tests were silently invisible. Confirmed against a native
 # x86_64 build of this exact source with matching flags (NOFORTRAN=1
-# NO_LAPACK=1 USE_THREAD=0): openblas_utest finds 66 tests and
-# openblas_utest_ext finds 600, all passing — so "0 tests" under wasm was a
-# genuine discovery bug, not expected behavior for this suite.
+# NO_LAPACK=1 USE_THREAD=0 BUILD_SINGLE=1 BUILD_DOUBLE=1 BUILD_COMPLEX=0
+# BUILD_COMPLEX16=0): the wasm build finds and passes the exact same test
+# count as that native build, confirming "0 tests" under wasm was a genuine
+# discovery bug, not expected behavior for this suite. Re-verify this native
+# baseline whenever bumping the vendored OpenBLAS version — see
+# run_tests.sh's header comment for the currently-verified counts.
 #
 # Fix: switch ctest.h to its own built-in CTEST_ADD_TESTS_MANUALLY mode,
 # which bypasses the section-scan entirely in favor of explicit
@@ -328,7 +340,13 @@ make -j"$JOBS" -C utest "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS -DCT
 extract_ctest_symbols() {
   for o in "$@"; do
     case "$o" in
-      utest_main.o|test_extensions/xerbla.o|test_extensions/common.o) continue ;;
+      # utest_main.o's only D symbol is __ctest_suite_test (ctest.h's own
+      # internal bookkeeping, not a real test — already filtered by name
+      # below). common.o defines no tests at all. Both stay excluded as a
+      # minor optimization; do NOT add xerbla.o here — as of OpenBLAS
+      # 0.3.34 it defines a real test (openblas_extensions:xerbla_handler_
+      # registration), so excluding it would silently drop test coverage.
+      utest_main.o|test_extensions/common.o) continue ;;
     esac
     "$NM" --defined-only "utest/$o" 2>/dev/null \
       | awk '$2 == "D" && $3 != "__ctest_suite_test" {print $3}'
