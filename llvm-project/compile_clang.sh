@@ -41,6 +41,7 @@ WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 BASE_SYSROOT="${BASE_SYSROOT:-$LIND_WASM_ROOT/src/glibc/sysroot}"
 LIND_DYLINK="${LIND_DYLINK:-0}"
+ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
 # In dylink mode clang's own executable becomes a wasm PIE that imports
 # libc++/libc++abi at runtime (via --preload) instead of statically embedding
@@ -300,6 +301,21 @@ post_process_binary() {
     echo "[clang] ERROR: failed to generate '$OPT_WASM'; exiting." >&2
     exit 1
   fi
+
+  # --- add-export-tool ---
+  # wasm-opt's optimization passes strip exports it doesn't see used within
+  # the module (e.g. __stack_pointer, needed by the runtime's multi-process/
+  # exit machinery, not by anything inside the module itself), so these must
+  # be re-added *after* wasm-opt runs, not just requested at link time.
+  # Matches lind_compile's do_dynamic_compile/do_library_compile and
+  # compile_bash.sh's DYLINK branch.
+  if [[ ! -x "$ADD_EXPORT_TOOL" ]]; then
+    echo "[clang] ERROR: add-export-tool not found at '$ADD_EXPORT_TOOL'" >&2
+    exit 1
+  fi
+  "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
+  "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
+  "$ADD_EXPORT_TOOL" "$OPT_WASM" "$OPT_WASM" __stack_pointer global __stack_pointer optional
 
   # --- lind-boot --precompile ---
   if [[ ! -x "$LIND_BOOT" ]]; then
