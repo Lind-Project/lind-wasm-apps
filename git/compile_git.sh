@@ -49,7 +49,7 @@ LLVM_BIN_DIR="$(dirname "$CLANG")"
 AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
 RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -83,6 +83,12 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include"
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
+
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
+fi
 
 # ----------------------------------------------------------------------
 # Branch Logic: Dynamic vs Static Settings
@@ -261,21 +267,19 @@ cp git "$GIT_WASM"
 # 4. wasm-opt & exports
 ###############################################################################
 
-if [[ -x "$WASM_OPT" ]]; then
-  echo "[git] running wasm-opt (asyncify + optimization)..."
+if [[ -x "$LIND_WASM_OPT" ]]; then
+  echo "[git] running lind-wasm-opt..."
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    "$WASM_OPT" \
-      --enable-bulk-memory --enable-threads \
-      --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-      --asyncify --pass-arg=asyncify-import-globals \
-      -O2 --debuginfo \
+    # --fpcast-emu: dylink mains must match the fpcast-built libc.cwasm table
+    # convention or cross-module indirect calls trap at exit.
+    "$LIND_WASM_OPT" --target=main --fpcast-emu \
       "$GIT_WASM" -o "$GIT_OPT_WASM"
   else
-    "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
+    "$LIND_WASM_OPT" --static \
       "$GIT_WASM" -o "$GIT_OPT_WASM"
   fi
 else
-  echo "[git] NOTE: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.."
+  echo "[git] NOTE: lind-wasm-opt not found at '$LIND_WASM_OPT'; skipping optimization. Exiting.."
   exit 1
 fi
 

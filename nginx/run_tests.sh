@@ -20,7 +20,7 @@ APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
     LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
-LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
+LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run --enable-fpcast"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 NGINX_BIN="usr/sbin/nginx"
 NGINX_CONF_DIR="$LINDFS_ROOT/etc/nginx"

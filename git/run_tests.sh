@@ -28,7 +28,7 @@ fi
 
 LIND_DYLINK="${LIND_DYLINK:-0}"
 
-LIND_RUN=("$LIND_WASM_ROOT/scripts/bin/lind_run")
+LIND_RUN=("$LIND_WASM_ROOT/scripts/bin/lind_run" --enable-fpcast)
 if [[ "$LIND_DYLINK" == "1" ]]; then
     # Dynamic builds need shared libs preloaded into the wasm env namespace.
     # These paths are relative to lindfs (installed by make install).

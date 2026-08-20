@@ -25,6 +25,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
@@ -67,6 +68,12 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include"
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
+
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
+fi
 
 # ----------------------------------------------------------------------
 # 3) Branch Logic: Dynamic vs Static Settings
@@ -226,24 +233,24 @@ cp "$CURL_BIN" "$CURL_WASM"
 # ----------------------------------------------------------------------
 # 8) wasm-opt & exports
 # ----------------------------------------------------------------------
-if [[ -x "$WASM_OPT" ]]; then
-  echo "[curl] running wasm-opt (asyncify + optimization)…"
+if [[ -x "$LIND_WASM_OPT" ]]; then
+  echo "[curl] running lind-wasm-opt…"
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    "$WASM_OPT" \
-      --enable-bulk-memory --enable-threads \
+    # Raw wasm-opt (= `lind-wasm-opt --target=main --fpcast-emu`) + max-func-params@32:
+    # curl links OpenSSL's 32-param record-layer ctors into the main module.
+    "$WASM_OPT" --enable-bulk-memory --enable-threads \
+      --enable-exception-handling --enable-reference-types \
       --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
       --asyncify --pass-arg=asyncify-import-globals \
-      -O2 --debuginfo \
+      --fpcast-emu --pass-arg=relocatable-fpcast --pass-arg=max-func-params@32 \
+      --translate-to-exnref -O2 --debuginfo \
       "$CURL_WASM" -o "$CURL_OPT_WASM"
   else
-    "$WASM_OPT" \
-      --epoch-injection \
-      --asyncify \
-      -O2 --debuginfo \
+    "$LIND_WASM_OPT" --static \
       "$CURL_WASM" -o "$CURL_OPT_WASM"
   fi
 else
-  echo "[curl] ERROR: wasm-opt not found at '$WASM_OPT'; skipping optimization. Exiting.." >&2
+  echo "[curl] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; skipping optimization. Exiting.." >&2
   exit 1
 fi
 

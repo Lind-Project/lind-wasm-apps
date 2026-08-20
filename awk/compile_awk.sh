@@ -21,7 +21,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -60,6 +60,12 @@ CFLAGS_WASM=(
   -I"$MERGED_SYSROOT/include"
   -I"$MERGED_SYSROOT/include/wasm32-wasi"
 )
+
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
+fi
 
 LDFLAGS_WASM=(
   "-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
@@ -143,13 +149,13 @@ AWK_OPT_CWASM="$SCRIPT_DIR/gawk.opt.cwasm"
 
 cp "$AWK_BIN" "$AWK_WASM"
 
-if [[ ! -x "$WASM_OPT" ]]; then
-  echo "[awk] ERROR: wasm-opt not found at '$WASM_OPT'" >&2
+if [[ ! -x "$LIND_WASM_OPT" ]]; then
+  echo "[awk] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'" >&2
   exit 1
 fi
 
-echo "[awk] running wasm-opt (asyncify + optimization)..."
-"$WASM_OPT" --epoch-injection --asyncify --fpcast-emu -O2 --debuginfo \
+echo "[awk] running lind-wasm-opt..."
+"$LIND_WASM_OPT" --static --fpcast-emu \
   "$AWK_WASM" -o "$AWK_OPT_WASM"
 
 if [[ ! -f "$AWK_OPT_WASM" ]]; then
