@@ -1,0 +1,90 @@
+# Known pg_regress failures under lind-wasm (serial schedule).
+# One test name per line; '#' lines and blanks are ignored.
+#
+# postgres/run_tests.sh (PG_REGRESS=1) fails only on regress failures NOT
+# listed here. When a listed test starts passing, the suite prints a NOTE --
+# remove the line so a regression in that test is caught again.
+#
+# Tests that HANG belong in regress_skip_tests.txt instead; those are removed
+# from the schedule entirely. float8 and infinite_recurse are excluded when the
+# schedule is generated (postgres/compile_postgres.sh).
+#
+# Baseline recorded 2026-08-30 on lind-wasm 838090b00 / lind-wasm-apps
+# 8c3f83e72b, built with `make fpcast` + LIND_DYLINK=1:
+#   72 of 236 tests failed (164 passed).
+# 53 of the 72 fail with "test process exited with exit code 2" and an empty
+# results file -- the psql client dies rather than producing wrong output, so
+# these are runtime failures, not SQL differences. See
+# progress/postgres-run-tests-pr280.md.
+alter_generic
+alter_table
+box
+cluster
+comments
+conversion
+copy
+copy2
+copyselect
+create_index
+create_index_spgist
+database
+domain
+drop_if_exists
+encoding
+euc_kr
+expressions
+geometry
+groupingsets
+hash_part
+indexing
+inet
+json
+json_encoding
+jsonb
+jsonb_jsonpath
+jsonpath
+jsonpath_encoding
+largeobject
+limit
+misc
+misc_functions
+misc_sanity
+mvcc
+oid8
+opr_sanity
+partition_aggregate
+partition_join
+partition_merge
+partition_prune
+partition_split
+pg_dependencies
+pg_ndistinct
+plancache
+plpgsql
+point
+polymorphism
+portals
+prepare
+rangefuncs
+rangetypes
+regex
+reloptions
+returning
+rowtypes
+rules
+select_parallel
+sequence
+sqljson
+sqljson_jsontable
+sqljson_queryfuncs
+stats_import
+subscription
+sysviews
+temp
+truncate
+type_sanity
+unicode
+uuid
+with
+xid
+xml

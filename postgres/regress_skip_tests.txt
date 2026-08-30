@@ -1,0 +1,20 @@
+# pg_regress tests EXCLUDED from the schedule under lind-wasm.
+# One test name per line; '#' lines and blanks are ignored.
+#
+# This file is for tests that HANG (the suite would otherwise burn its whole
+# REGRESS_TIMEOUT on one test). Tests that merely FAIL belong in
+# regress_known_failures.txt instead — those still run, so a change in their
+# behaviour is still visible.
+#
+# postgres/run_tests.sh subtracts these from /regress/serial_schedule at run
+# time and reports them via the SKIPPED tally.
+#
+# NOTE: float8 and infinite_recurse are already excluded when the schedule is
+# generated in postgres/compile_postgres.sh, so they need no entry here.
+
+# Hangs at 100% CPU in both backend and pg_regress when run after the ~125
+# preceding tests in the serial schedule (observed 2026-08-30, killed after
+# 53 min). Not reproducible in isolation: with only test_setup before it,
+# object_address fails in 261 ms instead of hanging, so the trigger is
+# accumulated cluster state rather than the test itself.
+object_address
