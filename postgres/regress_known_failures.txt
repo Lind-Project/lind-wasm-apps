@@ -1,0 +1,136 @@
+# pg_regress tests observed FAILING under lind-wasm (serial schedule).
+# One test name per line; '#' lines and blanks are ignored.
+#
+# THIS IS A REFERENCE SET, NOT A PASS/FAIL GATE.
+# The regress results are not deterministic under lind-wasm, so
+# postgres/run_tests.sh reports the comparison against this file but does not
+# fail on it. See the measurements below.
+#
+# Measured 2026-08-30, three consecutive identical runs (lind-wasm 838090b00,
+# lind-wasm-apps 8c3f83e72b, `make fpcast`, LIND_DYLINK=1), 236 tests each:
+#
+#   run 1: 72 failed     run 2: 73 failed     run 3: 79 failed
+#
+#   46  tests failed in ALL three runs        (marked [stable] below)
+#   60  tests failed in some runs but not others (marked [flaky] below)
+#   106 tests failed at least once            (this file = that union)
+#
+# Roughly three quarters of the failures are "# (test process exited with exit
+# code 2)" with a near-empty results file: the psql client dies instead of
+# producing wrong output, so this is a runtime failure class, not SQL
+# incompatibility. `comments`, which contains only SELECT statements, is in it.
+# Undiagnosed; see progress/postgres-run-tests-pr280.md.
+#
+# Tests that HANG belong in regress_skip_tests.txt instead (removed from the
+# schedule). float8 and infinite_recurse are excluded when the schedule is
+# generated in postgres/compile_postgres.sh.
+
+# --- [stable] failed in all 3 runs ---
+alter_generic
+alter_table
+box
+cluster
+comments
+conversion
+copy2
+create_index
+create_index_spgist
+drop_if_exists
+expressions
+geometry
+groupingsets
+inet
+json
+json_encoding
+jsonb
+jsonb_jsonpath
+jsonpath
+jsonpath_encoding
+limit
+misc
+misc_functions
+misc_sanity
+opr_sanity
+partition_merge
+partition_prune
+partition_split
+plancache
+plpgsql
+point
+portals
+rangetypes
+regex
+returning
+rules
+select_parallel
+sqljson
+sqljson_jsontable
+sqljson_queryfuncs
+subscription
+sysviews
+temp
+type_sanity
+uuid
+with
+
+# --- [flaky] failed in at least one run, passed in another ---
+advisory_lock
+amutils
+bitmapops
+circle
+combocid
+copy
+copydml
+copyselect
+database
+date
+dependency
+domain
+encoding
+enum
+equivclass
+euc_kr
+foreign_data
+foreign_key
+functional_deps
+guc
+hash_part
+horology
+indexing
+indirect_toast
+largeobject
+line
+lseg
+md5
+money
+multirangetypes
+mvcc
+numerology
+oid8
+partition_aggregate
+partition_join
+path
+pg_dependencies
+pg_lsn
+pg_ndistinct
+polygon
+polymorphism
+portals_p2
+prepare
+rangefuncs
+regproc
+reloptions
+rowtypes
+select_views
+sequence
+stats_import
+stats_rewrite
+strings
+truncate
+tsdicts
+tsearch
+unicode
+window
+xid
+xml
+xmlmap
