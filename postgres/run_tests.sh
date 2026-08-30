@@ -4,11 +4,17 @@ set -euo pipefail
 # postgres test suite for lind-wasm (see TESTING.md)
 #
 # Tier 1 (default): smoke tests — initdb, server startup, basic SQL, text
-#                   search, plpgsql, clean shutdown.
+#                   search, plpgsql, clean shutdown. Deterministic; this is the
+#                   part that is safe to gate CI on.
 # Tier 2 (opt-in):  PG_REGRESS=1 ./postgres/run_tests.sh
-#                   Runs the full pg_regress serial schedule and compares the
+#                   Runs the full pg_regress serial schedule and REPORTS the
 #                   failing-test list against postgres/regress_known_failures.txt.
-#                   Only NEW failures (not in the baseline) fail the suite.
+#                   It does not fail the suite on that comparison: the regress
+#                   results are nondeterministic under lind-wasm (measured
+#                   2026-08-30 over three identical runs: 72/73/79 failures of
+#                   236, 60 tests flipping). Tier 2 fails only if the run cannot
+#                   complete at all. Treat its output as a report to read, not
+#                   a gate.
 #
 # Notes:
 #   - postgres is a dylink-only app (plpgsql.so / dict_snowball.so / regress.so
@@ -305,9 +311,14 @@ run_regress() {
     run_psql postgres "DROP DATABASE IF EXISTS regression;" >/dev/null 2>&1 || true
     run_psql postgres "CREATE DATABASE regression;" >/dev/null
 
-    # Capture the failing-test list and diff it against the known-failures
-    # baseline. Only failures absent from the baseline fail the suite; baseline
-    # entries that now pass are reported so the file gets pruned.
+    # IMPORTANT: the regress results are NOT deterministic under lind-wasm.
+    # Measured over 3 identical runs (2026-08-30): 72 / 73 / 79 failures, with
+    # only 46 tests failing in all three and 60 tests flipping between pass and
+    # fail. A "no new failures vs baseline" gate therefore cries wolf on nearly
+    # every run, so this function REPORTS the comparison and returns success.
+    # It fails only when the run could not be completed at all (timeout, dead
+    # server, pg_regress error) -- that is a real, actionable failure.
+    #
     # pg_regress output is TAP ("not ok 12   - char   123 ms") on PG >= 16 and
     # "test char ... FAILED" on older versions; handle both.
     timeout "$REGRESS_TIMEOUT" "$LIND_RUN" --enable-fpcast /bin/pg_regress.cwasm \
@@ -323,43 +334,52 @@ run_regress() {
     sudo cp "$LINDFS_ROOT/regress/regression.diffs" "$SAVED_DIFFS" 2>/dev/null || true
     sudo chmod 0644 "$SAVED_OUT" "$SAVED_DIFFS" 2>/dev/null || true
 
-    local actual_failures baseline new_failures resolved
+    # Did the run complete? pg_regress ends with a TAP plan line ("1..236").
+    # Absence means it was killed by $REGRESS_TIMEOUT or died partway.
+    if ! grep -qE '^1\.\.[0-9]+' "$SAVED_OUT" 2>/dev/null; then
+        echo "pg_regress did not complete (timeout ${REGRESS_TIMEOUT}s or crash)" >&2
+        echo "last output: $(tail -2 "$REGRESS_LOG" 2>/dev/null | tr '\n' ' ')" >&2
+        echo "results: $SAVED_OUT" >&2
+        return 1
+    fi
+
+    local actual_failures baseline unexpected recovered summary
     actual_failures="$(awk '($1 == "test" && / FAILED/) {print $2}
                             ($1 == "not" && $2 == "ok") {print $5}' "$REGRESS_LOG" | sort -u)"
     if [[ -f "$BASELINE_FILE" ]]; then
         baseline="$(grep -vE '^\s*(#|$)' "$BASELINE_FILE" | sort -u)"
     else
-        echo "baseline $BASELINE_FILE missing; treating all failures as new" >&2
         baseline=""
     fi
-    new_failures="$(comm -23 <(echo "$actual_failures") <(echo "$baseline"))"
-    resolved="$(comm -13 <(echo "$actual_failures") <(echo "$baseline"))"
+    unexpected="$(comm -23 <(echo "$actual_failures") <(echo "$baseline"))"
+    recovered="$(comm -13 <(echo "$actual_failures") <(echo "$baseline"))"
+    summary="$(grep -E "of [0-9]+ tests" "$REGRESS_LOG" | tail -1)"
 
-    if [[ -n "$resolved" ]]; then
-        echo "$PREFIX NOTE: baseline tests now passing (prune regress_known_failures.txt):" >&2
-        echo "$resolved" | sed "s/^/$PREFIX         /" >&2
-    fi
-    # summary line, e.g. "# 205 of 237 tests passed."
-    grep -E "of [0-9]+ tests" "$REGRESS_LOG" | tail -2 >&2 || true
+    # Full report goes to the log file, where run_test's 3-line echo can't clip it.
+    {
+        echo "$PREFIX pg_regress: ${summary:-(no summary line)}"
+        echo "$PREFIX   failed this run : $(echo "$actual_failures" | grep -c . )"
+        echo "$PREFIX   in baseline     : $(echo "$baseline" | grep -c . )"
+        if [[ -n "$unexpected" ]]; then
+            echo "$PREFIX   NOT in baseline (investigate, but note the suite is flaky):"
+            echo "$unexpected" | sed "s/^/$PREFIX       /"
+        fi
+        if [[ -n "$recovered" ]]; then
+            echo "$PREFIX   baseline tests that passed this run: $(echo "$recovered" | grep -c . )"
+        fi
+        echo "$PREFIX   results: $SAVED_OUT   diffs: $SAVED_DIFFS"
+    } >> "$LOG_FILE"
 
-    if [[ -n "$new_failures" ]]; then
-        # run_test only echoes the last few lines of a failing test's output, so
-        # write the full list to the log file where it won't be truncated.
-        {
-            echo "$PREFIX NEW regress failures (not in baseline):"
-            echo "$new_failures" | sed "s/^/$PREFIX     /"
-        } >> "$LOG_FILE"
-        echo "$(echo "$new_failures" | wc -l | tr -d ' ') new regress failures; full list in $LOG_FILE" >&2
-        echo "diffs: $SAVED_DIFFS   results: $SAVED_OUT" >&2
-        return 1
-    fi
+    # Mirror the headline to the console; run_test only shows this on failure,
+    # so also emit it directly for the passing case.
+    echo "$PREFIX ${summary:-pg_regress finished}, $(echo "$unexpected" | grep -c . ) outside baseline (see $LOG_FILE)"
     return 0
 }
 
 if [[ "$PG_REGRESS" == "1" ]]; then
     build_filtered_schedule
     echo "$PREFIX running pg_regress serial schedule (this takes a while)..."
-    run_test "pg_regress (no new failures vs baseline)" run_regress
+    run_test "pg_regress run completes" run_regress
 else
     echo "$PREFIX SKIP: pg_regress (set PG_REGRESS=1 to enable)" | tee -a "$LOG_FILE"
     log_skip "pg_regress" >/dev/null
