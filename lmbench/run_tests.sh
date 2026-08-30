@@ -71,6 +71,9 @@ LARGE_FILE_HOST="${TMP_DIR_HOST}/sample_large.bin"
 FS_DIR_GUEST="${TMP_DIR_GUEST}/fs_dir"
 FS_DIR_HOST="${TMP_DIR_HOST}/fs_dir"
 
+source "$SCRIPT_DIR/../scripts/test_lib.sh"
+trap 'rm -rf "$TMP_DIR_HOST"' EXIT
+
 print_release_switch_instructions() {
     local runtime_root="$1"
 
@@ -275,12 +278,12 @@ finish_test_section() {
     if [[ "$test_rc" -eq 0 ]]; then
         PASS_COUNT=$((PASS_COUNT + 1))
         append_log "# Result: PASS"
-        printf '[PASS] %s\n' "$binary_name"
+        printf 'PASS: %s\n' "$binary_name"
     else
         FAIL_COUNT=$((FAIL_COUNT + 1))
         FAILURES+=("$binary_name")
         append_log "# Result: FAIL (exit $test_rc)"
-        printf '[FAIL] %s (exit %s)\n' "$binary_name" "$test_rc"
+        printf 'FAIL: %s (exit %s)\n' "$binary_name" "$test_rc"
     fi
 
     append_log "#####################################"
@@ -299,6 +302,11 @@ run_configured_test() {
 
     binary_guest_path="${parsed_args[0]}"
     binary_name="${binary_guest_path##*/}"
+
+    if is_skipped "$binary_name"; then
+        log_skip "$binary_name"
+        return 0
+    fi
 
     begin_test_section "$binary_name" "$test_line"
 
@@ -333,17 +341,21 @@ write_summary() {
         failed_list="${FAILURES[*]}"
     fi
 
+    local total=$((RUN_COUNT + SKIPPED))
+
     append_log ""
     append_log "#####################################"
     append_log "# Summary"
+    append_log "# Total: $total"
     append_log "# Ran: $RUN_COUNT"
     append_log "# Passed: $PASS_COUNT"
     append_log "# Failed: $FAIL_COUNT"
+    append_log "# Skipped: $SKIPPED"
     append_log "# Failed Binaries: $failed_list"
     append_log "#####################################"
 
-    printf '%s %d/%d tests passed, %d failed\n' \
-        "$PREFIX" "$PASS_COUNT" "$RUN_COUNT" "$FAIL_COUNT"
+    printf '%s Total: %d, %d/%d tests passed, %d failed, %d skipped\n' \
+        "$PREFIX" "$total" "$PASS_COUNT" "$RUN_COUNT" "$FAIL_COUNT" "$SKIPPED"
     printf '%s Log saved to: %s\n' "$PREFIX" "$LOG_FILE"
 
     if (( FAIL_COUNT > 0 )); then
