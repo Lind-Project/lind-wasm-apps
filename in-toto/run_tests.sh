@@ -27,6 +27,7 @@ if [[ "$MODE" == "native" ]]; then
   WORK_HOST="$(mktemp -d)"
   WORK_GUEST="$WORK_HOST"
   CLI=("$BIN")
+  CHILD="$BIN"
 else
   BIN_GUEST="/usr/local/bin/in-toto-cli"
   [[ -f "$LINDFS$BIN_GUEST" ]] || { echo "ERROR: $LINDFS$BIN_GUEST missing (make in-toto && make install-in-toto)"; exit 1; }
@@ -35,6 +36,7 @@ else
   rm -rf "$WORK_HOST"; mkdir -p "$WORK_HOST"
   # lind_run needs sudo; guest paths are chroot-relative.
   CLI=(sudo -E timeout -s KILL 120 "$LIND_WASM_ROOT/scripts/bin/lind_run" "$BIN_GUEST")
+  CHILD="$BIN_GUEST"
 fi
 mkdir -p "$WORK_HOST/links"
 echo "[test] mode=$MODE workdir(host)=$WORK_HOST"
@@ -45,6 +47,14 @@ echo "[test] keygen"
 run keygen "$WORK_GUEST/owner.pk8" "$WORK_GUEST/owner.pub.json" >/dev/null && \
 run keygen "$WORK_GUEST/func.pk8"  "$WORK_GUEST/func.pub.json"  >/dev/null && \
   [[ -s "$WORK_HOST/owner.pk8" && -s "$WORK_HOST/func.pub.json" ]] && ok "keygen wrote keys" || bad "keygen"
+
+echo "[test] run -- <cmd> (fork/exec a child, record its product)"
+run run --name child --key "$WORK_GUEST/func.pk8" --out "$WORK_GUEST/links" \
+    --products "$WORK_GUEST/child.pub.json" --lstrip "$WORK_GUEST/" \
+    -- "$CHILD" keygen "$WORK_GUEST/child.pk8" "$WORK_GUEST/child.pub.json" >/dev/null \
+  && grep -q '"return-value": 0' "$WORK_HOST"/links/child.*.link && grep -q '"child.pub.json"' "$WORK_HOST"/links/child.*.link \
+  && ok "child ran, product recorded" || bad "run -- cmd"
+rm -f "$WORK_HOST"/links/child.*.link
 
 echo "[test] step write-code"
 printf 'print("hello in-toto")\n' > "$WORK_HOST/foo.py"

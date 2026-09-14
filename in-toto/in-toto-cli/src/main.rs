@@ -1,25 +1,37 @@
 //! in-toto-cli: small command-line driver for the `in-toto` crate.
 //!
 //!   keygen     <out.pk8> <out.pub.json>
-//!   run        --name <step> --key <pk8> --out <link-dir> [--materials p..] [--products p..] [--lstrip <prefix>]
+//!   run        --name <step> --key <pk8> --out <link-dir> [--materials p..] [--products p..] [--lstrip <prefix>] [-- <cmd> <args..>]
 //!   gen-layout --key <owner.pk8> --step-key <functionary.pub.json> --out <root.layout> [--expires <RFC3339>]
+//!              [--src <file>] [--pkg <file>] [--step-src <name>] [--step-pkg <name>] [-- <expected cmd of step-pkg>]
 //!   verify     --layout <root.layout> --key <owner.pub.json> --links <link-dir>
 //!
 //! No clap, no std::net, no std::process (unsupported on wasm32-wasip1).
+//! `run -- <cmd>` uses libc fork/execv/waitpid directly, the same way the Rust
+//! grates launch their child, so the command runs as a child cage under lind.
 
 use std::collections::HashMap;
+use std::ffi::CString;
 use std::fs;
+use std::os::raw::{c_char, c_int};
 use std::path::Path;
 use std::process::exit;
+use std::ptr;
 
 use chrono::{DateTime, Utc};
 use in_toto::crypto::{KeyId, KeyType, PrivateKey, PublicKey, SignatureScheme};
 use in_toto::models::rule::{Artifact, ArtifactRule};
-use in_toto::models::step::Step;
-use in_toto::models::{LayoutMetadataBuilder, Metablock, MetadataWrapper, VirtualTargetPath};
-use in_toto::runlib::in_toto_run;
+use in_toto::models::step::{Command, Step};
+use in_toto::interchange::Json;
+use in_toto::models::byproducts::ByProducts;
+use in_toto::models::{
+    LayoutMetadataBuilder, LinkMetadataBuilder, Metablock, MetadataWrapper, VirtualTargetPath,
+};
+use in_toto::runlib::record_artifacts;
 use in_toto::verifylib::in_toto_verify;
 
+// Defaults for the two-step demo layout: <step-src> creates <src>, <step-pkg>
+// consumes <src> and creates <pkg>. All four can be overridden.
 const STEP_WRITE: &str = "write-code";
 const STEP_PACKAGE: &str = "package";
 const ARTIFACT_SRC: &str = "foo.py";
@@ -27,7 +39,7 @@ const ARTIFACT_PKG: &str = "foo.tar.gz";
 
 fn usage() -> ! {
     eprintln!(
-        "usage:\n  in-toto-cli keygen <out.pk8> <out.pub.json>\n  in-toto-cli run --name <step> --key <pk8> --out <link-dir> [--materials p..] [--products p..] [--lstrip <prefix>]\n  in-toto-cli gen-layout --key <owner.pk8> --step-key <functionary.pub.json> --out <root.layout> [--expires <RFC3339>]\n  in-toto-cli verify --layout <root.layout> --key <owner.pub.json> --links <link-dir>"
+        "usage:\n  in-toto-cli keygen <out.pk8> <out.pub.json>\n  in-toto-cli run --name <step> --key <pk8> --out <link-dir> [--materials p..] [--products p..] [--lstrip <prefix>] [-- <cmd> <args..>]\n  in-toto-cli gen-layout --key <owner.pk8> --step-key <functionary.pub.json> --out <root.layout> [--expires <RFC3339>] [--src <file>] [--pkg <file>] [--step-src <name>] [--step-pkg <name>] [-- <expected cmd>]\n  in-toto-cli verify --layout <root.layout> --key <owner.pub.json> --links <link-dir>"
     );
     exit(2)
 }
@@ -118,8 +130,51 @@ fn key_id_str(k: &KeyId) -> String {
         .unwrap_or_else(|| format!("{:?}", k))
 }
 
+extern "C" {
+    fn fork() -> c_int;
+    fn execv(path: *const c_char, argv: *const *const c_char) -> c_int;
+    fn waitpid(pid: c_int, status: *mut c_int, options: c_int) -> c_int;
+    fn _exit(code: c_int) -> !;
+}
+
+/// Run `cmd` as a child process and return its exit status.
+/// fork/execv/waitpid come from glibc; on lind the child is a new cage, so a
+/// grate wrapping this process (e.g. the IMFS grate) also sees the child.
+fn run_child(cmd: &[String]) -> i32 {
+    let cstrs: Vec<CString> = cmd
+        .iter()
+        .map(|s| CString::new(s.as_str()).unwrap_or_else(|_| die(format!("bad argument {:?}", s))))
+        .collect();
+    let mut argv: Vec<*const c_char> = cstrs.iter().map(|s| s.as_ptr()).collect();
+    argv.push(ptr::null());
+
+    let pid = unsafe { fork() };
+    if pid < 0 {
+        die(format!("fork: {}", std::io::Error::last_os_error()));
+    }
+    if pid == 0 {
+        unsafe { execv(argv[0], argv.as_ptr()) };
+        eprintln!("execv {}: {}", cmd[0], std::io::Error::last_os_error());
+        unsafe { _exit(127) }
+    }
+    let mut status: c_int = 0;
+    if unsafe { waitpid(pid, &mut status, 0) } < 0 {
+        die(format!("waitpid: {}", std::io::Error::last_os_error()));
+    }
+    if status & 0x7f != 0 {
+        die(format!("command killed by signal {}", status & 0x7f));
+    }
+    (status >> 8) & 0xff
+}
+
 fn cmd_run(args: &[String]) {
-    let o = Opts::parse(args);
+    // Everything after "--" is the step command; it runs between recording
+    // materials and recording products, like in-toto-run.
+    let (opt_args, cmd) = match args.iter().position(|a| a == "--") {
+        Some(i) => (&args[..i], &args[i + 1..]),
+        None => (args, &args[args.len()..]),
+    };
+    let o = Opts::parse(opt_args);
     let name = o.one("name");
     let key = load_private_key(&o.one("key"));
     let out_dir = o.one("out");
@@ -132,9 +187,29 @@ fn cmd_run(args: &[String]) {
     let lstrip_v: Vec<&str> = lstrip.iter().map(String::as_str).collect();
     let lstrip_opt: Option<&[&str]> = if lstrip_v.is_empty() { None } else { Some(&lstrip_v) };
 
-    // Empty command: only record and sign artifacts.
-    let link = in_toto_run(&name, None, &mats, &prods, &[], Some(&key), None, lstrip_opt)
-        .unwrap_or_else(|e| die(format!("in_toto_run({}): {:?}", name, e)));
+    let materials = record_artifacts(&mats, None, lstrip_opt)
+        .unwrap_or_else(|e| die(format!("record materials: {:?}", e)));
+
+    let mut byproducts = ByProducts::new();
+    if !cmd.is_empty() {
+        let rc = run_child(cmd);
+        if rc != 0 {
+            eprintln!("warning: {} exited with status {}", cmd[0], rc);
+        }
+        byproducts = byproducts.set_return_value(rc);
+    }
+
+    let products = record_artifacts(&prods, None, lstrip_opt)
+        .unwrap_or_else(|e| die(format!("record products: {:?}", e)));
+
+    let link = LinkMetadataBuilder::new()
+        .name(name.clone())
+        .materials(materials)
+        .byproducts(byproducts)
+        .command(Command::from(cmd))
+        .products(products)
+        .signed::<Json>(&key)
+        .unwrap_or_else(|e| die(format!("sign link {}: {:?}", name, e)));
 
     let fname = format!("{}.{}.link", name, key.key_id().prefix());
     let path = Path::new(&out_dir).join(&fname);
@@ -143,13 +218,22 @@ fn cmd_run(args: &[String]) {
 }
 
 fn cmd_gen_layout(args: &[String]) {
-    let o = Opts::parse(args);
+    // Everything after "--" is the expected command of the second step.
+    let (opt_args, cmd) = match args.iter().position(|a| a == "--") {
+        Some(i) => (&args[..i], &args[i + 1..]),
+        None => (args, &args[args.len()..]),
+    };
+    let o = Opts::parse(opt_args);
     let owner = load_private_key(&o.one("key"));
     let functionary = load_public_key(&o.one("step-key"));
     let out = o.one("out");
+    let step_src = o.opt("step-src").unwrap_or_else(|| STEP_WRITE.to_string());
+    let step_pkg = o.opt("step-pkg").unwrap_or_else(|| STEP_PACKAGE.to_string());
+    let art_src = o.opt("src").unwrap_or_else(|| ARTIFACT_SRC.to_string());
+    let art_pkg = o.opt("pkg").unwrap_or_else(|| ARTIFACT_PKG.to_string());
 
     let mut builder = LayoutMetadataBuilder::new()
-        .readme("lind-wasm in-toto demo layout: write-code -> package".to_string())
+        .readme(format!("lind-wasm in-toto demo layout: {} -> {}", step_src, step_pkg))
         .add_key(functionary.clone());
     if let Some(exp) = o.opt("expires") {
         let dt = DateTime::parse_from_rfc3339(&exp)
@@ -158,25 +242,28 @@ fn cmd_gen_layout(args: &[String]) {
         builder = builder.expires(dt);
     }
 
-    let write_code = Step::new(STEP_WRITE)
+    let write_code = Step::new(&step_src)
         .threshold(1)
         .add_key(functionary.key_id().clone())
-        .add_expected_product(ArtifactRule::Create(vpath(ARTIFACT_SRC)))
+        .add_expected_product(ArtifactRule::Create(vpath(&art_src)))
         .add_expected_product(ArtifactRule::Disallow(vpath("*")));
 
-    let package = Step::new(STEP_PACKAGE)
+    let mut package = Step::new(&step_pkg)
         .threshold(1)
         .add_key(functionary.key_id().clone())
         .add_expected_material(ArtifactRule::Match {
-            pattern: vpath(ARTIFACT_SRC),
+            pattern: vpath(&art_src),
             in_src: None,
             with: Artifact::Products,
             in_dst: None,
-            from: STEP_WRITE.to_string(),
+            from: step_src.clone(),
         })
         .add_expected_material(ArtifactRule::Disallow(vpath("*")))
-        .add_expected_product(ArtifactRule::Create(vpath(ARTIFACT_PKG)))
+        .add_expected_product(ArtifactRule::Create(vpath(&art_pkg)))
         .add_expected_product(ArtifactRule::Disallow(vpath("*")));
+    if !cmd.is_empty() {
+        package = package.expected_command(Command::from(cmd));
+    }
 
     let layout = builder
         .add_step(write_code)
