@@ -75,3 +75,29 @@ the build.
 The script needs the gcc closure and the IMFS grate staged in `lindfs`. The
 required files are listed in `examples/gcc-preloads.txt`. The ELF built under
 the grate is byte-identical to one built without it.
+
+## Example: the same build inside an SGX enclave
+
+`examples/gcc-imfs-sgx.sh` runs the gcc example through TriSeal's `enarx` on
+the sgx backend. Every step is an `enarx run`. The build step makes the IMFS
+grate the enarx workload, with in-toto-cli as the grate's child.
+
+1. Two keys are generated inside the enclave.
+2. `write-code` records `hello.c`.
+3. `build` forks gcc inside the enclave. gcc writes the ELF into the
+   in-memory filesystem and in-toto signs a link with its hash.
+4. `gen-layout` and `verify` pass.
+5. `hello.c` is tampered and rebuilt. `verify` fails.
+
+Under enarx there is no chroot, so every path is host-absolute. The exec
+target is loaded through the grate, so `in-toto-cli.cwasm` itself is in
+`PRELOADS`. The linker script for `libc.so` names three absolute host paths,
+so the host's own copies of those files are preloaded too. The comment block
+at the top of the script lists each of these.
+
+`in-toto-cli.cwasm` must be built against the sysroot that enarx's lind-boot
+was built from. A module built in the dev container carries a
+`debug::lind_debug_num` import that enarx cannot satisfy.
+
+The enclave runtime needed one addition to TriSeal's sallyport: `getdents64`.
+Without it `verify` sees an empty links directory.
