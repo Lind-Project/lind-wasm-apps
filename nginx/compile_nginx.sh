@@ -52,7 +52,7 @@ AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
 RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
 # Wasm optimization and precompilation tools
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -112,6 +112,12 @@ CFLAGS_WASM="-O2 -g -pthread -matomics -mbulk-memory \
     -I$MERGED_SYSROOT/include \
     -I$MERGED_SYSROOT/include/wasm32-wasi \
     -D_GNU_SOURCE"
+
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=" -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
 
 if [[ "$LIND_DYLINK" == "1" ]]; then
     echo "[nginx] Dynamic linking mode enabled (LIND_DYLINK=1)"
@@ -860,29 +866,19 @@ rm -f "$NGINX_WASM" "$NGINX_OPT_WASM" "$NGINX_OPT_CWASM"
 # for debugging and write the runnable module to the traditional `nginx.wasm`
 # path. Full mode still keeps the historical `.opt.wasm` and `.cwasm` aliases.
 ##################
-if [[ ! -x "$WASM_OPT" ]]; then
-    echo "[nginx] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact." >&2
+if [[ ! -x "$LIND_WASM_OPT" ]]; then
+    echo "[nginx] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifact." >&2
     exit 1
 fi
 
 if [[ "$LIND_DYLINK" == "1" ]]; then
-    echo "[nginx] running wasm-opt (dylink-aware: epoch-import + asyncify-import-globals)..."
-    "$WASM_OPT" \
-        --fpcast-emu \
-        --enable-bulk-memory --enable-threads \
-        --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-        --asyncify --pass-arg=asyncify-import-globals \
-        -O2 --debuginfo \
+    echo "[nginx] running lind-wasm-opt (dylink main)..."
+    "$LIND_WASM_OPT" --target=main --fpcast-emu \
         "$NGINX_RAW_WASM" \
         -o "$NGINX_WASM"
 else
-    echo "[nginx] running wasm-opt (asyncify + epoch injection) to produce runnable nginx.wasm..."
-    "$WASM_OPT" \
-        --fpcast-emu \
-        --epoch-injection \
-        --asyncify \
-        --debuginfo \
-        -O2 \
+    echo "[nginx] running lind-wasm-opt (static)..."
+    "$LIND_WASM_OPT" --static --fpcast-emu \
         "$NGINX_RAW_WASM" \
         -o "$NGINX_WASM"
 fi
