@@ -26,7 +26,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 SYSROOT="${SYSROOT:-$APPS_BUILD/sysroot_merged}"
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
 
@@ -92,6 +92,13 @@ pushd "$BUILD_WASM" >/dev/null
 # CPython uses -O0 because the build system relies on specific code generation
 # behavior that breaks with optimization.
 
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+EH_SJLJ_FLAGS=""
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  EH_SJLJ_FLAGS="-fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 if [[ ! -f "Makefile" ]]; then
   echo "[cpython] configuring wasm build..."
   ../configure \
@@ -102,7 +109,7 @@ if [[ ! -f "Makefile" ]]; then
     -pthread \
     --target=wasm32-unknown-wasi \
     --sysroot $SYSROOT \
-    -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC" \
+    -Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low -D _FILE_OFFSET_BITS=64 -D __USE_LARGEFILE64 -g -O0 -fPIC $EH_SJLJ_FLAGS" \
     ac_cv_func_working_mktime=yes \
     ac_cv_func_mmap_fixed_mapped=yes \
     bash_cv_func_sigsetjmp=no \
@@ -144,12 +151,12 @@ else
   PYTHON_OPT_WASM="$BUILD_WASM/python.opt.wasm"
   PYTHON_OPT_CWASM="$BUILD_WASM/python.opt.cwasm"
 
-  if [[ -x "$WASM_OPT" ]]; then
-    echo "[cpython] running wasm-opt (asyncify + optimization)..."
-    "$WASM_OPT" --epoch-injection --asyncify -O2 --debuginfo \
+  if [[ -x "$LIND_WASM_OPT" ]]; then
+    echo "[cpython] running lind-wasm-opt..."
+    "$LIND_WASM_OPT" --static --fpcast-emu \
       "$PYTHON_WASM" -o "$PYTHON_OPT_WASM"
   else
-    echo "[cpython] ERROR: wasm-opt not found at '$WASM_OPT'" >&2
+    echo "[cpython] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'" >&2
     exit 1
   fi
 
@@ -232,12 +239,9 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   "$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM" __stack_pointer global __stack_pointer optional \
     || { echo "[cpython] ERROR: add-export-tool stack pointer failed" >&2; exit 1; }
 
-  "$WASM_OPT" --enable-bulk-memory --enable-threads \
-    --epoch-injection --pass-arg=epoch-import \
-    --asyncify --pass-arg=asyncify-import-globals \
-    -O2 --debuginfo \
+  "$LIND_WASM_OPT" --target=library --fpcast-emu \
     "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" \
-    || { echo "[cpython] ERROR: wasm-opt failed on shared libpython" >&2; exit 1; }
+    || { echo "[cpython] ERROR: lind-wasm-opt failed on shared libpython" >&2; exit 1; }
 
   if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
     echo "[cpython] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'" >&2
@@ -303,14 +307,10 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     exit 1
   fi
 
-  echo "[cpython] running wasm-opt on PIE python..."
-  "$WASM_OPT" \
-    --enable-bulk-memory --enable-threads \
-    --epoch-injection --pass-arg=epoch-import --pass-arg=epoch-main-module \
-    --asyncify --pass-arg=asyncify-import-globals \
-    --debuginfo \
+  echo "[cpython] running lind-wasm-opt on PIE python..."
+  "$LIND_WASM_OPT" --target=main --fpcast-emu \
     "$PYTHON_WASM" -o "$PYTHON_OPT_WASM" \
-    || { echo "[cpython] ERROR: wasm-opt failed on PIE python" >&2; exit 1; }
+    || { echo "[cpython] ERROR: lind-wasm-opt failed on PIE python" >&2; exit 1; }
 
   if [[ ! -f "$PYTHON_OPT_WASM" ]]; then
     echo "[cpython] ERROR: Failed to generate $PYTHON_OPT_WASM" >&2

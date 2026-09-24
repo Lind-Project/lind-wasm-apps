@@ -34,7 +34,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -79,6 +79,12 @@ CC_WASM="$CLANG --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT \
   -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi"
 
 CFLAGS_WASM="-Os"
+
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=" -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
 
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
   -Wl,--export=__stack_pointer,--export=__stack_low \
@@ -173,13 +179,12 @@ post_process_binary() {
   echo "[binutils] $NAME binary size: $(du -h "$WASM_FILE" | cut -f1)"
 
   # --- wasm-opt ---
-  if [[ -x "$WASM_OPT" ]]; then
-    echo "[binutils] running wasm-opt on $NAME (epoch-injection + asyncify + O2)…"
-    "$WASM_OPT" --epoch-injection --asyncify \
-      --debuginfo -O2 \
+  if [[ -x "$LIND_WASM_OPT" ]]; then
+    echo "[binutils] running lind-wasm-opt on $NAME…"
+    "$LIND_WASM_OPT" --static \
       "$WASM_FILE" -o "$OPT_WASM"
   else
-    echo "[binutils] ERROR: wasm-opt not found at '$WASM_OPT'; exiting." >&2
+    echo "[binutils] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; exiting." >&2
     exit 1
   fi
 
