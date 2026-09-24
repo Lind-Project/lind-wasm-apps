@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────
+# tinycc/run_tests.sh
+# Sanity test suite for tcc (Tiny C Compiler) in Lind/wasm sandbox
+# ─────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -8,15 +12,19 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-LINDFS="${LIND_WASM_ROOT}/lindfs"
+LINDFS_ROOT="${LIND_WASM_ROOT}/lindfs"
+STAGE_DIR="$APPS_ROOT/build/tinycc"
 TINYCC_BIN="bin/tcc"
-TEST_DIR="$LINDFS/tests/tinycc"
+TEST_DIR="$LINDFS_ROOT/tests/tinycc"
 TEST_DIR_RELATIVE="tests/tinycc"
 
+source "$SCRIPT_DIR/../scripts/test_lib.sh"
+
 # --- Configuration Variables ---
-COMPILER="lind_run bin/tcc"             
+COMPILER="lind_run bin/tcc"
 CFLAGS="-Wall"                # Compiler flags
 RESULTS_FILE="$TEST_DIR/results.log"    # Summary of results
+TIMEOUT_SECS="${TIMEOUT_SECS:-10}"
 
 # ANSI Color Codes
 GREEN='\033[0;32m'
@@ -25,9 +33,9 @@ CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-STAGE_DIR="$APPS_ROOT/build/tinycc"
-
-# Verify tinycc is built
+# ─────────────────────────────────────────────────────────────
+# Preconditions — must run before any test is recorded
+# ─────────────────────────────────────────────────────────────
 echo "[test] Checking staged binary..."
 
 if [[ ! -f "$STAGE_DIR/bin/tcc" ]]; then
@@ -39,13 +47,11 @@ fi
 
 echo "  OK: staged binary found : $STAGE_DIR/bin/tcc"
 
-# Verify tinycc is installed in lindfs
-
 echo
 echo "[test] Checking lindfs installation..."
 
-if [[ ! -f "$LINDFS/$TINYCC_BIN" ]]; then
-  echo "  ERROR: grep is not installed in lindfs ($LINDFS/$TINYCC_BIN not found)"
+if [[ ! -f "$LINDFS_ROOT/$TINYCC_BIN" ]]; then
+  echo "  ERROR: tinycc is not installed in lindfs ($LINDFS_ROOT/$TINYCC_BIN not found)"
   echo "  Please build and install tinycc by running:"
   echo "    make tinycc"
   echo "    make install-tinycc"
@@ -56,46 +62,71 @@ echo "  OK: tinycc installed at $LINDFS_ROOT/$TINYCC_BIN"
 
 # Initialize Test Directory
 mkdir -p "$TEST_DIR"
+trap 'rm -rf "$TEST_DIR"' EXIT
 echo "TCC Test Results - $(date)" > "$RESULTS_FILE"
+
+# ----------------------------------------------------------------------
+# Host 32-bit dynamic linker setup
+# ----------------------------------------------------------------------
+# Dynamically linked executables produced by tcc expect the i386 linker at
+# /lib/ld-linux.so.2. This is a host-level prerequisite
+
+sudo ln -s /usr/i686-linux-gnu/lib/ld-linux.so.2 /lib/ld-linux.so.2
+echo '/usr/i686-linux-gnu/lib' | sudo tee /etc/ld.so.conf.d/i686-cross.conf
+sudo ldconfig
+
+
+PASS=0
+FAIL=0
+TOTAL=0
 
 # --- Function to Run a Test Case ---
 # Arguments: test_name, c_code, expected_output
 run_test() {
-    local name=$1
-    local code=$2
-    local expected=$3
+    local name="$1"
+    local code="$2"
+    local expected="$3"
+
+    if is_skipped "$name"; then
+        log_skip "$name"
+        return
+    fi
+
     local src="$TEST_DIR/$name.c"
     local bin="$TEST_DIR/$name.bin"
+    local src_relative="$TEST_DIR_RELATIVE/$name.c"
+    local bin_relative="$TEST_DIR_RELATIVE/$name.bin"
 
     echo -e "${CYAN}Testing ${name}...${NC}"
 
     # 1. Write the C file
     echo "$code" > "$src"
 
-    local src_relative="$TEST_DIR_RELATIVE/$name.c"
-    local bin_relative="$TEST_DIR_RELATIVE/$name.bin"
+    TOTAL=$((TOTAL + 1))
 
-    # 2. Compile
-    $COMPILER $CFLAGS "$src_relative" -o "$bin_relative" 2>>"$RESULTS_FILE"
-    
-    if [ $? -ne 0 ]; then
-        echo -e "  [${RED}FAIL${NC}] Compilation failed"
-        echo "$name: Compilation Failed" >> "$RESULTS_FILE"
+    # 2. Compile (through lind_run, since tcc itself is the app under test)
+    if ! timeout ${TIMEOUT_SECS}s $COMPILER $CFLAGS "$src_relative" -o "$bin_relative" 2>>"$RESULTS_FILE"; then
+        echo -e "  ${RED}FAIL:${NC} $name (compilation failed)"
+        echo "$name: FAIL (compilation failed)" >> "$RESULTS_FILE"
+        FAIL=$((FAIL + 1))
         return
     fi
 
     # 3. Execute and Capture Output
-    local actual=$($bin)
+    local actual
+    actual=$(timeout ${TIMEOUT_SECS}s "$bin")
 
     # 4. Compare
     if [ "$actual" == "$expected" ]; then
-        echo -e "  [${GREEN}PASS${NC}] Output matched"
+        echo -e "  ${GREEN}PASS:${NC} $name"
         echo "$name: PASS" >> "$RESULTS_FILE"
+        PASS=$((PASS + 1))
     else
-        echo -e "  [${RED}FAIL${NC}] Output mismatch"
-        echo -e "    Expected: $expected"
-        echo -e "    Actual:   $actual"
-        echo "$name: FAIL (Output mismatch)" >> "$RESULTS_FILE"
+        echo -e "  ${RED}FAIL:${NC} $name"
+        echo    "       expected: $expected"
+        echo    "       actual  : $actual"
+        echo "$name: FAIL (output mismatch)" >> "$RESULTS_FILE"
+        FAIL=$((FAIL + 1))
     fi
 }
 
@@ -180,7 +211,22 @@ int main() {
 }' \
 "1"
 
-
-
+# ─────────────────────────────────────────────────────────────
+# SUMMARY
+# ─────────────────────────────────────────────────────────────
 echo -e "${YELLOW}------------------------------------------${NC}"
 echo "Full results saved to $RESULTS_FILE"
+echo ""
+echo -e " Total  : $TOTAL"
+echo -e " ${GREEN}Pass${NC}   : $PASS"
+echo -e " ${RED}Fail${NC}   : $FAIL"
+echo -e " Skipped: $SKIPPED"
+echo ""
+if [ $FAIL -gt 0 ]; then
+    echo -e "${RED}FAILED${NC} — $FAIL/$TOTAL tests failed"
+    exit 1
+else
+    echo -e "${GREEN}ALL PASSED${NC} — $PASS/$TOTAL tests passed"
+    exit 0
+fi
+
