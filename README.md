@@ -4,13 +4,36 @@ Cross-compiled applications for the [Lind](https://github.com/Lind-Project/lind-
 
 ## Prerequisites
 
-- [lind-wasm](https://github.com/Lind-Project/lind-wasm) built and installed (provides the glibc sysroot, LLVM toolchain, wasm-opt, and lind-boot)
+- [lind-wasm](https://github.com/Lind-Project/lind-wasm) built (provides the glibc sysroot, LLVM toolchain, wasm-opt, and lind-boot) — see "Building lind-wasm" below.
 - This repo cloned alongside `lind-wasm`:
   ```
   ~/lind-wasm/                    # the runtime
   ~/lind-wasm/lind-wasm-apps/     # this repo
   ```
 - Set `LIND_WASM_ROOT` if your layout differs (default: `~/lind-wasm`)
+
+### Building lind-wasm
+
+`lind-wasm-apps` needs a release (non-debug) `lind-boot`, plus **two** sysroot
+variants built in `lind-wasm` — a plain one and an fpcast-enabled one (some
+apps need the latter; see [fpcast-emu](#fpcast-emu-indirect-call-type-mismatch-fix)
+below):
+
+**Avoid `make lind-debug`.** It rebuilds `lind-boot` without `--release` and
+rebuilds glibc with `-DLIND_DEBUG`, but writes both to the *same* paths as the
+commands above (`build/lind-boot`, `build/sysroot`) — there's no separate
+debug output location, so it silently overwrites the release artifacts
+`lind-wasm-apps` expects. If you've ever run it, or have `LIND_DEBUG=1` set in
+your shell, rebuild the non-debug artifacts before building anything here:
+
+```bash
+cd lind-wasm
+unset LIND_DEBUG
+make lindfs
+make lind-boot          # runtime, built with --release
+make sysroot            # plain sysroot -> build/sysroot
+make sysroot WITH_FPCAST=1 SYSROOT_DIR=build/sysroot-fpcast # fpcast sysroot -> build/sysroot-fpcast
+```
 
 ## Quick Start
 
@@ -90,22 +113,34 @@ LIND_DYLINK=0 make git
 
 ### fpcast-emu (indirect call type mismatch fix)
 
-Some apps (bash, nginx, coreutils, grep) use `--fpcast-emu` in their wasm-opt pass to handle indirect function pointer type mismatches. For dynamic builds, fpcast-emu requires additional setup:
+Some apps (`awk`, `bash`, `coreutils`, `grep`, `gmake`, `nginx`, `perl`, `postgres`,
+`lmbench`) use `--fpcast-emu` in their wasm-opt pass to handle indirect function pointer
+type mismatches, and must be linked against a sysroot that lind-wasm built with
+`WITH_FPCAST=1`. All other apps use the plain sysroot.
 
-1. Rebuild the lind-wasm sysroot with fpcast support:
-   ```bash
-   cd ~/lind-wasm
-   make sysroot WITH_FPCAST=1
-   ```
+`lind-wasm-apps` keeps both sysroot variants around at once and routes each app to the
+right one automatically — there's no need to rebuild the lind-wasm sysroot in place every
+time you switch between fpcast and non-fpcast apps.
 
-2. Apps are compiled with `--fpcast-emu` automatically (see each app's compile script)
+1. Build both sysroot variants once in lind-wasm — see "Building lind-wasm" under
+   Prerequisites above.
 
-3. Run with `--enable-fpcast`:
+2. Back in `lind-wasm-apps`, `BASE_SYSROOT_FPCAST` defaults to
+   `$(LIND_WASM_ROOT)/build/sysroot-fpcast`, matching the path above. Override it (as an
+   env var or `make` argument) if you put the fpcast sysroot somewhere else.
+
+3. Just build normally — `make bash`, `make lmbench`, `make all`, etc. Each app's
+   Makefile target already depends on the correct merged sysroot
+   (`sysroot_merged` or `sysroot_merged_fpcast` under `build/`), so fpcast and
+   non-fpcast apps can be built side by side without re-merging anything in between.
+
+4. Run fpcast apps with `--enable-fpcast`:
    ```bash
    lind-wasm --enable-fpcast usr/local/bin/bash -c "echo hello"
    ```
 
-Without `WITH_FPCAST=1` in the sysroot, dynamic builds of apps using fpcast-emu will fail with indirect call type mismatch errors at runtime.
+If `BASE_SYSROOT_FPCAST` doesn't exist, building any fpcast app fails fast with an error
+naming the missing path and the exact `make sysroot` command to produce it.
 
 ## Running
 
@@ -116,7 +151,7 @@ After building and installing, run apps through the Lind runtime:
 lind-wasm usr/local/bin/bash -c "echo hello"
 lind-wasm usr/local/bin/git --version
 
-# Apps that use fpcast-emu (bash, nginx, coreutils, grep)
+# Apps that use fpcast-emu (awk, bash, coreutils, grep, gmake, nginx, perl, postgres, lmbench)
 lind-wasm --enable-fpcast usr/local/bin/bash -c "echo hello"
 
 # Dynamic builds (shared libs preloaded automatically after install)
@@ -149,10 +184,11 @@ Apps with test suites: bash, coreutils, curl, git, grep, lmbench, sed, tinycc, c
 
 ```
 build/
-  sysroot_overlay/    # headers + static libs from library builds (zlib, openssl, etc.)
-  sysroot_merged/     # base glibc sysroot + overlay combined
-  <app>/              # per-app staging dir (installed to lindfs via make install)
-  .toolchain.env      # detected toolchain paths (written by make preflight)
+  sysroot_overlay/        # headers + static libs from library builds (zlib, openssl, etc.)
+  sysroot_merged/         # plain glibc sysroot + overlay combined
+  sysroot_merged_fpcast/  # fpcast glibc sysroot + overlay combined (see fpcast-emu below)
+  <app>/                  # per-app staging dir (installed to lindfs via make install)
+  .toolchain.env          # detected toolchain paths (written by make preflight)
 ```
 
 ### Library Targets
@@ -190,6 +226,7 @@ make rebuild-sysroot  # force-rebuild merged sysroot
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LIND_WASM_ROOT` | `~/lind-wasm` | Path to lind-wasm installation |
+| `BASE_SYSROOT_FPCAST` | `$LIND_WASM_ROOT/build/sysroot-fpcast` | Path to the fpcast-enabled sysroot (see fpcast-emu above) |
 | `LIND_DYLINK` | `0` | Set to `1` for dynamic/PIE builds |
 | `JOBS` | `$(nproc)` | Parallel build jobs |
 | `ARTIFACT_MODE` | `full` | Set to `fast` to skip cwasm generation (dev builds) |
