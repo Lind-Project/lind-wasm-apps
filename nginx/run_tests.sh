@@ -26,6 +26,8 @@ NGINX_BIN="usr/sbin/nginx"
 NGINX_CONF_DIR="$LINDFS_ROOT/etc/nginx"
 NGINX_HTML_DIR="$LINDFS_ROOT/var/www/html"
 
+source "$SCRIPT_DIR/../scripts/test_lib.sh"
+
 # --- configurable settings ---------------------------------------------------
 TEST_PORT="${TEST_PORT:-8080}"
 STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-15}"
@@ -133,12 +135,19 @@ echo "$PREFIX nginx ready (PID $NGINX_PID)"
 run_test() {
     local name="$1"
     shift
+
+    if is_skipped "$name"; then
+        echo "$PREFIX SKIP: $name" | tee -a "$LOG_FILE"
+        log_skip "$name" >/dev/null
+        return
+    fi
+
     local test_output
     if test_output=$("$@" 2>&1); then
-        echo "$PREFIX [PASS] $name" | tee -a "$LOG_FILE"
+        echo "$PREFIX PASS: $name" | tee -a "$LOG_FILE"
         (( PASS_COUNT++ )) || true
     else
-        echo "$PREFIX [FAIL] $name" | tee -a "$LOG_FILE"
+        echo "$PREFIX FAIL: $name" | tee -a "$LOG_FILE"
         if [[ -n "${test_output:-}" ]]; then
             echo "$PREFIX        output: $(echo "$test_output" | head -3)" | tee -a "$LOG_FILE"
         fi
@@ -151,23 +160,23 @@ BASE_URL="http://localhost:$TEST_PORT"
 # --- test cases --------------------------------------------------------------
 test_get_index() {
     local body status
-    status="$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/")"
+    status="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' "$BASE_URL/")"
     [[ "$status" == "200" ]] || { echo "$PREFIX        expected 200, got $status" >&2; return 1; }
-    body="$(curl -s "$BASE_URL/")"
+    body="$(curl --max-time 10 -s "$BASE_URL/")"
     [[ "$body" == *"Welcome to nginx"* ]] || { echo "$PREFIX        body does not contain 'Welcome to nginx'" >&2; return 1; }
 }
 
 test_head_request() {
     local status content_length
-    status="$(curl -s -o /dev/null -w '%{http_code}' -I "$BASE_URL/")"
+    status="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' -I "$BASE_URL/")"
     [[ "$status" == "200" ]] || { echo "$PREFIX        expected 200, got $status" >&2; return 1; }
-    content_length="$(curl -s -I "$BASE_URL/" | grep -i '^Content-Length:' || true)"
+    content_length="$(curl --max-time 10 -s -I "$BASE_URL/" | grep -i '^Content-Length:' || true)"
     [[ -n "$content_length" ]] || { echo "$PREFIX        Content-Length header not present" >&2; return 1; }
 }
 
 test_404_error() {
     local status
-    status="$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/nonexistent_page_that_does_not_exist")"
+    status="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' "$BASE_URL/nonexistent_page_that_does_not_exist")"
     [[ "$status" == "404" ]] || { echo "$PREFIX        expected 404, got $status" >&2; return 1; }
 }
 
@@ -176,17 +185,17 @@ test_static_file() {
     local filename="test_static_$$.txt"
     echo "$content" > "$NGINX_HTML_DIR/$filename"
     local body status
-    status="$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/$filename")"
+    status="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' "$BASE_URL/$filename")"
     [[ "$status" == "200" ]] || { echo "$PREFIX        expected 200, got $status" >&2; return 1; }
-    body="$(curl -s "$BASE_URL/$filename")"
+    body="$(curl --max-time 10 -s "$BASE_URL/$filename")"
     [[ "$body" == "$content" ]] || { echo "$PREFIX        body mismatch" >&2; return 1; }
 }
 
 test_content_length() {
     local cl body_len
-    cl="$(curl -s -I "$BASE_URL/" | grep -i '^Content-Length:' | tr -d '\r' | awk '{print $2}')"
+    cl="$(curl --max-time 10 -s -I "$BASE_URL/" | grep -i '^Content-Length:' | tr -d '\r' | awk '{print $2}')"
     [[ -n "$cl" ]] || { echo "$PREFIX        Content-Length header not found" >&2; return 1; }
-    body_len="$(curl -s -o /dev/null -w '%{size_download}' "$BASE_URL/")"
+    body_len="$(curl --max-time 10 -s -o /dev/null -w '%{size_download}' "$BASE_URL/")"
     [[ "$body_len" -eq "$cl" ]] || { echo "$PREFIX        Content-Length=$cl but body is $body_len bytes" >&2; return 1; }
 }
 
@@ -194,14 +203,14 @@ test_content_length() {
 # Accepting 200 as well made the contract ambiguous -- we now enforce 405.
 test_post_method() {
     local status
-    status="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/")"
+    status="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/")"
     [[ "$status" == "405" ]] || { echo "$PREFIX        expected 405, got $status" >&2; return 1; }
 }
 
 test_sequential_requests() {
     local i status
     for (( i=1; i<=10; i++ )); do
-        status="$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/")"
+        status="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' "$BASE_URL/")"
         [[ "$status" == "200" ]] || { echo "$PREFIX        request $i failed with status $status" >&2; return 1; }
     done
 }
@@ -212,7 +221,7 @@ test_sequential_requests() {
 # appears when the TCP connection was actually kept alive and reused.
 test_keepalive() {
     local output
-    output="$(curl -v -s -o /dev/null "$BASE_URL/" "$BASE_URL/" 2>&1)"
+    output="$(curl --max-time 10 -v -s -o /dev/null "$BASE_URL/" "$BASE_URL/" 2>&1)"
     if echo "$output" | grep -qiE \
         "re-using existing connection|reusing existing connection|Re-using|reuse conn"; then
         return 0
@@ -226,7 +235,7 @@ test_concurrent_requests() {
     for (( i=0; i<5; i++ )); do
         local tmpfile="/tmp/nginx-test-concurrent_$i"
         tmpfiles+=("$tmpfile")
-        curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/" > "$tmpfile" 2>/dev/null &
+        curl --max-time 10 -s -o /dev/null -w '%{http_code}' "$BASE_URL/" > "$tmpfile" 2>/dev/null &
         pids+=($!)
     done
     local all_ok=true
@@ -261,7 +270,7 @@ run_test "Concurrent requests"           test_concurrent_requests
 TOTAL=$(( PASS_COUNT + FAIL_COUNT ))
 {
     echo ""
-    echo "$PREFIX $PASS_COUNT/$TOTAL tests passed, $FAIL_COUNT failed"
+    echo "$PREFIX $PASS_COUNT/$TOTAL tests passed, $FAIL_COUNT failed, $SKIPPED skipped"
     if [[ ${#FAILURES[@]} -gt 0 ]]; then
         echo "$PREFIX failed tests:"
         for f in "${FAILURES[@]}"; do

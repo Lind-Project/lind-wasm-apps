@@ -18,7 +18,7 @@ APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COREUTILS_ROOT="$APPS_ROOT/coreutils"
 
 APPS_BUILD="$APPS_ROOT/build"
-MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
+MERGED_SYSROOT="${MERGED_SYSROOT:-$APPS_BUILD/sysroot_merged}"
 BUILD_ROOT="$APPS_BUILD/coreutils_wasi"
 BUILD_DIR="$BUILD_ROOT/build"
 STAGE_DIR="$APPS_BUILD/coreutils/bin"

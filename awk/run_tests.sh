@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 # awk/run_tests.sh
 # Sanity test suite for gawk in Lind/wasm sandbox
@@ -13,7 +13,10 @@ fi
 
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 
+source "$SCRIPT_DIR/../scripts/test_lib.sh"
+
 mkdir -p "$LINDFS_ROOT/tests/awk"
+trap 'rm -rf "$LINDFS_ROOT/tests/awk"' EXIT
 
 PASS=0
 FAIL=0
@@ -39,6 +42,11 @@ assert_awk() {
     local program="$3"
     local input="${4:-}"
 
+    if is_skipped "$description"; then
+        log_skip "$description"
+        return
+    fi
+
     local scriptfile="tests/awk/test$counter.awk"
     local scriptfile_path="$LINDFS_ROOT/tests/awk/test$counter.awk"
     counter=$((counter + 1))
@@ -61,10 +69,10 @@ assert_awk() {
     TOTAL=$((TOTAL + 1))
 
     if [ "$expected" = "$actual" ]; then
-        echo -e "  ${GREEN}PASS${NC} $description"
+        echo -e "  ${GREEN}PASS:${NC} $description"
         PASS=$((PASS + 1))
     else
-        echo -e "  ${RED}FAIL${NC} $description"
+        echo -e "  ${RED}FAIL:${NC} $description"
         echo    "       expected: $(echo "$expected" | head -5)"
         echo    "       actual  : $(echo "$actual"   | head -5)"
         FAIL=$((FAIL + 1))
@@ -239,6 +247,7 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e " Total : $TOTAL"
 echo -e " ${GREEN}Pass${NC}  : $PASS"
 echo -e " ${RED}Fail${NC}  : $FAIL"
+echo -e " Skipped: $SKIPPED"
 echo ""
 if [ $FAIL -gt 0 ]; then
     echo -e "${RED}FAILED${NC} — $FAIL/$TOTAL tests failed"
