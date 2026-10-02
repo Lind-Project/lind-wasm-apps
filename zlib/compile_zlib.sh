@@ -95,9 +95,7 @@ fi
 "$ADD_EXPORT_TOOL" "$DYNAMIC_LIB_WASM" "$DYNAMIC_LIB_WASM"  __stack_pointer global __stack_pointer optional || { echo "[zlib] ERROR: add-export-tool stack pointer failed" >&2; exit 1; }
 
 
-# --fpcast-emu: shared libs must match the fpcast-built libc.cwasm table
-# convention (exit handlers are invoked cross-module; mismatches trap at exit).
-"$LIND_WASM_OPT" --target=library --fpcast-emu "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[zlib] ERROR: lind-wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
+"$LIND_WASM_OPT" --target=library "$DYNAMIC_LIB_WASM" -o "$DYNAMIC_LIB_OPT" || { echo "[zlib] ERROR: lind-wasm-opt failed on '$DYNAMIC_LIB_OPT'; Exiting.." >&2; exit 1; }
 
 if [[ ! -f "$DYNAMIC_LIB_OPT" ]]; then
   echo "[zlib] ERROR: Failed to generate '$DYNAMIC_LIB_OPT'; Exiting.." >&2
