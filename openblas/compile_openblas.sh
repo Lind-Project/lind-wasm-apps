@@ -3,16 +3,20 @@ set -euo pipefail
 
 ###############################################################################
 # Cross-compile OpenBLAS as a library for wasm32-wasi (LindWasm), and
-# cross-compile its own utest/ suite so run_tests.sh can execute it.
+# cross-compile two of its own test suites — utest/ and ctest/ — so
+# run_tests.sh can execute both. (test/, the classic Fortran BLAS reference
+# suite, is out of scope: no wasm32 Fortran compiler exists, and unlike
+# ctest/, it has no Fortran-free fallback build path. See the ctest/
+# section below for details.)
 #
 # LIND_DYLINK=1 (default) is the primary, supported configuration: builds
 # libopenblas.so (a dylink shared module, same recipe as zlib/openssl) as
-# the consumable artifact, and links openblas_utest/openblas_utest_ext as
-# dylink *executables* that import their BLAS/CBLAS symbols from
-# libopenblas.so at runtime via --preload — i.e. the tests genuinely
-# exercise the .so, not a separate statically-linked copy of the same code.
-# LIND_DYLINK=0 is a legacy static-only fallback: libopenblas.a only, test
-# binaries statically linked against it, no .so produced.
+# the consumable artifact, and links the test binaries as dylink
+# *executables* that import their BLAS/CBLAS symbols from libopenblas.so
+# at runtime via --preload — i.e. the tests genuinely exercise the .so,
+# not a separate statically-linked copy of the same code. LIND_DYLINK=0 is
+# a legacy static-only fallback: libopenblas.a only, test binaries
+# statically linked against it, no .so produced.
 #
 # Scope:
 #   - BLAS + CBLAS only. LAPACK is disabled (NO_LAPACK=1, NOFORTRAN=1) because
@@ -127,6 +131,13 @@ else
   OPENBLAS_CFLAGS="-O2 -g"
 fi
 
+# lind-wasm's runtime requires every executable module to declare a shared
+# linear memory (see CC_WASI's comment above) — utest/Makefile's own link
+# recipes already include $(LDFLAGS), but ctest/Makefile's do not (see its
+# use near the legacy static ctest build below), so this needs to stay a
+# separate reusable value rather than being baked directly into one place.
+OPENBLAS_LDFLAGS="-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
+
 # CROSS=1 additionally suppresses OpenBLAS's own "build then execute" test
 # steps (utest/ctest run_test rules) that the default 'all' target would
 # otherwise try to run on the host — which fails, since these binaries are
@@ -165,7 +176,7 @@ OPENBLAS_MAKE_ARGS=(
   # openblas_utest$(EXE) doesn't turn into openblas_utest.exe.
   EXE=
   CFLAGS="$OPENBLAS_CFLAGS"
-  LDFLAGS="-Wl,--import-memory,--export-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
+  LDFLAGS="$OPENBLAS_LDFLAGS"
 )
 
 make -j"$JOBS" "${OPENBLAS_MAKE_ARGS[@]}" libs netlib \
@@ -374,6 +385,55 @@ make -j"$JOBS" -C utest "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS -DCT
   test_registry.o test_extensions/test_registry_ext.o \
   || { echo "[openblas] ERROR: test registry object build failed" >&2; exit 1; }
 
+# ---------------------------------------------------------------------------
+# ctest/ — CBLAS interface conformance suite (level1/2/3 BLAS via cblas_*
+# wrappers), run alongside utest/. Unlike utest/, these are plain
+# main()-based programs with no ctest.h-style framework, so none of the
+# test-registration machinery above applies here.
+#
+# OpenBLAS's own ctest/Makefile already provides a Fortran-free path: with
+# NOFORTRAN=1 (required — no wasm32 Fortran compiler exists), each
+# xNcblatM target's rule switches from linking the Fortran .f driver via
+# $(FC) to linking a plain C driver (c_*c.c) via $(CC), with -lgfortran
+# filtered out. BUILD_COMPLEX=0/BUILD_COMPLEX16=0 above (matching utest's
+# scope) means only single/double real routines are built here —
+# xscblat*/xdcblat*, not xccblat*/xzcblat*.
+#
+# test/ (the classic Fortran BLAS reference suite, as opposed to this CBLAS
+# suite) has no such fallback — its own 'all' target is an unconditional
+# no-op under NOFORTRAN=1 — and is therefore not buildable at all without a
+# wasm32 Fortran compiler; out of scope.
+# ---------------------------------------------------------------------------
+CTEST_BINS=(xscblat1 xscblat2 xscblat3 xdcblat1 xdcblat2 xdcblat3)
+
+# Derive each binary's real object list from make's own dry-run output,
+# rather than hand-copying ctest/Makefile's stestl*o/dtestl*o variables and
+# per-binary driver object names — those names depend on the NOFORTRAN
+# branch above and have already changed shape once across a version bump
+# (see the EXE= fix earlier in this file).
+ctest_link_objs() {
+  local target="$1"
+  make -n -C ctest "${OPENBLAS_MAKE_ARGS[@]}" "$target" 2>/dev/null \
+    | grep -E -- "-o ${target} " | tail -1 | tr ' ' '\n' | grep -E '\.o$'
+}
+
+declare -A CTEST_OBJS_FOR
+ALL_CTEST_OBJS=""
+for bin in "${CTEST_BINS[@]}"; do
+  objs=$(ctest_link_objs "$bin")
+  if [[ -z "$objs" ]]; then
+    echo "[openblas] ERROR: could not derive object list for ctest/$bin" >&2
+    exit 1
+  fi
+  CTEST_OBJS_FOR["$bin"]="$objs"
+  ALL_CTEST_OBJS="$ALL_CTEST_OBJS $objs"
+done
+# shellcheck disable=SC2046
+ALL_CTEST_OBJS=$(echo $ALL_CTEST_OBJS | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
+make -j"$JOBS" -C ctest "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS" $ALL_CTEST_OBJS \
+  || { echo "[openblas] ERROR: ctest object build failed" >&2; exit 1; }
+
 if [[ ! -x "$LIND_WASM_OPT" ]]; then
   echo "[openblas] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'" >&2
   exit 1
@@ -424,70 +484,92 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     -Wl,--export=__tls_base
   )
 
-  link_dylink_utest() {
-    local bin="$1"; shift
-    local wasm_out="$OPENBLAS_SRC/utest/$bin"
+  # dir: subdirectory (utest or ctest) the object paths below are relative to.
+  link_dylink_exe() {
+    local dir="$1" bin="$2"; shift 2
+    local wasm_out="$OPENBLAS_SRC/$dir/$bin"
     (
-      cd utest
+      cd "$dir"
       # shellcheck disable=SC2086
       $CC_WASI $SJLJ_FLAGS "${LDFLAGS_DYLINK_EXE[@]}" "${DYLINK_CRT_OBJS[@]}" $* -o "$bin"
-    ) || { echo "[openblas] ERROR: dylink link failed for $bin" >&2; exit 1; }
+    ) || { echo "[openblas] ERROR: dylink link failed for $dir/$bin" >&2; exit 1; }
 
     "$ADD_EXPORT_TOOL" "$wasm_out" "$wasm_out" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional \
-      || { echo "[openblas] ERROR: add-export-tool tls failed for $bin" >&2; exit 1; }
+      || { echo "[openblas] ERROR: add-export-tool tls failed for $dir/$bin" >&2; exit 1; }
     "$ADD_EXPORT_TOOL" "$wasm_out" "$wasm_out" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional \
-      || { echo "[openblas] ERROR: add-export-tool global failed for $bin" >&2; exit 1; }
+      || { echo "[openblas] ERROR: add-export-tool global failed for $dir/$bin" >&2; exit 1; }
     "$ADD_EXPORT_TOOL" "$wasm_out" "$wasm_out" __stack_pointer global __stack_pointer optional \
-      || { echo "[openblas] ERROR: add-export-tool stack pointer failed for $bin" >&2; exit 1; }
+      || { echo "[openblas] ERROR: add-export-tool stack pointer failed for $dir/$bin" >&2; exit 1; }
   }
 
-  link_dylink_utest openblas_utest $UTEST_OBJS test_registry.o
-  link_dylink_utest openblas_utest_ext $UTEST_EXT_OBJS test_extensions/test_registry_ext.o
+  link_dylink_exe utest openblas_utest $UTEST_OBJS test_registry.o
+  link_dylink_exe utest openblas_utest_ext $UTEST_EXT_OBJS test_extensions/test_registry_ext.o
+
+  for bin in "${CTEST_BINS[@]}"; do
+    # shellcheck disable=SC2086
+    link_dylink_exe ctest "$bin" ${CTEST_OBJS_FOR[$bin]}
+  done
 
   LIND_WASM_OPT_MODE="--target=main"
 else
   # ---------------------------------------------------------------------------
-  # Legacy static path: OpenBLAS's own utest/Makefile rules statically link
-  # $(OBJS)/$(OBJS_EXT) against ../libopenblas.a. CROSS=1 (already in
+  # Legacy static path: OpenBLAS's own utest/Makefile and ctest/Makefile
+  # rules statically link against ../libopenblas.a. CROSS=1 (already in
   # OPENBLAS_MAKE_ARGS) turns the 'all' target's run_test rule into a
   # build-only no-op, since these binaries can't run on the host.
   # ---------------------------------------------------------------------------
   make -C utest -j"$JOBS" "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS -DCTEST_ADD_TESTS_MANUALLY $SJLJ_FLAGS" all \
     || { echo "[openblas] ERROR: utest build failed" >&2; exit 1; }
+  # Unlike utest/Makefile, ctest/Makefile's own link recipes for these
+  # binaries never reference $(LDFLAGS) at all (just "$(CC) $(CFLAGS) -o
+  # $@ ..."), so the --import-memory/--export-memory flags lind-wasm's
+  # runtime requires never make it into the link line. Fold them into
+  # CFLAGS instead, just for this call — clang ignores -Wl,... flags
+  # (with a harmless "argument unused" warning) on the separate -c
+  # compile steps that also see this same CFLAGS value.
+  make -C ctest -j"$JOBS" "${OPENBLAS_MAKE_ARGS[@]}" CFLAGS="$OPENBLAS_CFLAGS $OPENBLAS_LDFLAGS" all \
+    || { echo "[openblas] ERROR: ctest build failed" >&2; exit 1; }
 
   LIND_WASM_OPT_MODE="--static"
 fi
 
 # ---------------------------------------------------------------------------
-# The linked utest binaries are raw wasm32 modules; lind-wasm's runtime needs
-# them instrumented (epoch injection, asyncify, and — since SJLJ_FLAGS above
-# makes ctest.h's setjmp/longjmp use wasm exception-handling — conversion
+# The linked utest/ctest binaries are raw wasm32 modules; lind-wasm's runtime
+# needs them instrumented (epoch injection, asyncify, and — since SJLJ_FLAGS
+# above makes ctest.h's setjmp/longjmp use wasm exception-handling — conversion
 # from clang's legacy EH encoding to the standard exnref-based one Cranelift
 # actually supports) and precompiled to .cwasm via lind-boot before they can
 # run. lind-wasm-opt (not raw wasm-opt) encodes the exact flag set and pass
 # ordering this requires per target — see its source for details.
 # ---------------------------------------------------------------------------
-for bin in openblas_utest openblas_utest_ext; do
-  src="$OPENBLAS_SRC/utest/$bin"
+TEST_BIN_DIRS=(utest openblas_utest utest openblas_utest_ext)
+for bin in "${CTEST_BINS[@]}"; do
+  TEST_BIN_DIRS+=(ctest "$bin")
+done
+
+for ((i = 0; i < ${#TEST_BIN_DIRS[@]}; i += 2)); do
+  dir="${TEST_BIN_DIRS[i]}"
+  bin="${TEST_BIN_DIRS[i + 1]}"
+  src="$OPENBLAS_SRC/$dir/$bin"
   if [[ ! -f "$src" ]]; then
     echo "[openblas] WARNING: $bin was not produced; skipping" >&2
     continue
   fi
 
-  opt_wasm="$OPENBLAS_SRC/utest/$bin.opt.wasm"
+  opt_wasm="$OPENBLAS_SRC/$dir/$bin.opt.wasm"
   "$LIND_WASM_OPT" "$LIND_WASM_OPT_MODE" "$src" -o "$opt_wasm" \
     || { echo "[openblas] ERROR: lind-wasm-opt failed on $bin" >&2; exit 1; }
 
   "$LIND_BOOT" --precompile "$opt_wasm" \
     || { echo "[openblas] ERROR: lind-boot --precompile failed on $bin" >&2; exit 1; }
 
-  opt_cwasm="$OPENBLAS_SRC/utest/$bin.opt.cwasm"
+  opt_cwasm="$OPENBLAS_SRC/$dir/$bin.opt.cwasm"
   if [[ ! -f "$opt_cwasm" ]]; then
     echo "[openblas] ERROR: $opt_cwasm was not produced" >&2
     exit 1
   fi
   cp "$opt_cwasm" "$STAGE_DIR/$bin"
-  echo "[openblas] staged utest binary -> $STAGE_DIR/$bin"
+  echo "[openblas] staged $dir binary -> $STAGE_DIR/$bin"
 done
 
 if [[ ! -f "$STAGE_DIR/openblas_utest" ]]; then
