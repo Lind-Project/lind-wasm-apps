@@ -27,6 +27,7 @@ GNULIB_STAMP   := $(APPS_BUILD)/.stamp_gnulib
 ZLIB_STAMP     := $(APPS_BUILD)/.stamp_zlib
 OPENSSL_STAMP  := $(APPS_BUILD)/.stamp_openssl
 LIBCXX_STAMP   := $(APPS_BUILD)/.stamp_libcxx
+OPENBLAS_STAMP := $(APPS_BUILD)/.stamp_openblas
 MERGE_BASE_STAMP    := $(APPS_BUILD)/.stamp_merge_base_sysroot
 MERGE_TIRPC_STAMP   := $(APPS_BUILD)/.stamp_merge_tirpc
 MERGE_GNULIB_STAMP  := $(APPS_BUILD)/.stamp_merge_gnulib
@@ -46,11 +47,11 @@ LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 #   make check-build                # runs the full TESTABLE_APPS list
 #   make check-build APP=nginx      # runs a single app on demand
 #   make check-build APP="nginx grep sed"  # runs multiple apps on demand
-TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
+TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython openblas
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install install-base
+.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 openblas clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install-openblas install install-base
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -101,7 +102,7 @@ clean:
 	done
 	@# Infrastructure: stamps, sysroot, overlay, toolchain env
 	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
-	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)'
+	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)' '$(OPENBLAS_STAMP)'
 	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)'
 
 print-config:
@@ -179,6 +180,18 @@ $(ZLIB_STAMP): $(APPS_ROOT)/zlib/compile_zlib.sh | $(TOOL_ENV)
 	touch '$@'
 
 zlib: $(ZLIB_STAMP)
+
+# ---------------- openblas (via compile_openblas.sh) ---------------------------
+# Cross-compiles OpenBLAS (BLAS + CBLAS only; LAPACK/Fortran disabled) as a
+# static library, plus its own utest/ suite as wasm32-wasi binaries. Only
+# needs the base sysroot (no other overlay libraries), so depends on
+# $(TOOL_ENV) directly like zlib/openssl rather than the merged sysroot.
+$(OPENBLAS_STAMP): $(APPS_ROOT)/openblas/compile_openblas.sh | $(TOOL_ENV)
+	. '$(TOOL_ENV)'
+	JOBS='$(JOBS)' '$(APPS_ROOT)/openblas/compile_openblas.sh'
+	touch '$@'
+
+openblas: $(OPENBLAS_STAMP)
 
 # ---------------- openssl (via compile_openssl.sh) ----------------------------
 $(OPENSSL_STAMP): $(APPS_ROOT)/openssl/compile_openssl.sh | $(TOOL_ENV)
@@ -439,6 +452,10 @@ install-clang: install-libcxx
 install-tinycc:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' tinycc
 
+install-openblas:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' openblas
+	'$(APPS_ROOT)/scripts/post_install_lib.sh' '$(LINDFS_ROOT)' openblas
+
 install-cpython: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' cpython
 
@@ -474,4 +491,4 @@ install-gmake:
 
 install-base: install-bash install-coreutils install-perl install-gmake install-awk install-curl install-grep install-sed install-diffutils
 
-install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-perl install-awk install-gmake install-gnulib install-libtirpc install-openssl install-zlib install-libcxx
+install: install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-perl install-awk install-gmake install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-openblas
