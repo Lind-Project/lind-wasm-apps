@@ -4,6 +4,8 @@
 //!   run        --name <step> --key <pk8> --out <link-dir> [--materials p..] [--products p..] [--lstrip <prefix>] [-- <cmd> <args..>]
 //!   gen-layout --key <owner.pk8> --step-key <functionary.pub.json> --out <root.layout> [--expires <RFC3339>]
 //!              [--src <file>] [--pkg <file>] [--step-src <name>] [--step-pkg <name>] [-- <expected cmd of step-pkg>]
+//!   gen-layout --key <owner.pk8> --step-key <functionary.pub.json> --out <root.layout> [--expires <RFC3339>]
+//!              --steps <plan.json>      (any number of steps, see load_plan)
 //!   verify     --layout <root.layout> --key <owner.pub.json> --links <link-dir>
 //!
 //! No clap, no std::net, no std::process (unsupported on wasm32-wasip1).
@@ -39,7 +41,7 @@ const ARTIFACT_PKG: &str = "foo.tar.gz";
 
 fn usage() -> ! {
     eprintln!(
-        "usage:\n  in-toto-cli keygen <out.pk8> <out.pub.json>\n  in-toto-cli run --name <step> --key <pk8> --out <link-dir> [--materials p..] [--products p..] [--lstrip <prefix>] [-- <cmd> <args..>]\n  in-toto-cli gen-layout --key <owner.pk8> --step-key <functionary.pub.json> --out <root.layout> [--expires <RFC3339>] [--src <file>] [--pkg <file>] [--step-src <name>] [--step-pkg <name>] [-- <expected cmd>]\n  in-toto-cli verify --layout <root.layout> --key <owner.pub.json> --links <link-dir>"
+        "usage:\n  in-toto-cli keygen <out.pk8> <out.pub.json>\n  in-toto-cli run --name <step> --key <pk8> --out <link-dir> [--materials p..] [--products p..] [--lstrip <prefix>] [-- <cmd> <args..>]\n  in-toto-cli gen-layout --key <owner.pk8> --step-key <functionary.pub.json> --out <root.layout> [--expires <RFC3339>] [--src <file>] [--pkg <file>] [--step-src <name>] [--step-pkg <name>] [-- <expected cmd>]\n  in-toto-cli gen-layout --key <owner.pk8> --step-key <functionary.pub.json> --out <root.layout> [--expires <RFC3339>] --steps <plan.json>\n  in-toto-cli verify --layout <root.layout> --key <owner.pub.json> --links <link-dir>"
     );
     exit(2)
 }
@@ -232,9 +234,7 @@ fn cmd_gen_layout(args: &[String]) {
     let art_src = o.opt("src").unwrap_or_else(|| ARTIFACT_SRC.to_string());
     let art_pkg = o.opt("pkg").unwrap_or_else(|| ARTIFACT_PKG.to_string());
 
-    let mut builder = LayoutMetadataBuilder::new()
-        .readme(format!("lind-wasm in-toto demo layout: {} -> {}", step_src, step_pkg))
-        .add_key(functionary.clone());
+    let mut builder = LayoutMetadataBuilder::new().add_key(functionary.clone());
     if let Some(exp) = o.opt("expires") {
         let dt = DateTime::parse_from_rfc3339(&exp)
             .unwrap_or_else(|e| die(format!("--expires must be RFC3339: {}", e)))
@@ -242,39 +242,120 @@ fn cmd_gen_layout(args: &[String]) {
         builder = builder.expires(dt);
     }
 
-    let write_code = Step::new(&step_src)
-        .threshold(1)
-        .add_key(functionary.key_id().clone())
-        .add_expected_product(ArtifactRule::Create(vpath(&art_src)))
-        .add_expected_product(ArtifactRule::Disallow(vpath("*")));
-
-    let mut package = Step::new(&step_pkg)
-        .threshold(1)
-        .add_key(functionary.key_id().clone())
-        .add_expected_material(ArtifactRule::Match {
-            pattern: vpath(&art_src),
-            in_src: None,
-            with: Artifact::Products,
-            in_dst: None,
-            from: step_src.clone(),
-        })
-        .add_expected_material(ArtifactRule::Disallow(vpath("*")))
-        .add_expected_product(ArtifactRule::Create(vpath(&art_pkg)))
-        .add_expected_product(ArtifactRule::Disallow(vpath("*")));
-    if !cmd.is_empty() {
-        package = package.expected_command(Command::from(cmd));
+    let layout = match o.opt("steps") {
+        Some(plan) => {
+            if !cmd.is_empty() {
+                die("--steps takes each expected command from the plan, not after --");
+            }
+            let steps = load_plan(&plan, functionary.key_id());
+            builder = builder.readme(format!("lind-wasm in-toto layout: {} steps from {}", steps.len(), plan));
+            for step in steps {
+                builder = builder.add_step(step);
+            }
+            builder.build()
+        }
+        None => {
+            builder = builder.readme(format!("lind-wasm in-toto demo layout: {} -> {}", step_src, step_pkg));
+            let (write_code, package) = demo_steps(&step_src, &step_pkg, &art_src, &art_pkg, cmd, functionary.key_id());
+            builder.add_step(write_code).add_step(package).build()
+        }
     }
-
-    let layout = builder
-        .add_step(write_code)
-        .add_step(package)
-        .build()
-        .unwrap_or_else(|e| die(format!("build layout: {:?}", e)));
+    .unwrap_or_else(|e| die(format!("build layout: {:?}", e)));
 
     let mb = Metablock::new(MetadataWrapper::Layout(layout), &[&owner])
         .unwrap_or_else(|e| die(format!("sign layout: {:?}", e)));
     write_json(&out, &mb);
     println!("wrote {}", out);
+}
+
+/// The two-step demo layout: `step_src` creates `art_src`, `step_pkg` turns it into `art_pkg`.
+fn demo_steps(
+    step_src: &str,
+    step_pkg: &str,
+    art_src: &str,
+    art_pkg: &str,
+    cmd: &[String],
+    key: &KeyId,
+) -> (Step, Step) {
+    let write_code = Step::new(step_src)
+        .threshold(1)
+        .add_key(key.clone())
+        .add_expected_product(ArtifactRule::Create(vpath(art_src)))
+        .add_expected_product(ArtifactRule::Disallow(vpath("*")));
+
+    let mut package = Step::new(step_pkg)
+        .threshold(1)
+        .add_key(key.clone())
+        .add_expected_material(ArtifactRule::Match {
+            pattern: vpath(art_src),
+            in_src: None,
+            with: Artifact::Products,
+            in_dst: None,
+            from: step_src.to_string(),
+        })
+        .add_expected_material(ArtifactRule::Disallow(vpath("*")))
+        .add_expected_product(ArtifactRule::Create(vpath(art_pkg)))
+        .add_expected_product(ArtifactRule::Disallow(vpath("*")));
+    if !cmd.is_empty() {
+        package = package.expected_command(Command::from(cmd));
+    }
+    (write_code, package)
+}
+
+/// Read a plan: a JSON list of {name, expected_materials, expected_products, expected_command?}.
+/// Rules use the in-toto array form, e.g. ["MATCH", "src/a.c", "WITH", "PRODUCTS", "FROM", "fetch"].
+/// Every step gets `key` with threshold 1.
+fn load_plan(path: &str, key: &KeyId) -> Vec<Step> {
+    let raw = fs::read(path).unwrap_or_else(|e| die(format!("read {}: {}", path, e)));
+    let plan: serde_json::Value = serde_json::from_slice(&raw)
+        .unwrap_or_else(|e| die(format!("parse plan {}: {}", path, e)));
+    let entries = plan
+        .as_array()
+        .unwrap_or_else(|| die(format!("plan {}: expected a JSON list of steps", path)));
+    if entries.is_empty() {
+        die(format!("plan {}: no steps", path));
+    }
+
+    entries
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let name = e
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_else(|| die(format!("plan step {}: missing string \"name\"", i)));
+            let mut step = Step::new(name).threshold(1).add_key(key.clone());
+            for rule in plan_rules(e, "expected_materials", name) {
+                step = step.add_expected_material(rule);
+            }
+            for rule in plan_rules(e, "expected_products", name) {
+                step = step.add_expected_product(rule);
+            }
+            if let Some(c) = e.get("expected_command") {
+                let cmd: Vec<String> = serde_json::from_value(c.clone()).unwrap_or_else(|err| {
+                    die(format!("plan step {}: expected_command must be a list of strings: {}", name, err))
+                });
+                step = step.expected_command(Command::from(cmd));
+            }
+            step
+        })
+        .collect()
+}
+
+fn plan_rules(step: &serde_json::Value, field: &str, name: &str) -> Vec<ArtifactRule> {
+    let rules = step
+        .get(field)
+        .and_then(|v| v.as_array())
+        .unwrap_or_else(|| die(format!("plan step {}: missing list \"{}\"", name, field)));
+    rules
+        .iter()
+        .map(|r| {
+            // The crate's rule visitor needs borrowed strings, which from_value cannot give.
+            let text = r.to_string();
+            serde_json::from_str::<ArtifactRule>(&text)
+                .unwrap_or_else(|e| die(format!("plan step {}: bad rule {} in {}: {}", name, r, field, e)))
+        })
+        .collect()
 }
 
 fn cmd_verify(args: &[String]) {
