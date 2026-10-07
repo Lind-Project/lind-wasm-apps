@@ -50,7 +50,7 @@ TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install install-base
+.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc in-toto diffutils awk gmake perl ed25519 clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-in-toto install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install install-base
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -377,6 +377,10 @@ postgres: $(MERGE_BASE_STAMP) diffutils
 tinycc: 
 	'$(APPS_ROOT)/tinycc/compile_tinycc.sh'
 
+# ---------------- in-toto (Rust, WASM build) ---------------------------------
+in-toto:
+	'$(APPS_ROOT)/in-toto/compile_in-toto.sh'
+
 # ---------------- diffutils (WASM build) --------------------------------------
 # Cross-compiles GNU diffutils (cmp, diff, diff3, sdiff) to wasm32-wasi.
 # Stages to build/diffutils/usr/local/bin.
@@ -438,6 +442,9 @@ install-clang: install-libcxx
 
 install-tinycc:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' tinycc
+
+install-in-toto:
+	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' in-toto
 
 install-cpython: install-zlib install-openssl
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' cpython
