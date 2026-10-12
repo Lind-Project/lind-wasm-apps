@@ -1,0 +1,43 @@
+#!/bin/bash
+# lind_run PROGRAM [ARGS...]: LFI stand-in for lind-wasm's `lind_run`, so the
+# apps' own run_tests.sh scripts run unmodified. PROGRAM is a path inside the
+# filesystem root ($LIND_WASM_ROOT/lindfs, here the rootfs) -- absolute, or
+# relative to its root, which is the working directory the scripts use.
+#
+#   LFI_GRATES="/grates/strace-grate"   grate chain (paths inside the root) put
+#                                       in front of the program
+#   LFI_STDOUT_FILTER="regex"           drop stdout lines matching it (some grates
+#                                       print banners the scripts would compare)
+# The host's environment is passed through; PATH is the sandbox's.
+HOSTPATH=$PATH
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HERE=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+source "$HERE/env.sh"
+LINDFS=${LIND_WASM_ROOT:?LIND_WASM_ROOT is not set}/lindfs
+# lind-boot options that may precede the program: --env NAME=VAL (kept), and
+# the wasm-specific ones (--enable-fpcast, --preload ...), which mean nothing here
+userenv=(); userpath=
+while [[ ${1:-} == --* ]]; do
+    case $1 in
+      --env)        userenv+=("$2"); [[ $2 == PATH=* ]] && userpath=${2#PATH=}; shift 2 ;;
+      --env=*)      userenv+=("${1#--env=}"); [[ $1 == --env=PATH=* ]] && userpath=${1#--env=PATH=}; shift ;;
+      --preload)    shift 2 ;;
+      *)            shift ;;
+    esac
+done
+prog=$1; shift
+args=()
+while IFS= read -r -d '' kv; do
+    case $kv in LFI_*|PATH=*|PWD=*|OLDPWD=*|_=*) continue ;; esac
+    args+=(--env "$kv")
+done < <(/usr/bin/env -0)
+for kv in "${userenv[@]}"; do [[ $kv == PATH=* ]] || args+=(--env "$kv"); done
+args+=(--env "PATH=${userpath:-/usr/local/bin:/bin:/usr/bin}")
+sandbox_prog=/${prog#/}
+[ -n "${LFI_STDOUT_FILTER:-}" ] && exec > >(/usr/bin/grep --line-buffered -v -E "$LFI_STDOUT_FILTER")
+read -ra chain <<< "${LFI_GRATES:-}"
+if [ ${#chain[@]} -gt 0 ]; then
+    first=$LINDFS${chain[0]}; rest=("${chain[@]:1}")
+    exec "$RUN" -r --dir=/="$LINDFS" --dir=/dev=/dev --wd=/ "${args[@]}" "$first" "${rest[@]}" "$sandbox_prog" "$@"
+fi
+exec "$RUN" -r --dir=/="$LINDFS" --dir=/dev=/dev --wd=/ "${args[@]}" "$LINDFS$sandbox_prog" "$@"
