@@ -1,0 +1,9 @@
+# Local build outputs: stale stamp files would make make skip builds in the image
+build/
+
+# VCS metadata: commit is passed via --build-arg APPS_COMMIT instead
+.git/
+
+# Local result exports and build logs (repo root only)
+apps-build-results*/
+build-*.log

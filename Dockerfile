@@ -1,130 +1,124 @@
-##################################################################
-# Sample usage
-# docker build -f Dockerfile \   
-#   --build-arg BASE_IMAGE=securesystemslab/lind-wasm-dev:latest \
-#   -t lind-wasm-apps:dev .
-##################################################################
+# syntax=docker/dockerfile:1.7-labs
 
-ARG ARTIFACT_MODE=fast
-ARG BASE_IMAGE=securesystemslab/lind-wasm-dev:latest
+# Build (and later test) all lind-wasm-apps on top of the lind-wasm release image.
+#
+# Stages:
+#   build     - preflight + merge-sysroot (fail-fast), build all apps
+#               (continue-and-record), install into /lindfs, create device nodes
+#   test      - (TODO) run app tests; to be added once test scripts are ready
+#   artifacts - build results only (results.tsv + per-target logs), for export
+#
+# App build failures do NOT fail `docker build`. Check results.tsv instead.
+#
+# Usage (from lind-wasm-apps repo root):
+#   # 1) build image
+#   docker build --platform=linux/amd64 -f Docker/Dockerfile.apps \
+#     --build-arg APPS_COMMIT=$(git rev-parse HEAD) \
+#     --target build -t lind-wasm-apps:build-local .
+#
+#   # 2) export build results (reuses the cache from step 1)
+#   docker build --platform=linux/amd64 -f Docker/Dockerfile.apps \
+#     --build-arg APPS_COMMIT=$(git rev-parse HEAD) \
+#     --target artifacts --output type=local,dest=./apps-build-results .
+#
+#   # build a subset only (quick local iteration)
+#   docker build ... --build-arg APPS="sed grep" ...
 
-FROM ${BASE_IMAGE} AS src
+# Base image: lind-wasm release image (toolchain, sysroot, lind_debug.o, lindfs).
+# Use --pull in CI so the latest published release image is always used.
+ARG BASE_IMAGE=securesystemslab/lind-wasm:latest
 
-COPY --chown=lind:lind . /home/lind/lind-wasm/lind-wasm-apps
-WORKDIR /home/lind/lind-wasm/lind-wasm-apps
 
-# Stage 1: shared setup that multiple app builds depend on.
-FROM src AS shared
-RUN make -j"$(nproc)" -Otarget preflight merge-base-sysroot libtirpc
+FROM ${BASE_IMAGE} AS build
 
-# Stage 2: build apps in sibling stages so BuildKit can schedule them in parallel.
-# Cap per-stage JOBS so concurrent stages do not all try to consume the full machine.
-FROM shared AS bash-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" bash
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-FROM shared AS coreutils-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" coreutils
+# Apps to build. clang is excluded: compile_clang.sh fails with
+# "LD: unbound variable", and clang has no tests yet.
+ARG APPS="lmbench bash nginx coreutils git curl grep sed binutils diffutils perl awk gmake tinycc cpython postgres gcc"
+# Libraries to install into lindfs (ed25519 is header-only, no install target).
+ARG LIBS="libtirpc gnulib zlib openssl libcxx"
+# Commit of lind-wasm-apps being built (.git is excluded from the build context).
+ARG APPS_COMMIT=unknown
 
-FROM shared AS cpython-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" cpython
+ENV RESULTS_DIR=/apps-results
 
-FROM shared AS lmbench-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" lmbench
+WORKDIR /apps
+COPY . /apps
 
-FROM shared AS sed-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" sed
+# Record build context for traceability.
+RUN mkdir -p "$RESULTS_DIR/logs" \
+ && { echo "date: $(date -Is)"; \
+      echo "apps_commit: ${APPS_COMMIT}"; \
+      echo "nproc: $(nproc)"; \
+      make -C /apps print-config; } > "$RESULTS_DIR/env.txt" 2>&1 \
+ && printf "target\texit\tseconds\n" > "$RESULTS_DIR/results.tsv" \
+ && cat "$RESULTS_DIR/env.txt"
 
-FROM shared AS nginx-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" nginx
+# Step 1: build environment. Fail-fast: nothing after this is meaningful if it fails.
+# merge-sysroot also builds libtirpc, gnulib, zlib, openssl, libc++ and merges ed25519.
+RUN make -C /apps preflight     2>&1 | tee "$RESULTS_DIR/logs/preflight.log" \
+ && make -C /apps merge-sysroot 2>&1 | tee "$RESULTS_DIR/logs/merge-sysroot.log"
 
-FROM shared AS grep-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" grep
+# Step 2: build apps. Continue-and-record: one make call per app, so the
+# Makefile's fail-fast shell flags stop only that app. Top-level make stays
+# serial; each compile script already uses JOBS=$(nproc) internally.
+RUN <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail   # no -e: record failures and keep going
+for t in $APPS; do
+  start=$(date +%s)
+  make -C /apps "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
+  rc=$?
+  printf "%s\t%s\t%s\n" "$t" "$rc" "$(( $(date +%s) - start ))" >> "$RESULTS_DIR/results.tsv"
+  if [ "$rc" -eq 0 ]; then
+    echo "[OK]   $t"
+  else
+    echo "[FAIL] $t (exit $rc) -- last 20 lines:"
+    tail -n 20 "$RESULTS_DIR/logs/$t.log"
+  fi
+done
+EOF
 
-FROM shared AS curl-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" curl
+# Step 3: install into /lindfs. Libraries first, then only the apps that built.
+# The aggregate 'install' target is not used: install-* targets do not depend
+# on their builds, so one unbuilt app would abort the whole install.
+RUN <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail
+run_install() {
+  local t="install-$1" start rc
+  start=$(date +%s)
+  make -C /apps "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
+  rc=$?
+  printf "%s\t%s\t%s\n" "$t" "$rc" "$(( $(date +%s) - start ))" >> "$RESULTS_DIR/results.tsv"
+  echo "[$( [ "$rc" -eq 0 ] && echo OK || echo FAIL )] $t"
+}
+for lib in $LIBS; do run_install "$lib"; done
+for app in $APPS; do
+  if awk -v t="$app" '$1==t && $2==0 {f=1} END {exit !f}' "$RESULTS_DIR/results.tsv"; then
+    run_install "$app"
+  else
+    printf "%s\t%s\t%s\n" "install-$app" "skipped" "0" >> "$RESULTS_DIR/results.tsv"
+    echo "[SKIP] install-$app (build failed)"
+  fi
+done
+echo; column -t "$RESULTS_DIR/results.tsv"
+EOF
 
-FROM shared AS git-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" git
+# Step 4: device nodes needed at runtime (curl TLS needs /dev/urandom).
+RUN mkdir -p /lindfs/dev \
+ && { [ -e /lindfs/dev/null ]    || mknod -m 666 /lindfs/dev/null    c 1 3; } \
+ && { [ -e /lindfs/dev/random ]  || mknod -m 666 /lindfs/dev/random  c 1 8; } \
+ && { [ -e /lindfs/dev/urandom ] || mknod -m 666 /lindfs/dev/urandom c 1 9; } \
+ && ls -l /lindfs/dev
 
-FROM shared AS postgres-build
-ARG ARTIFACT_MODE
-RUN jobs="$(nproc)"; app_jobs="$(( jobs ))"; if [ "$app_jobs" -lt 1 ]; then app_jobs=1; fi; \
-    make -Otarget JOBS="$app_jobs" ARTIFACT_MODE="$ARTIFACT_MODE" postgres
 
-# Stage 3: final image
-FROM ${BASE_IMAGE}
-WORKDIR /home/lind/lind-wasm/lind-wasm-apps
+# TODO: test stage, once test scripts are ready.
+# FROM build AS test
+# ...run tests per app with continue-and-record, write results to $RESULTS_DIR...
 
-# 1) Copy the full workspace ONCE (baseline)
-COPY --from=shared --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps \
-  /home/lind/lind-wasm/lind-wasm-apps
 
-# 2) Overlay only the build outputs from each sibling stage.
-COPY --from=bash-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/bash \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/bash
-
-COPY --from=coreutils-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/coreutils \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/coreutils
-
-COPY --from=cpython-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/cpython \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/cpython
-
-COPY --from=lmbench-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/lmbench \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/lmbench
-
-COPY --from=sed-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/sed \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/sed
-
-COPY --from=nginx-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/nginx \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/nginx
-
-COPY --from=grep-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/grep \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/grep
-
-COPY --from=curl-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/curl \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/curl
-
-COPY --from=git-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/git \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/git
-
-COPY --from=postgres-build --chown=lind:lind \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/postgres \
-  /home/lind/lind-wasm/lind-wasm-apps/build/bin/postgres
-
-# 3) Ensure lindfs exists in the final image.
-WORKDIR /home/lind/lind-wasm
-RUN make -Otarget lindfs && \
-    mkdir -p lindfs/dev && \
-    rm -f lindfs/dev/null && \
-    (mknod lindfs/dev/null c 1 3 || touch lindfs/dev/null) && \
-    chmod 666 lindfs/dev/null
-
-WORKDIR /home/lind/lind-wasm/lind-wasm-apps
+# Export build results only: docker build --target artifacts --output type=local,dest=<dir> .
+FROM scratch AS artifacts
+COPY --from=build /apps-results /
