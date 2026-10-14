@@ -1,6 +1,11 @@
 # Shared environment for building the apps for the LFI sandbox (source me).
-LFI_TC=${LFI_TC:-/home/lind/lfi/.toolchain/x86_64-lfi-clang}
-LFI_RT=${LFI_RT:-/home/lind/lfi/lfi-runtime}
+# LFI_ROOT: your clone of the lind-lfi repository, after its scripts/bootstrap.sh and a build of
+# lfi-runtime (see lfi/README.md). LFI_TC / LFI_RT can be set individually instead.
+if [ -z "${LFI_TC:-}" ] || [ -z "${LFI_RT:-}" ]; then
+    : "${LFI_ROOT:?set LFI_ROOT to your lind-lfi checkout (or LFI_TC and LFI_RT)}"
+fi
+LFI_TC=${LFI_TC:-$LFI_ROOT/.toolchain/x86_64-lfi-clang}
+LFI_RT=${LFI_RT:-$LFI_ROOT/lfi-runtime}
 export PATH="$LFI_TC/lfi-bin:$LFI_TC/bin:$PATH"
 APPS_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 BUILD=${BUILD:-$APPS_ROOT/build-lfi}

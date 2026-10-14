@@ -1,4 +1,4 @@
-# LFI build of the apps (experimental copy of lind-wasm-apps).
+# LFI build of the apps. Needs LFI_ROOT (a bootstrapped, built lind-lfi checkout); see README.md.
 #   make              build the first category
 #   make test         smoke tests, directly and under the strace grate
 #   make APPS="sed grep" ...
