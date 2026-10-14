@@ -72,7 +72,24 @@ Things to know:
 
 ## Results
 
-RESULTS_PLACEHOLDER
+Pass counts of the apps' own `run_tests.sh`, unmodified, run from a clean clone
+(`lind-lfi` `threei-fixpass` code, this branch; `lfi/run-tests.sh sed grep awk make coreutils`).
+Each column puts the named grate in front of every program (`LFI_GRATES`); fd-translate's banner lines
+are dropped with `LFI_STDOUT_FILTER='^\[Grate Init\]|^\[fdt-test\]'`.
+
+| | sed | grep | awk | make | coreutils |
+|---|---|---|---|---|---|
+| no grate | 7/7 | 5/5 | 45/45 | 22/22 | 25/27 |
+| strace (C) | 7/7 | 5/5 | 45/45 | 22/22 | 25/27 |
+| ipc (Rust) | 7/7 | 5/5 | 45/45 | 22/22 | 25/27 |
+| fd-translate (Rust) | 7/7 | 5/5 | 45/45 | 22/22 | 25/27 |
+| geteuid (C) | 7/7 | 5/5 | 45/45 | 22/22 | 25/27 |
+| chroot (Rust, `--chroot-dir /`) | 7/7 | 5/5 | 45/45 | 22/22 | 25/27 |
+
+The two `coreutils` failures are `ln` (the script reads a relative symlink target from the host) and
+`df` (needs a mount table); both fail on real Lind (wasm) too, where coreutils passes 19/27 with the same
+script. sed, grep, awk and make are not installed in Lind's lindfs, so there is no wasm comparison for
+them. `make test` (smoke tests of the built programs) passes 48/48 directly and 48/48 under the strace grate.
 
 ## Known issues
 
