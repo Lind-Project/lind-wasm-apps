@@ -14,12 +14,21 @@ export LIND_DYLINK
 # -------- Paths ---------------------------------------------------------------
 LIND_WASM_ROOT ?= $(HOME)/lind-wasm
 BASE_SYSROOT   ?= $(LIND_WASM_ROOT)/src/glibc/sysroot
+# Apps that pass their linked wasm module through `wasm-opt --fpcast-emu`
+# (awk, bash, coreutils, grep, gmake, nginx, perl, postgres, lmbench — see
+# each target's comment below) must link against a sysroot built in lind-wasm
+# with `WITH_FPCAST=1`, kept as a separate tree from the plain sysroot above
+# so both can exist on disk at once. lind-wasm's `sync-sysroot` already
+# supports this via its own SYSROOT_DIR override, e.g.:
+#   make sysroot WITH_FPCAST=1 SYSROOT_DIR=build/sysroot-fpcast
+BASE_SYSROOT_FPCAST ?= $(LIND_WASM_ROOT)/build/sysroot-fpcast
 LLVM_BIN_DIR   ?= $(LIND_WASM_ROOT)/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin
 
 APPS_ROOT      := $(CURDIR)
 APPS_BUILD     := $(APPS_ROOT)/build
 APPS_OVERLAY   := $(APPS_BUILD)/sysroot_overlay
 MERGED_SYSROOT := $(APPS_BUILD)/sysroot_merged
+MERGED_SYSROOT_FPCAST := $(APPS_BUILD)/sysroot_merged_fpcast
 APPS_BIN_DIR   := $(APPS_BUILD)/bin
 APPS_LIB_DIR   := $(APPS_BUILD)/lib
 LIBTIRPC_STAMP := $(APPS_BUILD)/.stamp_libtirpc
@@ -35,6 +44,8 @@ MERGE_OPENSSL_STAMP := $(APPS_BUILD)/.stamp_merge_openssl
 MERGE_LIBCXX_STAMP  := $(APPS_BUILD)/.stamp_merge_libcxx
 MERGE_ED25519_STAMP := $(APPS_BUILD)/.stamp_merge_ed25519
 MERGE_ALL_STAMP     := $(APPS_BUILD)/.stamp_merge_sysroot
+MERGE_BASE_FPCAST_STAMP  := $(APPS_BUILD)/.stamp_merge_base_sysroot_fpcast
+MERGE_TIRPC_FPCAST_STAMP := $(APPS_BUILD)/.stamp_merge_tirpc_fpcast
 
 TOOL_ENV       := $(APPS_BUILD)/.toolchain.env
 JOBS ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)
@@ -46,11 +57,11 @@ LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 #   make check-build                # runs the full TESTABLE_APPS list
 #   make check-build APP=nginx      # runs a single app on demand
 #   make check-build APP="nginx grep sed"  # runs multiple apps on demand
-TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython
+TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython awk perl make nginx
 APP            ?= $(TESTABLE_APPS)
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install install-base
+.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-base-sysroot-fpcast merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install install-base
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
 
@@ -100,15 +111,18 @@ clean:
 	  fi; \
 	done
 	@# Infrastructure: stamps, sysroot, overlay, toolchain env
-	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
+	-rm -rf '$(APPS_OVERLAY)' '$(MERGED_SYSROOT)' '$(MERGED_SYSROOT_FPCAST)' '$(APPS_BIN_DIR)' '$(APPS_LIB_DIR)' '$(TOOL_ENV)'
 	-rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)'
 	-rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)'
+	-rm -f '$(MERGE_BASE_FPCAST_STAMP)' '$(MERGE_TIRPC_FPCAST_STAMP)'
 
 print-config:
 	@echo "LIND_WASM_ROOT=$(LIND_WASM_ROOT)"
 	@echo "BASE_SYSROOT=$(BASE_SYSROOT)"
+	@echo "BASE_SYSROOT_FPCAST=$(BASE_SYSROOT_FPCAST)"
 	@echo "APPS_OVERLAY=$(APPS_OVERLAY)"
 	@echo "MERGED_SYSROOT=$(MERGED_SYSROOT)"
+	@echo "MERGED_SYSROOT_FPCAST=$(MERGED_SYSROOT_FPCAST)"
 	@echo "APPS_BIN_DIR=$(APPS_BIN_DIR)"
 	@echo "APPS_LIB_DIR=$(APPS_LIB_DIR)"
 	@if [[ -r '$(TOOL_ENV)' ]]; then . '$(TOOL_ENV)'; \
@@ -123,6 +137,10 @@ dirs:
 	  '$(MERGED_SYSROOT)/include/wasm32-wasi' \
 	  '$(MERGED_SYSROOT)/lib/wasm32-wasi' \
 	  '$(MERGED_SYSROOT)/usr/lib/wasm32-wasi' \
+	  '$(MERGED_SYSROOT_FPCAST)/include' \
+	  '$(MERGED_SYSROOT_FPCAST)/include/wasm32-wasi' \
+	  '$(MERGED_SYSROOT_FPCAST)/lib/wasm32-wasi' \
+	  '$(MERGED_SYSROOT_FPCAST)/usr/lib/wasm32-wasi' \
 	  '$(APPS_BIN_DIR)' \
 	  '$(APPS_LIB_DIR)'
 
@@ -204,6 +222,19 @@ $(MERGE_BASE_STAMP): | $(TOOL_ENV)
 
 merge-base-sysroot: $(MERGE_BASE_STAMP)
 
+# ---------------- fpcast base sysroot (see BASE_SYSROOT_FPCAST above) --------
+$(MERGE_BASE_FPCAST_STAMP): | $(TOOL_ENV)
+	@echo "[merge] refreshing fpcast merged sysroot"
+	@[ -r '$(BASE_SYSROOT_FPCAST)/include/wasm32-wasi/stdio.h' ] || { \
+	  echo "ERROR: fpcast sysroot headers missing at $(BASE_SYSROOT_FPCAST)."; \
+	  echo "       Build it in lind-wasm with: make sysroot WITH_FPCAST=1 SYSROOT_DIR=$(BASE_SYSROOT_FPCAST)"; \
+	  exit 1; \
+	}
+	rsync -a --delete '$(BASE_SYSROOT_FPCAST)/' '$(MERGED_SYSROOT_FPCAST)/'
+	touch '$@'
+
+merge-base-sysroot-fpcast: $(MERGE_BASE_FPCAST_STAMP)
+
 
 $(MERGE_TIRPC_STAMP): $(MERGE_BASE_STAMP) $(LIBTIRPC_STAMP)
 	# libtirpc headers
@@ -212,6 +243,15 @@ $(MERGE_TIRPC_STAMP): $(MERGE_BASE_STAMP) $(LIBTIRPC_STAMP)
 	rsync -a '$(APPS_OVERLAY)/usr/include/tirpc/' '$(MERGED_SYSROOT)/include/wasm32-wasi/tirpc/' || true
 	rsync -a '$(APPS_OVERLAY)/usr/lib/wasm32-wasi/' '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
 	rsync -a '$(APPS_OVERLAY)/lib/wasm32-wasi/'     '$(MERGED_SYSROOT)/lib/wasm32-wasi/' || true
+	touch '$@'
+
+# lmbench is the only fpcast app that also needs the tirpc overlay.
+$(MERGE_TIRPC_FPCAST_STAMP): $(MERGE_BASE_FPCAST_STAMP) $(LIBTIRPC_STAMP)
+	mkdir -p '$(MERGED_SYSROOT_FPCAST)/include/tirpc' '$(MERGED_SYSROOT_FPCAST)/include/wasm32-wasi/tirpc'
+	rsync -a '$(APPS_OVERLAY)/usr/include/tirpc/' '$(MERGED_SYSROOT_FPCAST)/include/tirpc/' || true
+	rsync -a '$(APPS_OVERLAY)/usr/include/tirpc/' '$(MERGED_SYSROOT_FPCAST)/include/wasm32-wasi/tirpc/' || true
+	rsync -a '$(APPS_OVERLAY)/usr/lib/wasm32-wasi/' '$(MERGED_SYSROOT_FPCAST)/lib/wasm32-wasi/' || true
+	rsync -a '$(APPS_OVERLAY)/lib/wasm32-wasi/'     '$(MERGED_SYSROOT_FPCAST)/lib/wasm32-wasi/' || true
 	touch '$@'
 
 
@@ -270,32 +310,43 @@ $(MERGE_ALL_STAMP): $(MERGE_TIRPC_STAMP) $(MERGE_GNULIB_STAMP) $(MERGE_ZLIB_STAM
 merge-sysroot: $(MERGE_ALL_STAMP)
 
 # ---------------- lmbench (via compile_lmbench.sh) ---------------------------
-lmbench: $(MERGE_TIRPC_STAMP)
+# lmbench is passed through wasm-opt --fpcast-emu, so it links against the
+# fpcast merged sysroot (see BASE_SYSROOT_FPCAST above).
+lmbench: $(MERGE_TIRPC_FPCAST_STAMP)
 	. '$(TOOL_ENV)'
-	JOBS='$(JOBS)' '$(APPS_ROOT)/lmbench/src/compile_lmbench.sh'
+	JOBS='$(JOBS)' BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/lmbench/src/compile_lmbench.sh'
 
 # ---------------- bash (WASM build) -------------------------------------------
 # Uses bash/compile_bash.sh to build bash as a wasm32-wasi binary using the
 # merged sysroot and toolchain detected by preflight, and stages artifacts
-# under build/bash/bin.
-bash: $(MERGE_BASE_STAMP)
+# under build/bash/bin. bash is passed through wasm-opt --fpcast-emu, so it
+# links against the fpcast merged sysroot (see BASE_SYSROOT_FPCAST above).
+bash: $(MERGE_BASE_FPCAST_STAMP)
 	. '$(TOOL_ENV)'
-	JOBS='$(JOBS)' '$(APPS_ROOT)/bash/compile_bash.sh'
+	JOBS='$(JOBS)' BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/bash/compile_bash.sh'
 
 # ---------------- nginx (WASM build) -------------------------------------------
 # Uses nginx/compile_nginx.sh to build nginx as a wasm32-wasi binary using the
 # merged sysroot and toolchain detected by preflight, and stages artifacts
-# under build/bin/nginx/wasm32-wasi/.
-nginx: $(MERGE_BASE_STAMP)
+# under build/bin/nginx/wasm32-wasi/. nginx is passed through wasm-opt
+# --fpcast-emu, so it links against the fpcast merged sysroot (see
+# BASE_SYSROOT_FPCAST above).
+nginx: $(MERGE_BASE_FPCAST_STAMP)
 	. '$(TOOL_ENV)'
-	JOBS='$(JOBS)' '$(APPS_ROOT)/nginx/compile_nginx.sh'
+	JOBS='$(JOBS)' BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/nginx/compile_nginx.sh'
 
 # ---------------- coreutils (WASM build) --------------------------------------
 # Uses coreutils/compile_coreutils.sh and requires the merged sysroot,
-# stages artifacts under build/coreutils/bin.
-coreutils: $(MERGE_BASE_STAMP)
+# stages artifacts under build/coreutils/bin. coreutils is passed through
+# wasm-opt --fpcast-emu, so it links against the fpcast merged sysroot (see
+# BASE_SYSROOT_FPCAST above).
+coreutils: $(MERGE_BASE_FPCAST_STAMP)
 	. '$(TOOL_ENV)'
-	JOBS='$(JOBS)' '$(APPS_ROOT)/coreutils/compile_coreutils.sh'
+	JOBS='$(JOBS)' BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/coreutils/compile_coreutils.sh'
 
 # ---------------- git (WASM build) --------------------------------------------
 # Uses git/compile_git.sh to build git as a wasm32-wasi binary using the
@@ -316,10 +367,13 @@ curl: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 # ---------------- grep (WASM build) -------------------------------------------
 # Uses grep/compile_grep.sh to build grep as a wasm32-wasi binary using the
 # merged sysroot and toolchain detected by preflight, and
-# stages artifacts under build/grep.
-grep: $(MERGE_BASE_STAMP)
+# stages artifacts under build/grep. grep is passed through wasm-opt
+# --fpcast-emu, so it links against the fpcast merged sysroot (see
+# BASE_SYSROOT_FPCAST above).
+grep: $(MERGE_BASE_FPCAST_STAMP)
 	. '$(TOOL_ENV)'
-	JOBS='$(JOBS)' '$(APPS_ROOT)/grep/compile_grep.sh'
+	JOBS='$(JOBS)' BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/grep/compile_grep.sh'
 
 # ---------------- sed (WASM build) --------------------------------------------
 # Uses sed/compile_sed.sh to build sed as a wasm32-wasi binary using the
@@ -354,10 +408,12 @@ clang: $(MERGE_LIBCXX_STAMP)
 
 rebuild-libs:
 	rm -f '$(LIBTIRPC_STAMP)' '$(GNULIB_STAMP)' '$(ZLIB_STAMP)' '$(OPENSSL_STAMP)' '$(LIBCXX_STAMP)' \
-	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)'
+	  '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)' \
+	  '$(MERGE_TIRPC_FPCAST_STAMP)'
 
 rebuild-sysroot:
-	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)'
+	rm -f '$(MERGE_BASE_STAMP)' '$(MERGE_TIRPC_STAMP)' '$(MERGE_GNULIB_STAMP)' '$(MERGE_ZLIB_STAMP)' '$(MERGE_OPENSSL_STAMP)' '$(MERGE_LIBCXX_STAMP)' '$(MERGE_ED25519_STAMP)' '$(MERGE_ALL_STAMP)' \
+	  '$(MERGE_BASE_FPCAST_STAMP)' '$(MERGE_TIRPC_FPCAST_STAMP)'
 
 # ---------------- cpython (WASM build) ----------------------------------------
 # Uses cpython/compile_cpython.sh to cross-compile CPython for wasm32-wasi.
@@ -369,9 +425,12 @@ cpython: $(MERGE_ZLIB_STAMP) $(MERGE_OPENSSL_STAMP)
 # Uses postgres/compile_postgres.sh to build the PostgreSQL backend as a
 # wasm32-wasi binary using the merged sysroot and toolchain detected by
 # preflight, and stages artifacts under build/bin/postgres/wasm32-wasi/.
-postgres: $(MERGE_BASE_STAMP) diffutils
+# postgres is passed through wasm-opt --fpcast-emu, so it links against the
+# fpcast merged sysroot (see BASE_SYSROOT_FPCAST above).
+postgres: $(MERGE_BASE_FPCAST_STAMP) diffutils
 	. '$(TOOL_ENV)'
-	'$(APPS_ROOT)/postgres/compile_postgres.sh'
+	BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/postgres/compile_postgres.sh'
 
 # ---------------- tinycc (WASM build) --------------------------------------
 tinycc: 
@@ -385,22 +444,31 @@ diffutils: $(MERGE_BASE_STAMP)
 
 # ---------------- perl (WASM build) -------------------------------------------
 # Cross-compiles Perl for wasm32-wasi via perl-cross.
-# Stages to build/perl/usr/local/bin.
-perl: $(MERGE_BASE_STAMP)
-	'$(APPS_ROOT)/perl/compile_perl.sh'
+# Stages to build/perl/usr/local/bin. perl is passed through wasm-opt
+# --fpcast-emu, so it links against the fpcast merged sysroot (see
+# BASE_SYSROOT_FPCAST above).
+perl: $(MERGE_BASE_FPCAST_STAMP)
+	BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/perl/compile_perl.sh'
 
 # ---------------- awk (WASM build) --------------------------------------------
 # Cross-compiles GNU awk (gawk) to wasm32-wasi.
-# Stages to build/awk/usr/local/bin.
-awk: $(MERGE_BASE_STAMP)
-	'$(APPS_ROOT)/awk/compile_awk.sh'
+# Stages to build/awk/usr/local/bin. awk is passed through wasm-opt
+# --fpcast-emu, so it links against the fpcast merged sysroot (see
+# BASE_SYSROOT_FPCAST above).
+awk: $(MERGE_BASE_FPCAST_STAMP)
+	BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/awk/compile_awk.sh'
 
 # ---------------- make (WASM build) -------------------------------------------
 # Cross-compiles GNU make to wasm32-wasi.
 # Stages to build/make/usr/local/bin.
-# Target named "gmake" to avoid conflict with the make command itself.
-gmake: $(MERGE_BASE_STAMP)
-	'$(APPS_ROOT)/make/compile_make.sh'
+# Target named "gmake" to avoid conflict with the make command itself. gmake
+# is passed through wasm-opt --fpcast-emu, so it links against the fpcast
+# merged sysroot (see BASE_SYSROOT_FPCAST above).
+gmake: $(MERGE_BASE_FPCAST_STAMP)
+	BASE_SYSROOT='$(BASE_SYSROOT_FPCAST)' MERGED_SYSROOT='$(MERGED_SYSROOT_FPCAST)' \
+	  '$(APPS_ROOT)/make/compile_make.sh'
 
 install-bash:
 	'$(APPS_ROOT)/scripts/post_install.sh' '$(LINDFS_ROOT)' '$(APPS_BUILD)' bash

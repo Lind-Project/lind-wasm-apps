@@ -18,7 +18,7 @@ APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PERL_ROOT="$APPS_ROOT/perl"
 
 APPS_BUILD="$APPS_ROOT/build"
-MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
+MERGED_SYSROOT="${MERGED_SYSROOT:-$APPS_BUILD/sysroot_merged}"
 STAGE_DIR="$APPS_BUILD/perl/usr/local/bin"
 TOOL_ENV="$APPS_BUILD/.toolchain.env"
 

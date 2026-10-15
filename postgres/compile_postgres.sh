@@ -28,7 +28,7 @@ APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PG_ROOT="$APPS_ROOT/postgres"
 
 APPS_BUILD="$APPS_ROOT/build"
-MERGED_SYSROOT="$APPS_BUILD/sysroot_merged"
+MERGED_SYSROOT="${MERGED_SYSROOT:-$APPS_BUILD/sysroot_merged}"
 STAGE_DIR="$APPS_BUILD/postgres"
 STAGE_BIN="$STAGE_DIR/bin"
 STAGE_SHARE="$STAGE_DIR/share"
