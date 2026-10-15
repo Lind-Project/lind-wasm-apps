@@ -270,9 +270,7 @@ cp git "$GIT_WASM"
 if [[ -x "$LIND_WASM_OPT" ]]; then
   echo "[git] running lind-wasm-opt..."
   if [[ "$LIND_DYLINK" == "1" ]]; then
-    # --fpcast-emu: dylink mains must match the fpcast-built libc.cwasm table
-    # convention or cross-module indirect calls trap at exit.
-    "$LIND_WASM_OPT" --target=main --fpcast-emu \
+    "$LIND_WASM_OPT" --target=main \
       "$GIT_WASM" -o "$GIT_OPT_WASM"
   else
     "$LIND_WASM_OPT" --static \
