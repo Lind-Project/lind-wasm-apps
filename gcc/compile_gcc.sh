@@ -15,7 +15,8 @@ set -euo pipefail
 #      Generator tools are built natively via CC_FOR_BUILD; cc1 is cross-
 #      compiled to wasm32 via CC/CXX.
 #   4. Build with 'make all-gcc' (compiler only, no target libraries)
-#   5. Stage cc1, post-process with wasm-opt + lind-boot
+#   5. Stage cc1 and the gcc driver, post-process with wasm-opt + lind-boot
+#   6. Stage host headers, libc files and libgcc objects for lindfs
 #
 # Prerequisites:
 #   - Run 'make preflight' and ensure libc++ is in the merged sysroot
@@ -111,7 +112,11 @@ CXX_WASM="$CLANGXX --target=wasm32-unknown-wasi --sysroot=$MERGED_SYSROOT \
 CFLAGS_WASM="-Os"
 CXXFLAGS_WASM="-Os"
 
+# wasm-ld's default stack is 64 KiB and sits directly above the data
+# section. cc1's recursive C parser overflows it on ordinary sources and
+# silently corrupts globals, so use 8 MiB, like a native thread.
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
+  -Wl,-z,stack-size=8388608 \
   -Wl,--export=__stack_pointer,--export=__stack_low,--export=__tls_base \
   -L$MERGED_SYSROOT/lib/wasm32-wasi \
   -L$MERGED_SYSROOT/usr/lib/wasm32-wasi \
@@ -403,6 +408,36 @@ fi
 cp "$CC1_OPT_CWASM" "$STAGE_DIR/cc1"
 echo "[gcc] cc1 staged as $STAGE_DIR/cc1 (precompiled)"
 
+# ----------------------------------------------------------------------
+# 9b) Stage the gcc driver
+# ----------------------------------------------------------------------
+# 'make all-gcc' also builds xgcc, the driver that runs cc1, as and ld.
+# It forks and execs, so it needs asyncify. It is small enough that it
+# does not need the cc1 removelist.
+XGCC_BIN="$GCC_BUILD/gcc/xgcc"
+if [[ ! -f "$XGCC_BIN" ]]; then
+  echo "[gcc] ERROR: gcc driver not produced at '$XGCC_BIN'" >&2
+  exit 1
+fi
+
+XGCC_WASM="$SCRIPT_DIR/xgcc.wasm"
+XGCC_OPT_WASM="$SCRIPT_DIR/xgcc.opt.wasm"
+XGCC_OPT_CWASM="$SCRIPT_DIR/xgcc.opt.cwasm"
+cp "$XGCC_BIN" "$XGCC_WASM"
+
+echo "[gcc] running wasm-opt on the driver (epoch-injection + asyncify + O2)…"
+"$WASM_OPT" --epoch-injection --asyncify --debuginfo -O2 \
+  "$XGCC_WASM" -o "$XGCC_OPT_WASM"
+
+"$LIND_BOOT" --precompile "$XGCC_OPT_WASM"
+if [[ ! -f "$XGCC_OPT_CWASM" ]]; then
+  echo "[gcc] ERROR: precompile produced no .cwasm for the driver" >&2
+  exit 1
+fi
+
+cp "$XGCC_OPT_CWASM" "$STAGE_DIR/gcc"
+echo "[gcc] driver staged as $STAGE_DIR/gcc (precompiled)"
+
 popd >/dev/null 2>&1 || true
 
 echo
@@ -420,7 +455,8 @@ TARGET_TRIPLET="x86_64-linux-gnu"
 INCLUDE_DST="$APPS_BUILD/gcc/usr/include"
 LIB_DST="$APPS_BUILD/gcc/usr/lib/$TARGET_TRIPLET"
 LIB64_DST="$APPS_BUILD/gcc/lib/$TARGET_TRIPLET"
-GCC_INCLUDE_DST="$APPS_BUILD/gcc/usr/local/lib/gcc/$TARGET_TRIPLET/$TARGET_GCC_VER/include"
+GCC_LIB_DST="$APPS_BUILD/gcc/usr/local/lib/gcc/$TARGET_TRIPLET/$TARGET_GCC_VER"
+GCC_INCLUDE_DST="$GCC_LIB_DST/include"
 LINKER_DST="$APPS_BUILD/gcc/lib64"
 
 mkdir -p "$INCLUDE_DST" "$LIB_DST" "$LIB64_DST" "$GCC_INCLUDE_DST" "$LINKER_DST"
@@ -436,4 +472,13 @@ cp /usr/lib/$TARGET_TRIPLET/libm* "$LIB_DST/"
 cp /lib/$TARGET_TRIPLET/libc.so.6 /lib/$TARGET_TRIPLET/libm.so.6 \
    /lib/$TARGET_TRIPLET/libmvec* "$LIB64_DST/"
 cp /lib64/ld-linux-x86-64.so.2 "$LINKER_DST/"
+
+# The driver links crtbegin.o, crtend.o and libgcc.a into every program.
+# This build does not produce libgcc, so use the host gcc's copies. They
+# target the same x86_64 ABI as the code cc1 emits.
+cp /usr/lib/gcc/$TARGET_TRIPLET/$HOST_GCC_VER/crtbegin.o \
+   /usr/lib/gcc/$TARGET_TRIPLET/$HOST_GCC_VER/crtend.o \
+   /usr/lib/gcc/$TARGET_TRIPLET/$HOST_GCC_VER/crtbeginS.o \
+   /usr/lib/gcc/$TARGET_TRIPLET/$HOST_GCC_VER/crtendS.o \
+   /usr/lib/gcc/$TARGET_TRIPLET/$HOST_GCC_VER/libgcc.a "$GCC_LIB_DST/"
 echo "[gcc] headers and libc staged"
