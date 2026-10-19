@@ -19,6 +19,7 @@ case "$LIB" in
   gnulib)   SO_FILES=(libgnu.so) ;;
   zlib)     SO_FILES=(libz.so) ;;
   libcxx)   SO_FILES=(libc++.so libc++abi.so) ;;
+  openblas) SO_FILES=(libopenblas.so) ;;
   *)
     echo "[install-lib] ERROR: unknown library '$LIB'" >&2
     exit 1
