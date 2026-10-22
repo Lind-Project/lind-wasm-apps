@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 # run-lind-tests.sh
 # Custom bash test suite for Lind/wasm sandbox environment
@@ -14,8 +14,60 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
 fi
 
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
+STAGE_DIR="$APPS_ROOT/build/bash/bin"
+
+source "$SCRIPT_DIR/../scripts/test_lib.sh"
+
+# ─────────────────────────────────────────────────────────────
+# Preconditions — must run before any test is recorded
+# ─────────────────────────────────────────────────────────────
+if [[ ! -f "$STAGE_DIR/bash" ]]; then
+    echo "ERROR: bash binary not found at $STAGE_DIR/bash"
+    echo "Please build bash first by running:"
+    echo "  make bash"
+    exit 1
+fi
+
+if [[ ! -f "$LINDFS_ROOT/bin/bash" ]]; then
+    echo "ERROR: bash is not installed in lindfs ($LINDFS_ROOT/bin/bash not found)"
+    echo "Please build and install bash by running:"
+    echo "  make bash"
+    echo "  make install-bash"
+    exit 1
+fi
+
+# Coreutils that the test suite itself shells out to (cat, tr, wc, mktemp,
+# rm, touch), plus grep, which is its own separate app/install target.
+COREUTIL_BINARIES=(
+    "cat"
+    "tr"
+    "wc"
+    "mktemp"
+    "rm"
+    "touch"
+)
+
+for file in "${COREUTIL_BINARIES[@]}"; do
+    FULL_PATH="$LINDFS_ROOT/bin/$file"
+    if [[ ! -f "$FULL_PATH" ]]; then
+        echo "ERROR: $FULL_PATH not found"
+        echo "Coreutils have to be built and installed to lindfs to run bash tests:"
+        echo "  make coreutils"
+        echo "  make install-coreutils"
+        exit 1
+    fi
+done
+
+if [[ ! -f "$LINDFS_ROOT/usr/local/bin/grep" ]]; then
+    echo "ERROR: $LINDFS_ROOT/usr/local/bin/grep not found"
+    echo "grep has to be built and installed to lindfs to run bash tests:"
+    echo "  make grep"
+    echo "  make install-grep"
+    exit 1
+fi
 
 mkdir -p "$LINDFS_ROOT/tests/bash/"
+trap 'rm -rf "$LINDFS_ROOT/tests/bash"' EXIT
 
 PASS=0
 FAIL=0
@@ -32,6 +84,11 @@ assert() {
     local description="$1"
     local expected="$2"
     local cmd="$3"
+
+    if is_skipped "$description"; then
+        log_skip "$description"
+        return
+    fi
 
     local testfile="tests/bash/test$counter.sh"
 
@@ -52,11 +109,11 @@ assert() {
     
     # Overwrite the running state with the final result
     if [ "$expected" = "$actual" ]; then
-        echo -e "  ${GREEN}PASS${NC} $description                                "
+        echo -e "  ${GREEN}PASS:${NC} $description                                "
         PASS=$((PASS + 1))
     else
 	echo -e " ${RED} $testfile failed"
-        echo -e "  ${RED}FAIL${NC} $description                                "
+        echo -e "  ${RED}FAIL:${NC} $description                                "
         echo    "       expected: $(echo "$expected" | head -5)"
         echo    "       actual  : $(echo "$actual"   | head -5)"
         FAIL=$((FAIL + 1))
@@ -353,6 +410,7 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e " Total : $TOTAL"
 echo -e " ${GREEN}Pass${NC}  : $PASS"
 echo -e " ${RED}Fail${NC}  : $FAIL"
+echo -e " Skipped: $SKIPPED"
 echo ""
 if [ $FAIL -gt 0 ]; then
     echo -e "${RED}FAILED${NC} — $FAIL/$TOTAL tests failed"
@@ -361,31 +419,4 @@ else
     echo -e "${GREEN}ALL PASSED${NC} — $PASS/$TOTAL tests passed"
     exit 0
 fi
-
-COREUTIL_BINARIES=(
-    "cat"
-    "tr"
-    "wc"
-    "grep"
-    "mktemp"
-    "source"
-    "rm"
-    "touch"
-)
-
-for file in "${COREUTIL_BINARIES[@]}"; do
-    # Construct the full path
-    FULL_PATH="$LINDFS_ROOT/bin/$file"
-    if [[ ! -f "$FULL_PATH" ]]; then
-        echo -e "[ ${RED}MISSING${NC} ] $FULL_PATH"
-        echo -r "Coreutils have to be built and copied to lindfs to run bash tests"
-        echo "Tests 79,80,81, 84, 85, 89, 133 requires cat"
-        echo "Tests 87 and 88 require tr"
-	echo "Test 88 requires wc"
-	echo "Test 99 requires grep"
-	echo "Test 106 requires mktemp, source and rm"
-	echo "Test 117 requires touch and rm"
-	exit 1
-    fi
-done
 
