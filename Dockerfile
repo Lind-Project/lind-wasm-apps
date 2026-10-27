@@ -19,8 +19,7 @@
 # Otherwise Docker reuses the cached test results.
 
 # Release image with the fpcast runtime in /prebuilt-lindfs-fpcast/lib.
-# TODO: use securesystemslab/lind-wasm:latest after the lind-wasm PR is merged.
-ARG BASE_IMAGE=lind-wasm:release-fpcast-pr
+ARG BASE_IMAGE=securesystemslab/lind-wasm:latest
 
 FROM ${BASE_IMAGE} AS build
 
