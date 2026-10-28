@@ -14,8 +14,9 @@
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  # Same as the grates pipeline. Review after the first runs (time, memory).
-  machineType: E2_HIGHCPU_8
+  # TEST: 32 cores / 32 GB. gcc's wasm-opt step was killed on E2_HIGHCPU_8 (8 GB).
+  # Decide the final type from the measured time and cost.
+  machineType: E2_HIGHCPU_32
   # TODO: set from the first run. The first 100 GB is free.
   diskSizeGb: 200
   substitution_option: ALLOW_LOOSE
@@ -51,8 +52,8 @@ steps:
       - |
         set -uo pipefail
 
-        # COMMIT_SHA is empty when a trigger is run by Cloud Scheduler.
-        # Then use the checked-out source, and the branch head as a last resort.
+        # COMMIT_SHA is set when the trigger runs on a branch.
+        # If it is empty, use the checked-out source, then the branch head.
         commit="$${COMMIT_SHA:-}"
         if [[ -z "$${commit}" ]] && command -v git > /dev/null; then
           commit="$$(git -C /workspace rev-parse HEAD 2>/dev/null)"
@@ -94,8 +95,10 @@ steps:
 
         # Record which runtime image this run used. The tag "latest" moves
         # every time lind-wasm main changes, so the digest is the real record.
-        digest="$$(docker buildx imagetools inspect "$${BASE_IMAGE}" \
-          --format '{{.Manifest.Digest}}' 2>/dev/null)"
+        # Read the first "Digest:" line: the digest of the tag (image index).
+        # (--format is not applied by the buildx in this builder image.)
+        digest="$$(docker buildx imagetools inspect "$${BASE_IMAGE}" 2>/dev/null \
+          | awk '/^Digest:/ {print $$2; exit}')"
         echo -n "$${BASE_IMAGE}@$${digest:-<unknown>}" > /workspace/base_image
         echo "base image: $$(cat /workspace/base_image)"
 
@@ -194,25 +197,82 @@ steps:
         tar -C "$${out}" -czf "/workspace/$${asset}" .
         asset_url="https://github.com/$${GITHUB_REPO}/releases/download/$${tag}/$${asset}"
 
-        # Body: test results, failed build/install targets, and what was built.
-        {
-          echo "Test results:"
-          echo '```'
-          cat "$${out}/test-results.tsv"
-          echo '```'
-          echo
-          echo "Failed or skipped build/install targets:"
-          echo '```'
-          awk -F'\t' 'NR > 1 && $$2 != "0" {print $$1 "\t" $$2}' "$${out}/results.tsv"
-          echo '```'
-          echo
-          echo "branch: \`$${branch}\`"
-          echo "commit: \`$${commit}\`"
-          echo "base image: \`$$(cat /workspace/base_image)\`"
-          echo "$$(grep '^runtime:' "$${out}/env.txt")"
-          echo
-          echo "- [$${asset}]($${asset_url}) - all results and logs"
-        } > /workspace/release-body.md
+        # Body: test results, build failures, and what was run.
+        python3 - "$${out}" "$${branch}" "$${commit}" "$$(cat /workspace/base_image)" \
+          "$${asset}" "$${asset_url}" > /workspace/release-body.md <<'PY'
+        import re, sys
+        out, branch, commit, base_image, asset, asset_url = sys.argv[1:7]
+
+        def rows(path):
+            with open(path) as f:
+                lines = f.read().splitlines()[1:]
+            return [l.split("\t") for l in lines if l.strip()]
+
+        # Each app's test script prints its own summary line. Turn the known
+        # formats into "passed/total". If none match, show the raw line.
+        ansi = re.compile(r"\x1b\[[0-9;]*m")
+        patterns = [
+            (re.compile(r"FAILED\D*(\d+)/(\d+) tests failed"),            # bash
+             lambda m: (int(m[2]) - int(m[1]), int(m[2]))),
+            (re.compile(r"PASS: (\d+) \| FAIL: \d+ \| SKIPPED: \d+ \| TOTAL: (\d+)"),  # coreutils
+             lambda m: (int(m[1]), int(m[2]))),
+            (re.compile(r"Results: (\d+) total, (\d+) passed"),           # grep
+             lambda m: (int(m[2]), int(m[1]))),
+            (re.compile(r"(\d+)/(\d+) tests passed"),                     # awk make perl nginx
+             lambda m: (int(m[1]), int(m[2]))),
+        ]
+        keywords = re.compile(r"ALL PASSED|FAILED|tests passed|Results:|PASS: \d+ \|")
+
+        def test_result(app):
+            try:
+                with open(f"{out}/logs/test-{app}.log", errors="replace") as f:
+                    lines = [ansi.sub("", l).strip() for l in f]
+            except OSError:
+                return "no log"
+            for line in reversed(lines):
+                for pat, conv in patterns:
+                    m = pat.search(line)
+                    if m:
+                        passed, total = conv(m)
+                        return f"{passed}/{total}"
+            for line in reversed(lines):
+                if keywords.search(line):
+                    return line[:100].replace("|", "\\|")
+            return "no summary line"
+
+        print("## Test results")
+        print("| app | result | exit |")
+        print("|---|---|---|")
+        for app, rc, *_ in rows(f"{out}/test-results.tsv"):
+            result = "-" if rc == "skipped" else test_result(app)
+            print(f"| {app} | {result} | {rc} |")
+        print()
+
+        # Only targets that ran and failed. "skipped" installs follow from a
+        # failed build, so they are not listed again.
+        failed = [(t, rc) for t, rc, *_ in rows(f"{out}/results.tsv")
+                  if rc not in ("0", "skipped")]
+        print("## Build failures")
+        if failed:
+            print("| target | exit |")
+            print("|---|---|")
+            for t, rc in failed:
+                print(f"| {t} | {rc} |")
+        else:
+            print("None")
+        print()
+
+        runtime = "unknown"
+        with open(f"{out}/env.txt", errors="replace") as f:
+            for line in f:
+                if line.startswith("runtime:"):
+                    runtime = line.split(":", 1)[1].strip()
+        print("## Run info")
+        print(f"- commit: `{commit}` (branch `{branch}`)")
+        print(f"- base image: `{base_image}`")
+        print(f"- runtime: {runtime}")
+        print(f"- [{asset}]({asset_url}) - all results and logs")
+        PY
 
         # Build the JSON in python so the body text is escaped correctly.
         python3 - "$${tag}" "$${commit}" /workspace/release-body.md \
