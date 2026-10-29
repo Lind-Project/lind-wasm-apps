@@ -14,8 +14,7 @@
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  # TEST: 32 cores / 32 GB. gcc's wasm-opt step was killed on E2_HIGHCPU_8 (8 GB).
-  # Decide the final type from the measured time and cost.
+  # 32 GB of memory is needed: gcc's wasm-opt step is killed on E2_HIGHCPU_8 (8 GB).
   machineType: E2_HIGHCPU_32
   # TODO: set from the first run. The first 100 GB is free.
   diskSizeGb: 200
@@ -33,7 +32,7 @@ availableSecrets:
     - versionName: projects/x-micron-451502-m7/secrets/slack-webhook-grates-ci/versions/latest
       env: SLACK_WEBHOOK
 
-# A full build takes about 2.5 hours on 8 cores. The docker build itself is
+# A full build takes about 1 hour 10 minutes on 32 cores. The docker build itself is
 # stopped at 5 hours (Build And Test), so the later steps still have time to
 # report it. If this timeout is hit instead, no step runs and Slack gets nothing.
 timeout: 21600s
