@@ -57,7 +57,14 @@ RUN <<'EOF'
 set -uo pipefail   # no -e: record failures and keep going
 for t in $APPS; do
   start=$(date +%s)
-  make -C /apps "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
+  # postgres: build one job at a time. Its build script removes and re-creates
+  # header symlinks while other files compile, so it fails at random with -j.
+  # TODO: remove after the build script is fixed.
+  case "$t" in
+    postgres) jobs="JOBS=1" ;;
+    *)        jobs="" ;;
+  esac
+  make -C /apps "$t" $jobs > "$RESULTS_DIR/logs/$t.log" 2>&1
   rc=$?
   printf "%s\t%s\t%s\n" "$t" "$rc" "$(( $(date +%s) - start ))" >> "$RESULTS_DIR/results.tsv"
   if [ "$rc" -eq 0 ]; then
