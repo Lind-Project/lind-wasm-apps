@@ -17,6 +17,14 @@ LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 STAGE_DIR="$APPS_ROOT/build/bash/bin"
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+grate_setup "$@"
+
+# Runtime command for every test; the grate (if any) goes between the runtime
+# flags and bin/bash.
+LIND_RUN=(lind_run --enable-fpcast
+    --env PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:.
+    "${GRATE_CMD[@]}")
 
 # ─────────────────────────────────────────────────────────────
 # Preconditions — must run before any test is recorded
@@ -100,7 +108,7 @@ assert() {
     
     # Evaluate the command
     local actual
-    actual=$(timeout ${TIMEOUT_SECS}s lind_run --enable-fpcast --env PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:.  bin/bash  "$testfile" 2>/dev/null)
+    actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/bash  "$testfile" 2>/dev/null)
     echo "--------- Test run Completed -------"
 
     exit_code=$?

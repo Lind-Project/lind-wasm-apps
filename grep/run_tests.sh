@@ -19,12 +19,16 @@ APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIND_WASM_ROOT="${LIND_WASM_ROOT:-$(cd "$APPS_ROOT/.." && pwd)}"
 STAGE_DIR="$APPS_ROOT/build/grep/usr/local/bin"
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
-LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
+LIND_RUN=("$LIND_WASM_ROOT/scripts/bin/lind_run" --enable-fpcast)
 GREP_BIN="/usr/local/bin/grep"
 TEST_DIR="/tests/grep"
 TIMEOUT_SECS="${TIMEOUT_SECS:-10}"
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+grate_setup "$@"
+# The grate goes after the runtime flags and before the binary under test.
+LIND_RUN+=("${GRATE_CMD[@]}")
 
 PASS=0
 FAIL=0
@@ -87,7 +91,7 @@ echo "[test] Running sanity tests..."
 if is_skipped "basic pattern match"; then
   log_skip "basic pattern match"
 else
-  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" --enable-fpcast $GREP_BIN "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "${LIND_RUN[@]}" $GREP_BIN "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
   EXPECTED=$'hello world\nhello again'
   if [[ "$OUTPUT" == "$EXPECTED" ]]; then
     pass "basic pattern match"
@@ -100,7 +104,7 @@ fi
 if is_skipped "case-insensitive (-i)"; then
   log_skip "case-insensitive (-i)"
 else
-  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" --enable-fpcast $GREP_BIN -i "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "${LIND_RUN[@]}" $GREP_BIN -i "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
   LINE_COUNT=$(echo "$OUTPUT" | wc -l | tr -d ' ')
   if [[ "$LINE_COUNT" -eq 4 ]]; then
     pass "case-insensitive (-i)"
@@ -113,7 +117,7 @@ fi
 if is_skipped "count matches (-c)"; then
   log_skip "count matches (-c)"
 else
-  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" --enable-fpcast $GREP_BIN -c "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
+  OUTPUT=$(sudo timeout "${TIMEOUT_SECS}s" "${LIND_RUN[@]}" $GREP_BIN -c "hello" "$TEST_DIR/hello.txt" 2>/dev/null || true)
   if [[ "$OUTPUT" == "2" ]]; then
     pass "count matches (-c)"
   else
@@ -125,7 +129,7 @@ fi
 if is_skipped "stdin pipe with regex (-oE)"; then
   log_skip "stdin pipe with regex (-oE)"
 else
-  OUTPUT=$(echo "test123" | sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" --enable-fpcast $GREP_BIN -oE "[0-9]+" 2>/dev/null || true)
+  OUTPUT=$(echo "test123" | sudo timeout "${TIMEOUT_SECS}s" "${LIND_RUN[@]}" $GREP_BIN -oE "[0-9]+" 2>/dev/null || true)
   if [[ "$OUTPUT" == "123" ]]; then
     pass "stdin pipe with regex (-oE)"
   else
@@ -137,7 +141,7 @@ fi
 if is_skipped "no match returns non-zero exit"; then
   log_skip "no match returns non-zero exit"
 else
-  sudo timeout "${TIMEOUT_SECS}s" "$LIND_RUN" --enable-fpcast $GREP_BIN "zzzznotfound" "$TEST_DIR/hello.txt" >/dev/null 2>&1 && RC=$? || RC=$?
+  sudo timeout "${TIMEOUT_SECS}s" "${LIND_RUN[@]}" $GREP_BIN "zzzznotfound" "$TEST_DIR/hello.txt" >/dev/null 2>&1 && RC=$? || RC=$?
   if [[ "$RC" -ne 0 ]]; then
     pass "no match returns non-zero exit"
   else
