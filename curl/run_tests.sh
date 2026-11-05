@@ -28,10 +28,9 @@ fi
 
 LIND_DYLINK="${LIND_DYLINK:-0}"
 
+LIND_RUN=("$LIND_WASM_ROOT/scripts/bin/lind_run")
 if [[ "$LIND_DYLINK" == "1" ]]; then
-        LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run --preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so"
-else
-        LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
+    LIND_RUN+=(--preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so)
 fi
 
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
@@ -44,6 +43,10 @@ STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-5}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-20}"
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+grate_setup "$@"
+# The grate goes after the runtime flags and before the binary under test.
+LIND_RUN+=("${GRATE_CMD[@]}")
 
 # --- server document root (stable, not temp) ---------------------------------
 SERVER_ROOT="$LINDFS_ROOT/tests/curl/www"
@@ -172,111 +175,111 @@ test_binary_exists() {
 # 2. --version flag
 test_version() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" --version 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" --version 2>&1)
     echo "$output" | grep -q "curl"
 }
 
 # 3. --help flag
 test_help() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" --help 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" --help 2>&1)
     echo "$output" | grep -qi "usage"
 }
 
 # 4. Basic HTTP GET
 test_http_get() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s "$BASE_URL/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s "$BASE_URL/test.txt" 2>&1)
     [[ "$output" == *"Hello from curl test"* ]]
 }
 
 # 5. HTTP GET with status code
 test_http_status() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
     [[ "$status" == *"200"* ]]
 }
 
 # 6. HTTP HEAD request (-I)
 test_http_head() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -I "$BASE_URL/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -I "$BASE_URL/test.txt" 2>&1)
     echo "$output" | grep -qi "Content-Length"
 }
 
 # 7. 404 error handling
 test_404() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' "$BASE_URL/nonexistent_file" 2>&1)
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w '%{http_code}' "$BASE_URL/nonexistent_file" 2>&1)
     [[ "$status" == *"404"* ]]
 }
 
 # 8. Download JSON and verify content
 test_json_get() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s "$BASE_URL/test.json" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s "$BASE_URL/test.json" 2>&1)
     [[ "$output" == *'"status":"ok"'* ]]
 }
 
 # 9. Custom header (-H)
 test_custom_header() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -v -H "X-Test-Header: lind-wasm" "$BASE_URL/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -v -H "X-Test-Header: lind-wasm" "$BASE_URL/test.txt" 2>&1)
     echo "$output" | grep -q "X-Test-Header"
 }
 
 # 10. User-Agent (-A)
 test_user_agent() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -v -A "LindWasmTest/1.0" "$BASE_URL/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -v -A "LindWasmTest/1.0" "$BASE_URL/test.txt" 2>&1)
     echo "$output" | grep -q "LindWasmTest"
 }
 
 # 11. Follow redirects (-L)
 test_follow_redirect_flag() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -L -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -L -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
     [[ "$status" == *"200"* ]]
 }
 
 # 12. Output to /dev/null (-o)
 test_output_devnull() {
-    timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null "$BASE_URL/test.txt" 2>&1
+    timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null "$BASE_URL/test.txt" 2>&1
     return $?
 }
 
 # 13. Write-out format (-w)
 test_write_out() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w 'code=%{http_code} size=%{size_download}' "$BASE_URL/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w 'code=%{http_code} size=%{size_download}' "$BASE_URL/test.txt" 2>&1)
     [[ "$output" == *"code=200"* ]]
 }
 
 # 14. Verbose output (-v)
 test_verbose() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -v "$BASE_URL/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -v "$BASE_URL/test.txt" 2>&1)
     echo "$output" | grep -q "GET /test.txt"
 }
 
 # 15. Silent mode (-s)
 test_silent() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s "$BASE_URL/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s "$BASE_URL/test.txt" 2>&1)
     ! echo "$output" | grep -q "% Total"
 }
 
 # 16. Multiple URLs in one request
 test_multiple_urls() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s "$BASE_URL/test.txt" "$BASE_URL/test.json" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s "$BASE_URL/test.txt" "$BASE_URL/test.json" 2>&1)
     [[ "$output" == *"Hello from curl test"* ]] && [[ "$output" == *'"status":"ok"'* ]]
 }
 
 # 17. POST request (-X POST with -d)
 test_post() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' \
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w '%{http_code}' \
         -X POST -d "key=value" "$BASE_URL/test.txt" 2>&1)
     [[ "$status" == *"501"* ]] || [[ "$status" == *"200"* ]] || [[ "$status" == *"405"* ]]
 }
@@ -284,7 +287,7 @@ test_post() {
 # 18. PUT request (-X PUT)
 test_put() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' \
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w '%{http_code}' \
         -X PUT -d "data" "$BASE_URL/test.txt" 2>&1)
     [[ -n "$status" ]]
 }
@@ -297,7 +300,7 @@ test_https_insecure() {
         return 0
     fi
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -k "$BASE_HTTPS/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -k "$BASE_HTTPS/test.txt" 2>&1)
     [[ "$output" == *"Hello from curl test"* ]]
 }
 
@@ -308,7 +311,7 @@ test_https_cacert() {
         return 0
     fi
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s --cacert tests/curl/certs/cert.pem "$BASE_HTTPS/test.txt" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s --cacert tests/curl/certs/cert.pem "$BASE_HTTPS/test.txt" 2>&1)
     [[ "$output" == *"Hello from curl test"* ]]
 }
 
@@ -316,7 +319,7 @@ test_https_cacert() {
 test_connect_timeout() {
     local start end elapsed
     start=$(date +%s)
-    timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s --connect-timeout 2 "http://192.0.2.1/" 2>&1 || true
+    timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s --connect-timeout 2 "http://192.0.2.1/" 2>&1 || true
     end=$(date +%s)
     elapsed=$((end - start))
     [[ $elapsed -lt 10 ]]
@@ -326,7 +329,7 @@ test_connect_timeout() {
 test_max_time() {
     local start end elapsed
     start=$(date +%s)
-    timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s --max-time 2 "http://192.0.2.1/" 2>&1 || true
+    timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s --max-time 2 "http://192.0.2.1/" 2>&1 || true
     end=$(date +%s)
     elapsed=$((end - start))
     [[ $elapsed -lt 10 ]]
@@ -335,7 +338,7 @@ test_max_time() {
 # 23. Download large file and verify size
 test_large_download() {
     local output size
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{size_download}' "$BASE_URL/largefile.bin" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w '%{size_download}' "$BASE_URL/largefile.bin" 2>&1)
     size=$(echo "$output" | tr -dc '0-9')
     [[ -n "$size" ]] && [[ "$size" -gt 0 ]]
 }
@@ -343,14 +346,14 @@ test_large_download() {
 # 24. HTTP range request
 test_range_request() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -r 0-4 -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -r 0-4 -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
     [[ "$status" == *"200"* ]] || [[ "$status" == *"206"* ]]
 }
 
 # 25. Retry flag (--retry)
 test_retry_flag() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s --retry 1 -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s --retry 1 -o /dev/null -w '%{http_code}' "$BASE_URL/test.txt" 2>&1)
     [[ "$status" == *"200"* ]]
 }
 # === EXTERNAL URL TESTS (DNS resolution + real network) ======================
@@ -358,41 +361,41 @@ test_retry_flag() {
 # 26. External HTTP GET (tests DNS resolution)
 test_external_http() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 10 "http://example.com/" 2>&1)
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 10 "http://example.com/" 2>&1)
     [[ "$status" == *"200"* ]]
 }
 
 # 27. External HTTPS GET (tests DNS + TLS handshake)
 test_external_https() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 10 "https://example.com/" 2>&1)
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 10 "https://example.com/" 2>&1)
     [[ "$status" == *"200"* ]]
 }
 
 # 28. External HTTPS content verification
 test_external_content() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s --max-time 10 "https://example.com/" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s --max-time 10 "https://example.com/" 2>&1)
     [[ "$output" == *"Example Domain"* ]]
 }
 
 # 29. External redirect follow (tests DNS + HTTP 301/302 handling)
 test_external_redirect() {
     local status
-    status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -L -o /dev/null -w '%{http_code}' --max-time 10 "http://www.google.com/" 2>&1)
+    status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -L -o /dev/null -w '%{http_code}' --max-time 10 "http://www.google.com/" 2>&1)
     [[ "$status" == *"200"* ]]
 }
 
 # 30. External HEAD request (tests DNS + response headers)
 test_external_head() {
     local output
-    output=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -I --max-time 10 "https://example.com/" 2>&1)
+    output=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -I --max-time 10 "https://example.com/" 2>&1)
     echo "$output" | grep -qi "Content-Type"
 }
 
 # Quick DNS check - if this fails, skip all external tests
 DNS_AVAILABLE=false
-dns_status=$(timeout ${TIMEOUT_SECS}s $LIND_RUN "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 5 "http://example.com/" 2>/dev/null) || true
+dns_status=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" "$CURL_BIN" -s -o /dev/null -w '%{http_code}' --max-time 5 "http://example.com/" 2>/dev/null) || true
 [[ "$dns_status" == *"200"* ]] && DNS_AVAILABLE=true
 
 # --- run tests ---------------------------------------------------------------

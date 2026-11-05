@@ -7,7 +7,9 @@ set -euo pipefail
 # No network access required — all tests use local operations.
 #
 # Usage:
-#   ./git/test.sh
+#   ./git/run_tests.sh                  # no grate
+#   ./git/run_tests.sh --grate chroot   # run every git call under a grate
+#   LIND_GRATE=chroot ./git/run_tests.sh
 #
 # Exit 0 on all pass, non-zero on any failure.
 ###############################################################################
@@ -40,6 +42,11 @@ GIT_BIN="usr/local/bin/git"
 TIMEOUT_SECS="${TIMEOUT_SECS:-20}"
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+grate_setup "$@"
+# The grate goes after the runtime flags and before the git binary.
+LIND_RUN+=("${GRATE_CMD[@]}")
+
 REPO_PATH="/tmp/git-test-repo"
 HOST_REPO_PATH="$LINDFS_ROOT$REPO_PATH"
 REMOTE_PATH="/tmp/git-test-remote.git"

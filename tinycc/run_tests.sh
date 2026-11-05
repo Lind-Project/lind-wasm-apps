@@ -19,9 +19,13 @@ TEST_DIR="$LINDFS_ROOT/tests/tinycc"
 TEST_DIR_RELATIVE="tests/tinycc"
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+grate_setup "$@"
 
 # --- Configuration Variables ---
-COMPILER="lind_run bin/tcc"
+# tcc runs through lind_run (under the grate, if any). The programs it
+# compiles run natively on the host, so the grate covers the compile step only.
+COMPILER=(lind_run "${GRATE_CMD[@]}" bin/tcc)
 CFLAGS="-Wall"                # Compiler flags
 RESULTS_FILE="$TEST_DIR/results.log"    # Summary of results
 TIMEOUT_SECS="${TIMEOUT_SECS:-10}"
@@ -105,7 +109,7 @@ run_test() {
     TOTAL=$((TOTAL + 1))
 
     # 2. Compile (through lind_run, since tcc itself is the app under test)
-    if ! timeout ${TIMEOUT_SECS}s $COMPILER $CFLAGS "$src_relative" -o "$bin_relative" 2>>"$RESULTS_FILE"; then
+    if ! timeout ${TIMEOUT_SECS}s "${COMPILER[@]}" $CFLAGS "$src_relative" -o "$bin_relative" 2>>"$RESULTS_FILE"; then
         echo -e "  ${RED}FAIL:${NC} $name (compilation failed)"
         echo "$name: FAIL (compilation failed)" >> "$RESULTS_FILE"
         FAIL=$((FAIL + 1))

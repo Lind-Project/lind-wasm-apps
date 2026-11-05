@@ -20,13 +20,17 @@ APPS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
     LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
-LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run --enable-fpcast"
+LIND_RUN=("$LIND_WASM_ROOT/scripts/bin/lind_run" --enable-fpcast)
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 NGINX_BIN="usr/sbin/nginx"
 NGINX_CONF_DIR="$LINDFS_ROOT/etc/nginx"
 NGINX_HTML_DIR="$LINDFS_ROOT/var/www/html"
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+grate_setup "$@"
+# The grate goes after the runtime flags and before the binary under test.
+LIND_RUN+=("${GRATE_CMD[@]}")
 
 # --- configurable settings ---------------------------------------------------
 TEST_PORT="${TEST_PORT:-8080}"
@@ -95,7 +99,7 @@ EOF
 
 # --- start nginx -------------------------------------------------------------
 echo "$PREFIX starting nginx on port $TEST_PORT..."
-setsid $LIND_RUN "$NGINX_BIN" -p / -c "$TEST_CONF" \
+setsid "${LIND_RUN[@]}" "$NGINX_BIN" -p / -c "$TEST_CONF" \
     >"$NGINX_LOG" 2>&1 &
 NGINX_PID=$!
 

@@ -25,6 +25,12 @@ LINDFS_BIN="/bin/"
 TIMEOUT_SECS=10
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+grate_setup "$@"
+
+# Runtime command for every utility under test; the grate (if any) goes
+# between lind_run and the utility binary.
+LIND_RUN=(lind_run "${GRATE_CMD[@]}")
 
 # Test working directory — absolute path so sandbox can see it
 TEST_DIR="tmp/lind-manual-tests-$$"
@@ -158,43 +164,43 @@ cd $LINDFS_ROOT
 echo "--- File Management ---"
 
 # touch: create a file
-timeout ${TIMEOUT_SECS}s lind_run bin/touch "$TEST_DIR/touchfile"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/touch "$TEST_DIR/touchfile"
 run_test "touch: create file" "yes" "$([ -f "$TEST_DIR/touchfile" ] && echo yes || echo no)"
 
 # ls: list files
 echo "hello" > "$TEST_DIR/lsfile1"
 echo "world" > "$TEST_DIR/lsfile2"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/ls "$TEST_DIR/lsfile1" "$TEST_DIR/lsfile2")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/ls "$TEST_DIR/lsfile1" "$TEST_DIR/lsfile2")
 run_test_contains "ls: list files" "lsfile1" "$actual"
 
 # mkdir: create directory
-timeout ${TIMEOUT_SECS}s lind_run bin/mkdir "$TEST_DIR/newdir"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/mkdir "$TEST_DIR/newdir"
 run_test "mkdir: create dir" "yes" "$([ -d "$TEST_DIR/newdir" ] && echo yes || echo no)"
 
 # rmdir: remove directory
-timeout ${TIMEOUT_SECS}s lind_run bin/mkdir "$TEST_DIR/removeme"
-timeout ${TIMEOUT_SECS}s lind_run bin/rmdir "$TEST_DIR/removeme"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/mkdir "$TEST_DIR/removeme"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/rmdir "$TEST_DIR/removeme"
 run_test "rmdir: remove dir" "no" "$([ -d "$TEST_DIR/removeme" ] && echo yes || echo no)"
 
 # cp: copy file
 echo "copytest" > "$TEST_DIR/original"
-timeout ${TIMEOUT_SECS}s lind_run bin/cp "$TEST_DIR/original" "$TEST_DIR/copied"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/cp "$TEST_DIR/original" "$TEST_DIR/copied"
 run_test "cp: copy file" "copytest" "$(cat "$TEST_DIR/copied")"
 
 # mv: move file
 echo "movetest" > "$TEST_DIR/movesrc"
-timeout ${TIMEOUT_SECS}s lind_run bin/mv "$TEST_DIR/movesrc" "$TEST_DIR/movedst"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/mv "$TEST_DIR/movesrc" "$TEST_DIR/movedst"
 run_test "mv: move file" "movetest" "$(cat "$TEST_DIR/movedst")"
 run_test "mv: source removed" "no" "$([ -f "$TEST_DIR/movesrc" ] && echo yes || echo no)"
 
 # rm: remove file
 echo "deleteme" > "$TEST_DIR/rmfile"
-timeout ${TIMEOUT_SECS}s lind_run bin/rm "$TEST_DIR/rmfile"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/rm "$TEST_DIR/rmfile"
 run_test "rm: remove file" "no" "$([ -f "$TEST_DIR/rmfile" ] && echo yes || echo no)"
 
 # ln: create symlink
 echo "linktest" > "$TEST_DIR/linkoriginal"
-timeout ${TIMEOUT_SECS}s lind_run bin/ln -s "$TEST_DIR/linkoriginal" "$TEST_DIR/symlink"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/ln -s "$TEST_DIR/linkoriginal" "$TEST_DIR/symlink"
 run_test "ln: create symlink" "linktest" "$(cat "$TEST_DIR/symlink")"
 
 echo ""
@@ -204,47 +210,47 @@ echo "--- Text Processing ---"
 
 # cat: read file
 echo "cattest" > "$TEST_DIR/catfile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/cat "$TEST_DIR/catfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/cat "$TEST_DIR/catfile")
 run_test "cat: read file" "cattest" "$actual"
 
 # head: first lines
 printf "line1\nline2\nline3\nline4\nline5\n" > "$TEST_DIR/headfile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/head -n 2 "$TEST_DIR/headfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/head -n 2 "$TEST_DIR/headfile")
 expected=$(printf "line1\nline2")
 run_test "head: first 2 lines" "$expected" "$actual"
 
 # tail: last lines
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/tail -n 2 "$TEST_DIR/headfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/tail -n 2 "$TEST_DIR/headfile")
 expected=$(printf "line4\nline5")
 run_test "tail: last 2 lines" "$expected" "$actual"
 
 # wc: word count
 echo "one two three" > "$TEST_DIR/wcfile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/wc -w "$TEST_DIR/wcfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/wc -w "$TEST_DIR/wcfile")
 run_test_contains "wc: word count" "3" "$actual"
 
 # sort: sort lines
 printf "banana\napple\ncherry\n" > "$TEST_DIR/sortfile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/sort "$TEST_DIR/sortfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/sort "$TEST_DIR/sortfile")
 expected=$(printf "apple\nbanana\ncherry")
 run_test "sort: alphabetical" "$expected" "$actual"
 
 # uniq: deduplicate
 printf "aaa\naaa\nbbb\nccc\nccc\n" > "$TEST_DIR/uniqfile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/uniq "$TEST_DIR/uniqfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/uniq "$TEST_DIR/uniqfile")
 expected=$(printf "aaa\nbbb\nccc")
 run_test "uniq: deduplicate" "$expected" "$actual"
 
 # cut: extract fields
 printf "a:b:c\nd:e:f\n" > "$TEST_DIR/cutfile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/cut -d: -f2 "$TEST_DIR/cutfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/cut -d: -f2 "$TEST_DIR/cutfile")
 expected=$(printf "b\ne")
 run_test "cut: extract field 2" "$expected" "$actual"
 
 # paste: merge lines
 printf "A\nB\n" > "$TEST_DIR/paste1"
 printf "1\n2\n" > "$TEST_DIR/paste2"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/paste "$TEST_DIR/paste1" "$TEST_DIR/paste2")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/paste "$TEST_DIR/paste1" "$TEST_DIR/paste2")
 expected=$(printf "A\t1\nB\t2")
 run_test "paste: merge files" "$expected" "$actual"
 
@@ -255,27 +261,27 @@ echo "--- Permissions & Info ---"
 
 # chmod: change permissions
 echo "chmodtest" > "$TEST_DIR/chmodfile"
-timeout ${TIMEOUT_SECS}s lind_run bin/chmod 755 "$TEST_DIR/chmodfile"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/chmod 755 "$TEST_DIR/chmodfile"
 actual=$(stat -c %a "$TEST_DIR/chmodfile")
 run_test "chmod: set 755" "755" "$actual"
 
 # pwd: print working directory
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/pwd)
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/pwd)
 # pwd might return / (lindfs root) or something else, just check it runs
 run_test_contains "pwd: outputs a path" "/" "$actual"
 
 # du: disk usage
 echo "dutest" > "$TEST_DIR/dufile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/du "$TEST_DIR/dufile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/du "$TEST_DIR/dufile")
 run_test_contains "du: reports usage" "$TEST_DIR/dufile" "$actual"
 
 # df: disk free
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/df)
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/df)
 run_test_contains "df: shows filesystem" "/" "$actual"
 
 # dd: copy bytes
 echo "ddtest" > "$TEST_DIR/ddinput"
-timeout ${TIMEOUT_SECS}s lind_run bin/dd if="$TEST_DIR/ddinput" of="$TEST_DIR/ddoutput"
+timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/dd if="$TEST_DIR/ddinput" of="$TEST_DIR/ddoutput"
 run_test "dd: copy file" "ddtest" "$(cat "$TEST_DIR/ddoutput")"
 
 echo ""
@@ -284,25 +290,25 @@ echo ""
 echo "--- Text Manipulation ---"
 
 # echo: print text
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/echo "hello world")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/echo "hello world")
 run_test "echo: print text" "hello world" "$actual"
 
 # printf: formatted output
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/printf "%s-%s\n" "foo" "bar")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/printf "%s-%s\n" "foo" "bar")
 run_test "printf: format string" "foo-bar" "$actual"
 
 # tr: translate characters
-actual=$(echo "hello" | timeout ${TIMEOUT_SECS}s lind_run bin/tr 'a-z' 'A-Z')
+actual=$(echo "hello" | timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/tr 'a-z' 'A-Z')
 run_test "tr: lowercase to upper" "HELLO" "$actual"
 
 # expand: tabs to spaces
 printf "a\tb\n" > "$TEST_DIR/expandfile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/expand "$TEST_DIR/expandfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/expand "$TEST_DIR/expandfile")
 run_test_contains "expand: tab to spaces" "a" "$actual"
 
 # unexpand: spaces to tabs
 printf "a       b\n" > "$TEST_DIR/unexpandfile"
-actual=$(timeout ${TIMEOUT_SECS}s lind_run bin/unexpand -a "$TEST_DIR/unexpandfile")
+actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" bin/unexpand -a "$TEST_DIR/unexpandfile")
 run_test_contains "unexpand: spaces to tab" "a" "$actual"
 
 echo ""
