@@ -29,7 +29,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/../lind-wasm" && pwd)"
 fi
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 # ----------------------------------------------------------------------
@@ -60,6 +60,12 @@ mkdir -p "$STAGE_DIR"
 # generation behavior that breaks with optimization (e.g. inline assembly
 # patterns for the i386 code generator).
 CFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$MERGED_SYSROOT -pthread -matomics -mbulk-memory -fno-pie -fvisibility=default -fno-builtin"
+
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CFLAGS_WASM+=" -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
 
 LDFLAGS_WASM="--target=wasm32-wasi -g -O0 --sysroot=$MERGED_SYSROOT -static -Wl,--import-memory,--export-memory,--shared-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base"
 
@@ -104,17 +110,13 @@ ar rcs libtcc1.a libtcc1.o
 TCC_WASM="$SCRIPT_DIR/tcc.wasm"
 TCC_OPT_WASM="$SCRIPT_DIR/tcc.opt.wasm"
 
-if [[ -x "$WASM_OPT" ]]; then
-  echo "[tinycc] running wasm-opt (asyncify + optimization)..."
-  "$WASM_OPT" \
-    --epoch-injection \
-    --asyncify \
-    --debuginfo \
-    -O2 \
+if [[ -x "$LIND_WASM_OPT" ]]; then
+  echo "[tinycc] running lind-wasm-opt..."
+  "$LIND_WASM_OPT" --static \
     "$TCC_WASM" \
     -o "$TCC_OPT_WASM"
 else
-  echo "[tinycc] ERROR: wasm-opt not found at '$WASM_OPT'" >&2
+  echo "[tinycc] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'" >&2
   exit 1
 fi
 
