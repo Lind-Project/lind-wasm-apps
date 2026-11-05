@@ -26,7 +26,7 @@ if [[ -z "${LIND_WASM_ROOT:-}" ]]; then
   LIND_WASM_ROOT="$(cd "$APPS_ROOT/.." && pwd)"
 fi
 
-WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
+LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 
 JOBS="${JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)}"
@@ -93,6 +93,14 @@ printf '#!/bin/sh\nexit 0\n' > "$STUB_BIN/readelf"
 printf '#!/bin/sh\nexit 0\n' > "$STUB_BIN/objdump"
 chmod +x "$STUB_BIN/readelf" "$STUB_BIN/objdump"
 
+CCFLAGS_WASM="-pthread -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -Wno-incompatible-function-pointer-types"
+
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
+if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
+  CCFLAGS_WASM+=" -fwasm-exceptions -mllvm -wasm-enable-sjlj"
+fi
+
 echo "[perl] configuring with perl-cross for wasm32-wasi..."
 # Set target-only tool overrides (buildmini uses HOST* prefix, so these
 # only affect the target configure pass)
@@ -110,7 +118,7 @@ RANLIB="$RANLIB" \
   -Dar="$AR" \
   -Dranlib="$RANLIB" \
   -Doptimize="-O2 -g" \
-  -Dccflags="-pthread -I$MERGED_SYSROOT/include -I$MERGED_SYSROOT/include/wasm32-wasi -Wno-incompatible-function-pointer-types" \
+  -Dccflags="$CCFLAGS_WASM" \
   -Dldflags="-Wl,--import-memory,--export-memory,--shared-memory,--max-memory=67108864,--export=__stack_pointer,--export=__stack_low,--export=__tls_base -L$MERGED_SYSROOT/lib/wasm32-wasi -L$MERGED_SYSROOT/usr/lib/wasm32-wasi" \
   -Dlibs="-lpthread -lm" \
   -Dperllibs="-lpthread -lm" \
@@ -241,12 +249,12 @@ PERL_OPT_CWASM="$SCRIPT_DIR/perl.opt.cwasm"
 
 cp "$PERL_BIN" "$PERL_WASM"
 
-if [[ -x "$WASM_OPT" ]]; then
-  echo "[perl] running wasm-opt (asyncify + optimization)..."
-  "$WASM_OPT" --epoch-injection --asyncify --fpcast-emu -O2 --debuginfo \
+if [[ -x "$LIND_WASM_OPT" ]]; then
+  echo "[perl] running lind-wasm-opt..."
+  "$LIND_WASM_OPT" --static --fpcast-emu \
     "$PERL_WASM" -o "$PERL_OPT_WASM"
 else
-  echo "[perl] ERROR: wasm-opt not found at '$WASM_OPT'" >&2
+  echo "[perl] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'" >&2
   exit 1
 fi
 

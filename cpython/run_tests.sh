@@ -46,13 +46,13 @@ cp Makefile Makefile.bak
 
 if [[ "$LIND_DYLINK" == "1" ]]; then
   sed -i \
-    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= lind_run --preload env=lib/libz.so --preload env=lib/libpython3.14.so|" \
-    -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='lind_run --preload env=lib/libz.so --preload env=lib/libpython3.14.so'|" \
+    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= lind_run --enable-fpcast --preload env=lib/libz.so --preload env=lib/libpython3.14.so|" \
+    -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='lind_run --enable-fpcast --preload env=lib/libz.so --preload env=lib/libpython3.14.so'|" \
     Makefile
 else
   sed -i \
-    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= lind_run|" \
-    -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='lind_run'|" \
+    -e "s|^HOSTRUNNER=.*|HOSTRUNNER= lind_run --enable-fpcast|" \
+    -e "s|^PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='.*'|PYTHON_FOR_BUILD=_PYTHON_HOSTRUNNER='lind_run --enable-fpcast'|" \
     Makefile
 fi
 

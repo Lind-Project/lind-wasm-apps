@@ -1,0 +1,13 @@
+# Local build outputs
+build/
+
+# VCS metadata
+.git/
+
+# Build definition files
+Dockerfile
+.dockerignore
+
+# Local results
+apps-results*/
+*.log

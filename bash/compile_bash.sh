@@ -40,6 +40,7 @@ LLVM_BIN_DIR="$(dirname "$CLANG")"
 AR="${AR:-"$LLVM_BIN_DIR/llvm-ar"}"
 RANLIB="${RANLIB:-"$LLVM_BIN_DIR/llvm-ranlib"}"
 
+WASM_OPT="${WASM_OPT:-$LIND_WASM_ROOT/tools/binaryen/bin/wasm-opt}"
 LIND_WASM_OPT="${LIND_WASM_OPT:-$LIND_WASM_ROOT/scripts/bin/lind-wasm-opt}"
 LIND_BOOT="${LIND_BOOT:-$LIND_WASM_ROOT/build/lind-boot}"
 ADD_EXPORT_TOOL="${ADD_EXPORT_TOOL:-$LIND_WASM_ROOT/tools/add-export-tool/add-export-tool}"
@@ -111,6 +112,8 @@ CFLAGS_WASM=(
 # same clang SjLj lowering as glibc; otherwise a longjmp thrown from libc has
 # no matching try_table in bash's own frames and escapes as an uncaught wasm
 # exception (matches lind_compile's do_static_compile/do_dynamic_compile).
+# EH-based setjmp/longjmp (default). The legacy asyncify-based path is
+# selected by setting LIND_ASYNCIFY_SETJMP=1, matching lind_compile behaviour.
 if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
   CFLAGS_WASM+=(-fwasm-exceptions -mllvm -wasm-enable-sjlj)
 fi
@@ -551,8 +554,13 @@ fi
 # output for debugging as `bash.raw.wasm`, but write the runnable module to the
 # traditional `bash.wasm` path. Full mode still adds the extra alias and cwasm.
 ##################
-if [[ ! -x "$LIND_WASM_OPT" ]]; then
-  echo "[bash] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifact." >&2
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  if [[ ! -x "$LIND_WASM_OPT" ]]; then
+    echo "[bash] ERROR: lind-wasm-opt not found at '$LIND_WASM_OPT'; cannot produce runnable Lind artifact." >&2
+    exit 1
+  fi
+elif [[ ! -x "$WASM_OPT" ]]; then
+  echo "[bash] ERROR: wasm-opt not found at '$WASM_OPT'; cannot produce runnable Lind artifact." >&2
   exit 1
 fi
 
@@ -565,6 +573,15 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 else
   "$LIND_WASM_OPT" --static --fpcast-emu \
+  # Shared modules require the import-table and import-globals passes so that
+  # lind-dylink can patch relocations at load time.
+  "$LIND_WASM_OPT" --target=main --fpcast-emu \
+    "$BASH_RAW_WASM" -o "$BASH_WASM"
+else
+  # Static bash uses raw wasm-opt, NOT `lind-wasm-opt --static`: the wrapper's
+  # `--translate-to-exnref` breaks bash's longjmp control flow (loops, break,
+  # continue, return, `[ ]`). See PR #266.
+  "$WASM_OPT" --epoch-injection --asyncify --fpcast-emu --debuginfo -O2 \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 fi
 
