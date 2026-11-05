@@ -182,7 +182,11 @@ FUNC_NAME (char const *s)						 \
 
 STRTOX (intmax_t,    vstrtoimax, strtoimax (s, &end, 0))
 STRTOX (uintmax_t,   vstrtoumax, strtoumax (s, &end, 0))
+#ifdef __wasm__
+STRTOX (double,      vstrtod,    c_strtod (s, &end))
+#else
 STRTOX (long double, vstrtold,   c_strtold (s, &end))
+#endif
 
 /* Output a single-character \ escape.  */
 
@@ -346,8 +350,15 @@ print_direc (const char *start, size_t length, char conversion,
 
       case 'a': case 'e': case 'f': case 'g':
       case 'A': case 'E': case 'F': case 'G':
+#ifdef __wasm__
+        /* Lind's libc currently formats a valid long double as NaN.  Use
+           the working double formatter for these conversions.  */
+        length_modifier = start;
+        length_modifier_len = 0;
+#else
         length_modifier = "L";
         length_modifier_len = 1;
+#endif
         break;
 
       default:
@@ -418,7 +429,11 @@ print_direc (const char *start, size_t length, char conversion,
     case 'g':
     case 'G':
       {
+#ifdef __wasm__
+        double arg = vstrtod (argument);
+#else
         long double arg = vstrtold (argument);
+#endif
         if (!have_field_width)
           {
             if (!have_precision)

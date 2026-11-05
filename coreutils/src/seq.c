@@ -27,6 +27,22 @@
 #include "quote.h"
 #include "xstrtod.h"
 
+#ifdef __wasm__
+/* Lind's libc cannot reliably format or convert long double values.  */
+typedef double seq_number;
+# define seq_xstrtod xstrtod
+# define seq_c_strtod c_strtod
+# define SEQ_FLOAT_MODIFIER ""
+#else
+typedef long double seq_number;
+# define seq_xstrtod xstrtold
+# define seq_c_strtod c_strtold
+# define SEQ_FLOAT_MODIFIER "L"
+#endif
+
+#define seq_printf(fmt, value) printf (fmt, value)
+#define seq_asprintf(str, fmt, value) asprintf (str, fmt, value)
+
 /* Roll our own isfinite rather than using <math.h>, so that we don't
    have to worry about linking -lm just for isfinite.  */
 #ifndef isfinite
@@ -102,8 +118,8 @@ decimal numbers with maximum precision PREC, and to %g otherwise.\n\
 /* A command-line operand.  */
 struct operand
 {
-  /* Its value, converted to 'long double'.  */
-  long double value;
+  /* Its numeric value.  */
+  seq_number value;
 
   /* Its print width, if it were printed out in a form similar to its
      input form.  An input like "-.1" is treated like "-0.1", and an
@@ -125,7 +141,7 @@ struct layout
   size_t suffix_len;
 };
 
-/* Read a long double value from the command line.
+/* Read a numeric value from the command line.
    Return if the string is correct else signal error.  */
 
 static operand
@@ -133,7 +149,7 @@ scan_arg (const char *arg)
 {
   operand ret;
 
-  if (! xstrtold (arg, NULL, &ret.value, c_strtold))
+  if (! seq_xstrtod (arg, NULL, &ret.value, seq_c_strtod))
     {
       error (0, 0, _("invalid floating point argument: %s"), arg);
       usage (EXIT_FAILURE);
@@ -175,7 +191,7 @@ scan_arg (const char *arg)
 }
 
 /* If FORMAT is a valid printf format for a double argument, return
-   its long double equivalent, allocated from dynamic storage, and
+   the format used for output, allocated from dynamic storage, and
    store into *LAYOUT a description of the output layout; otherwise,
    report an error and exit.  */
 
@@ -225,9 +241,14 @@ long_double_format (char const *fmt, struct layout *layout)
         size_t format_size = i + 1;
         char *ldfmt = xmalloc (format_size + 1);
         memcpy (ldfmt, fmt, length_modifier_offset);
+#ifdef __wasm__
+        strcpy (ldfmt + length_modifier_offset,
+                fmt + length_modifier_offset + has_L);
+#else
         ldfmt[length_modifier_offset] = 'L';
         strcpy (ldfmt + length_modifier_offset + 1,
                 fmt + length_modifier_offset + has_L);
+#endif
         layout->prefix_len = prefix_len;
         layout->suffix_len = suffix_len;
         return ldfmt;
@@ -239,19 +260,19 @@ long_double_format (char const *fmt, struct layout *layout)
 
 static void
 print_numbers (char const *fmt, struct layout layout,
-               long double first, long double step, long double last)
+               seq_number first, seq_number step, seq_number last)
 {
   bool out_of_range = (step < 0 ? first < last : last < first);
 
   if (! out_of_range)
     {
-      long double x = first;
-      long double i;
+      seq_number x = first;
+      seq_number i;
 
       for (i = 1; ; i++)
         {
-          long double x0 = x;
-          printf (fmt, x);
+          seq_number x0 = x;
+          seq_printf (fmt, x);
           if (out_of_range)
             break;
           x = first + i * step;
@@ -267,21 +288,21 @@ print_numbers (char const *fmt, struct layout layout,
                  of stopping at 0.000002.  */
 
               bool print_extra_number = false;
-              long double x_val;
+              seq_number x_val;
               char *x_str;
               int x_strlen;
               setlocale (LC_NUMERIC, "C");
-              x_strlen = asprintf (&x_str, fmt, x);
+              x_strlen = seq_asprintf (&x_str, fmt, x);
               setlocale (LC_NUMERIC, "");
               if (x_strlen < 0)
                 xalloc_die ();
               x_str[x_strlen - layout.suffix_len] = '\0';
 
-              if (xstrtold (x_str + layout.prefix_len, NULL, &x_val, c_strtold)
+              if (seq_xstrtod (x_str + layout.prefix_len, NULL, &x_val, seq_c_strtod)
                   && x_val == last)
                 {
                   char *x0_str = NULL;
-                  if (asprintf (&x0_str, fmt, x0) < 0)
+                  if (seq_asprintf (&x0_str, fmt, x0) < 0)
                     xalloc_die ();
                   print_extra_number = !STREQ (x0_str, x_str);
                   free (x0_str);
@@ -323,18 +344,18 @@ get_default_format (operand first, operand step, operand last)
           if (width <= INT_MAX)
             {
               int w = width;
-              sprintf (format_buf, "%%0%d.%dLf", w, prec);
+              sprintf (format_buf, "%%0%d.%d" SEQ_FLOAT_MODIFIER "f", w, prec);
               return format_buf;
             }
         }
       else
         {
-          sprintf (format_buf, "%%.%dLf", prec);
+          sprintf (format_buf, "%%.%d" SEQ_FLOAT_MODIFIER "f", prec);
           return format_buf;
         }
     }
 
-  return "%Lg";
+  return "%" SEQ_FLOAT_MODIFIER "g";
 }
 
 int
