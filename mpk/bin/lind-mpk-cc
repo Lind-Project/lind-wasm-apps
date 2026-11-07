@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Native x86-64 compiler wrapper for lind-mpk.
+#
+# Compiles with the host GCC (glibc 2.35 headers, same as lind's glibc) and
+# links against lind's glibc build so the result can be rewritten by
+# gsfork-elf and loaded by lind-boot's MPK backend. Mirrors
+# `lind_compile --mpk` in lind-wasm (scripts/lind_compile, do_mpk_compile).
+#
+# Invoked as lind-mpk-c++ it uses g++ and links libstdc++ statically, since
+# lindfs only provides rewritten libc/libm/ld.so.
+set -euo pipefail
+
+LIND_WASM_ROOT="${LIND_WASM_ROOT:-$HOME/lind-wasm}"
+G="${LIND_GLIBC:-$LIND_WASM_ROOT/glibc-2.35}"
+
+case "$(basename -- "$0")" in
+  # libstdc++.a is appended by the driver after our libs: keep ld.so (for
+  # __tls_get_addr) despite --as-needed and pull atexit & co. from
+  # libc_nonshared.a up front.
+  *c++|*cxx|*g++) COMPILER="${MPK_HOST_CXX:-g++}"
+    RUNTIME=(-static-libstdc++ -static-libgcc -Wl,-u,atexit -Wl,-u,at_quick_exit -Wl,--no-as-needed) ;;
+  *) COMPILER="${MPK_HOST_CC:-gcc}"; RUNTIME=(-static-libgcc) ;;
+esac
+
+# lind's glibc headers go after the include path so gnulib and other
+# replacement headers in the project keep precedence.
+COMMON=(-fPIC -fomit-frame-pointer -idirafter "$G/install/include")
+
+link=1
+inputs=0
+for arg in "$@"; do
+  case "$arg" in
+    -c|-S|-E|-M|-MM) link=0 ;;
+    -*) ;;
+    *) inputs=1 ;;
+  esac
+done
+
+if [[ $link == 1 && $inputs == 1 ]]; then
+  exec "$COMPILER" "${COMMON[@]}" "$@" "${RUNTIME[@]}" \
+    -Wl,--rpath=/lib/elf -L"$G/build" -lc "$G/build/libc_nonshared.a" "$G/build/elf/ld.so"
+fi
+exec "$COMPILER" "${COMMON[@]}" "$@"
