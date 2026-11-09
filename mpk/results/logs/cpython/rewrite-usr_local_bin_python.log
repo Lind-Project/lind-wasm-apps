@@ -1,0 +1,19 @@
+$ /home/lind/rewriter/.venv/bin/gsfork-elf rewrite /home/lind/lind-wasm-apps/build/mpk/native/cpython/usr/local/bin/python /home/lind/lind-wasm-apps/build/mpk/stage/cpython/usr/local/bin/python --scratch-field=sandbox_scratch --sandbox-field=sandbox_offset -L /home/lind/lind-wasm/glibc-2.35/build/elf -L /home/lind/lind-wasm/glibc-2.35/build --tcb-layout /home/lind/lind-wasm/glibc-2.35/build/libc.so.6 --trust-library ld-linux-x86-64.so.2 --trust-library libm.so.6 --trust-library libc.so.6
+gsfork-elf: /home/lind/rewriter/.venv/bin/ddisasm failed or reported recovery/link diagnostics:
+Building the initial gtirb representation [  96ms]
+Processing module: python
+    disassembly              load [   13s]    compute [ 5m14s]  transform WARNING: Could not find GLOBAL/WEAK symbol for _PyInterpolation_Type
+WARNING: Could not find GLOBAL/WEAK symbol for _PyTypeAlias_Type
+WARNING: Could not find GLOBAL/WEAK symbol for _PyObject_NextNotImplemented
+WARNING: Could not find GLOBAL/WEAK symbol for _PyInstrumentation_MISSING
+WARNING: Could not find GLOBAL/WEAK symbol for _Py_module_getattro
+WARNING: Could not find GLOBAL/WEAK symbol for _Py_slot_tp_getattr_hook
+WARNING: Could not find GLOBAL/WEAK symbol for _Py_slot_tp_getattro
+WARNING: Could not find GLOBAL/WEAK symbol for _Py_type_getattro
+WARNING: Moving symbol to first block of section: __bss_start
+[    5s]
+    SCC analysis                              compute [ 573ms]  transform [   0ms]
+    no return analysis       load [ 613ms]    compute [    2s]  transform [  30ms]
+    function inference       load [    1s]    compute [ 903ms]  transform [ 202ms]
+
+Diagnostics retained in /home/lind/lind-wasm-apps/build/mpk/stage/cpython/usr/local/bin/python.failed-g25g7q7m

@@ -8,6 +8,9 @@ PKRU-based isolation instead of WebAssembly).
 The latest results are in [results/report.md](results/report.md). Machine-readable
 data is in `results/report.json`, and logs are in `results/logs/<app>/`.
 
+To set up a fresh machine from scratch (repos, container, glibc, lind-boot, rewriter)
+and run the large gcc `cc1` rewrite, see [GCC-EVAL-HANDOFF.md](GCC-EVAL-HANDOFF.md).
+
 ## Reproducing
 
 To use a lind dev container that does **not** mount this repo, run this from the host:

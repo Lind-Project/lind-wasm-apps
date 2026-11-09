@@ -1,0 +1,1577 @@
+{
+  "versions": {
+    "date": "2026-11-03T22:57:29",
+    "lind-wasm": "b762da0af+dirty",
+    "lind-wasm-apps": "920548264f",
+    "lind-boot md5": "4f2ed1e36743",
+    "rewriter": "gsfork_elf md5 158fe1900dca",
+    "gcc": "11.4.0"
+  },
+  "summary": {
+    "compatible": [
+      "libtirpc",
+      "zlib"
+    ],
+    "partial": [
+      "coreutils",
+      "grep",
+      "make",
+      "postgres",
+      "sed"
+    ],
+    "runtime-fail": [
+      "diffutils",
+      "openblas"
+    ],
+    "rewrite-fail": [
+      "awk",
+      "bash",
+      "binutils",
+      "cpython",
+      "curl",
+      "ed25519",
+      "gcc",
+      "git",
+      "llvm-project",
+      "lmbench",
+      "nginx",
+      "openssl",
+      "perl",
+      "tinycc"
+    ],
+    "build-fail": [],
+    "not-assessed": [
+      "gnulib"
+    ]
+  },
+  "apps": {
+    "awk": {
+      "app": "awk",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 10.2,
+        "log": "logs/awk/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/gawk",
+            "status": "fail",
+            "seconds": 182.2,
+            "size": 3556080,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0xdb3d: original=0xd7fc: GOT reference does not resolve to str_array_func",
+            "log": "logs/awk/rewrite-usr_local_bin_gawk.log"
+          }
+        ],
+        "seconds": 182.2
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/gawk: gsfork-elf: <rewrite-out>:.text:0xdb3d: original=0xd7fc: GOT reference does not resolve to str_array_func"
+    },
+    "bash": {
+      "app": "bash",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 40.5,
+        "log": "logs/bash/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/bin/bash",
+            "status": "fail",
+            "seconds": 243.5,
+            "size": 3768360,
+            "reason": "gsfork-elf: <rewrite-out>: relinking lost a dynamic symbol/type",
+            "log": "logs/bash/rewrite-bin_bash.log"
+          }
+        ],
+        "seconds": 243.5
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/bin/bash: gsfork-elf: <rewrite-out>: relinking lost a dynamic symbol/type"
+    },
+    "binutils": {
+      "app": "binutils",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 40.3,
+        "log": "logs/binutils/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 13,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/addr2line",
+            "status": "fail",
+            "seconds": 344.0,
+            "size": 6830928,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x32871: original=0x31f78: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_addr2line.log"
+          },
+          {
+            "binary": "/usr/local/bin/ar",
+            "status": "fail",
+            "seconds": 361.5,
+            "size": 7010808,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3c771: original=0x3ae88: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_ar.log"
+          },
+          {
+            "binary": "/usr/local/bin/as",
+            "status": "fail",
+            "seconds": 680.8,
+            "size": 9653800,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x59d63: original=0x56c61: <rewrite-out>: required provenance/reference symbol b64 is missing",
+            "log": "logs/binutils/rewrite-usr_local_bin_as.log"
+          },
+          {
+            "binary": "/usr/local/bin/c++filt",
+            "status": "fail",
+            "seconds": 340.7,
+            "size": 6777912,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x320c1: original=0x31848: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_c++filt.log"
+          },
+          {
+            "binary": "/usr/local/bin/ld",
+            "status": "fail",
+            "seconds": 392.5,
+            "size": 10947536,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/binutils/usr/local/bin/ld:.text:0x13766d: pinsrd xmm1,dword ptr [rdx+10h],3: unsupported instruction pinsrd",
+            "log": "logs/binutils/rewrite-usr_local_bin_ld.log"
+          },
+          {
+            "binary": "/usr/local/bin/nm",
+            "status": "fail",
+            "seconds": 357.0,
+            "size": 6910104,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3acc1: original=0x397f8: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_nm.log"
+          },
+          {
+            "binary": "/usr/local/bin/objcopy",
+            "status": "fail",
+            "seconds": 438.5,
+            "size": 7618960,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x53b91: original=0x50828: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_objcopy.log"
+          },
+          {
+            "binary": "/usr/local/bin/objdump",
+            "status": "fail",
+            "seconds": 481.4,
+            "size": 11291616,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/binutils/usr/local/bin/objdump:.text:0x180efd: pinsrd xmm1,dword ptr [rdx+10h],3: unsupported instruction pinsrd",
+            "log": "logs/binutils/rewrite-usr_local_bin_objdump.log"
+          },
+          {
+            "binary": "/usr/local/bin/ranlib",
+            "status": "fail",
+            "seconds": 333.9,
+            "size": 6973896,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3b071: original=0x39968: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_ranlib.log"
+          },
+          {
+            "binary": "/usr/local/bin/readelf",
+            "status": "fail",
+            "seconds": 225.1,
+            "size": 4504456,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/binutils/usr/local/bin/readelf:.text:0x9421d: pinsrd xmm1,dword ptr [rdx+10h],3: unsupported instruction pinsrd",
+            "log": "logs/binutils/rewrite-usr_local_bin_readelf.log"
+          },
+          {
+            "binary": "/usr/local/bin/size",
+            "status": "fail",
+            "seconds": 326.6,
+            "size": 6853952,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x38371: original=0x37198: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_size.log"
+          },
+          {
+            "binary": "/usr/local/bin/strings",
+            "status": "fail",
+            "seconds": 333.1,
+            "size": 6832528,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x33a71: original=0x33058: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_strings.log"
+          },
+          {
+            "binary": "/usr/local/bin/strip",
+            "status": "fail",
+            "seconds": 372.4,
+            "size": 7532296,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x4eca1: original=0x4bcf8: GOT reference does not resolve to binary_vec",
+            "log": "logs/binutils/rewrite-usr_local_bin_strip.log"
+          }
+        ],
+        "seconds": 4987.5
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/addr2line: gsfork-elf: <rewrite-out>:.text:0x32871: original=0x31f78: GOT reference does not resolve to binary_vec"
+    },
+    "coreutils": {
+      "app": "coreutils",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 43.3,
+        "log": "logs/coreutils/build.log"
+      },
+      "rewrite": {
+        "ok": 99,
+        "total": 103,
+        "failed": [
+          {
+            "binary": "/bin/[",
+            "status": "fail",
+            "seconds": 3.9,
+            "size": 124728,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3d13: original=0x3b40: <rewrite-out>: required provenance/reference symbol or is missing",
+            "log": "logs/coreutils/rewrite-bin_[.log"
+          },
+          {
+            "binary": "/bin/base64",
+            "status": "fail",
+            "seconds": 3.6,
+            "size": 119904,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3278: original=0x3198: <rewrite-out>: required provenance/reference symbol b64 is missing",
+            "log": "logs/coreutils/rewrite-bin_base64.log"
+          },
+          {
+            "binary": "/bin/su",
+            "status": "fail",
+            "seconds": 0.5,
+            "size": 109304,
+            "needed": [
+              "libcrypt.so.1"
+            ],
+            "reason": "gsfork-elf: dependencies must be explicitly declared trusted (--trust-library): ['libcrypt.so.1']",
+            "log": "logs/coreutils/rewrite-bin_su.log"
+          },
+          {
+            "binary": "/bin/test",
+            "status": "fail",
+            "seconds": 3.6,
+            "size": 111920,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3c43: original=0x3a70: <rewrite-out>: required provenance/reference symbol or is missing",
+            "log": "logs/coreutils/rewrite-bin_test.log"
+          }
+        ],
+        "seconds": 632.3
+      },
+      "runtime_issues": {
+        "missing syscall 99 (sysinfo)": 2,
+        "missing syscall 95 (umask)": 2,
+        "panic: LIND DEBUG PANIC: Lind unsupported ioctl request": 5
+      },
+      "smoke": {
+        "pass": 8,
+        "fail": 6,
+        "skip": 0,
+        "failures": [
+          "sort \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "ls \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "mkdir \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "cp \u2014 exit 1 (want 0): /bin/cp: cannot create regular file `/tmp/mpk-coreutils/d/e/copy.txt': No such file or directory",
+          "stat-copy \u2014 exit 1 (want 0): /bin/stat: cannot stat `/tmp/mpk-coreutils/d/e/copy.txt': No such file or directory",
+          "rm \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting."
+        ],
+        "seconds": 0.7,
+        "log": "logs/coreutils/smoke.log"
+      },
+      "upstream": {
+        "exit": 1,
+        "pass": 19,
+        "fail": 8,
+        "skip": 0,
+        "seconds": 1.0,
+        "log": "logs/coreutils/upstream.log",
+        "first_failure": "FAIL: ls: list files"
+      },
+      "verdict": "partial",
+      "reason": "4/103 binaries failed to rewrite (first: /bin/[: gsfork-elf: <rewrite-out>:.text:0x3d13: original=0x3b40: <rewrite-out>: required provenance/reference symbol or is missi); smoke: sort \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.; run_tests.sh: 19 pass/8 fail; FAIL: ls: list files"
+    },
+    "cpython": {
+      "app": "cpython",
+      "kind": "program",
+      "note": "Upstream run_tests.sh drives 'make test' from a wasm build tree (build-wasm/); replaced by stdlib smoke tests.",
+      "build": {
+        "status": "ok",
+        "seconds": 41.8,
+        "log": "logs/cpython/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/python",
+            "status": "fail",
+            "seconds": 859.1,
+            "size": 42465064,
+            "reason": "gsfork-elf: /home/lind/rewriter/.venv/bin/ddisasm failed or reported recovery/link diagnostics:",
+            "log": "logs/cpython/rewrite-usr_local_bin_python.log"
+          }
+        ],
+        "seconds": 859.1
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/python: gsfork-elf: /home/lind/rewriter/.venv/bin/ddisasm failed or reported recovery/link diagnostics:"
+    },
+    "zlib": {
+      "app": "zlib",
+      "kind": "library",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 0.8,
+        "log": "logs/zlib/build.log"
+      },
+      "rewrite": {
+        "ok": 2,
+        "total": 2,
+        "failed": [],
+        "seconds": 21.1
+      },
+      "runtime_issues": {},
+      "smoke": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "failures": [],
+        "seconds": 0.1,
+        "log": "logs/zlib/smoke.log"
+      },
+      "verdict": "compatible",
+      "reason": ""
+    },
+    "curl": {
+      "app": "curl",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 29.2,
+        "log": "logs/curl/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/curl",
+            "status": "fail",
+            "seconds": 466.1,
+            "size": 26101440,
+            "reason": "gsfork-elf: /home/lind/rewriter/.venv/bin/ddisasm failed or reported recovery/link diagnostics:",
+            "log": "logs/curl/rewrite-usr_local_bin_curl.log"
+          }
+        ],
+        "seconds": 466.1
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/curl: gsfork-elf: /home/lind/rewriter/.venv/bin/ddisasm failed or reported recovery/link diagnostics:"
+    },
+    "openssl": {
+      "app": "openssl",
+      "kind": "library",
+      "note": "Built no-asm, like compile_openssl.sh. With OpenSSL's default x86-64 assembly, gsfork-elf rejects the AVX-512 paths (unsupported instruction vpxord).",
+      "build": {
+        "status": "ok",
+        "seconds": 17.2,
+        "log": "logs/openssl/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/openssl",
+            "status": "fail",
+            "seconds": 3600.4,
+            "size": 25097200,
+            "reason": "*** TIMEOUT after 3600s",
+            "log": "logs/openssl/rewrite-usr_local_bin_openssl.log"
+          }
+        ],
+        "seconds": 3600.4
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/openssl: *** TIMEOUT after 3600s"
+    },
+    "diffutils": {
+      "app": "diffutils",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 36.5,
+        "log": "logs/diffutils/build.log"
+      },
+      "rewrite": {
+        "ok": 3,
+        "total": 4,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/diff",
+            "status": "fail",
+            "seconds": 19.3,
+            "size": 627064,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x965c: original=0x907f: GOT reference does not resolve to noparent",
+            "log": "logs/diffutils/rewrite-usr_local_bin_diff.log"
+          }
+        ],
+        "seconds": 35.3
+      },
+      "runtime_issues": {
+        "missing syscall 27 (mincore)": 2
+      },
+      "smoke": {
+        "pass": 0,
+        "fail": 2,
+        "skip": 3,
+        "failures": [
+          "cmp \u2014 exit 134 (want 1): thread caused non-unwinding panic. aborting.",
+          "diff3 \u2014 exit 134 (want 1): thread caused non-unwinding panic. aborting."
+        ],
+        "seconds": 0.3,
+        "log": "logs/diffutils/smoke.log"
+      },
+      "verdict": "runtime-fail",
+      "reason": "1/4 binaries failed to rewrite (first: /usr/local/bin/diff: gsfork-elf: <rewrite-out>:.text:0x965c: original=0x907f: GOT reference does not resolve to noparent); smoke: cmp \u2014 exit 134 (want 1): thread caused non-unwinding panic. aborting."
+    },
+    "ed25519": {
+      "app": "ed25519",
+      "kind": "library",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 0.7,
+        "log": "logs/ed25519/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/ed25519-test",
+            "status": "fail",
+            "seconds": 7.3,
+            "size": 291984,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x46cd: original=0x42ac: <rewrite-out>: required provenance/reference symbol d is missing",
+            "log": "logs/ed25519/rewrite-usr_local_bin_ed25519-test.log"
+          }
+        ],
+        "seconds": 7.3
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/ed25519-test: gsfork-elf: <rewrite-out>:.text:0x46cd: original=0x42ac: <rewrite-out>: required provenance/reference symbol d is missing"
+    },
+    "gcc": {
+      "app": "gcc",
+      "kind": "program",
+      "note": "Needs network access once: contrib/download_prerequisites fetches GMP/MPFR/MPC.",
+      "build": {
+        "status": "ok",
+        "seconds": 169.1,
+        "log": "logs/gcc/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 2,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/gcc",
+            "status": "fail",
+            "seconds": 78.9,
+            "size": 11289152,
+            "reason": "gsfork-elf: cyclic GTIRB symbol forwarding",
+            "log": "logs/gcc/rewrite-usr_local_bin_gcc.log"
+          },
+          {
+            "binary": "/usr/local/libexec/gcc/x86_64-pc-linux-gnu/15.2.0/cc1",
+            "status": "fail",
+            "seconds": 3600.1,
+            "size": 373357392,
+            "reason": "*** TIMEOUT after 3600s",
+            "log": "logs/gcc/rewrite-usr_local_libexec_gcc_x86_64-pc-linux-gnu_15.2.0_cc1.log"
+          }
+        ],
+        "seconds": 3679.0
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/gcc: gsfork-elf: cyclic GTIRB symbol forwarding"
+    },
+    "git": {
+      "app": "git",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 9.6,
+        "log": "logs/git/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 7,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/git",
+            "status": "fail",
+            "seconds": 2004.9,
+            "size": 18726696,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x22fc1: original=0x22b56: GOT reference does not resolve to strbuf_slopbuf",
+            "log": "logs/git/rewrite-usr_local_bin_git.log"
+          },
+          {
+            "binary": "/usr/local/bin/git-shell",
+            "status": "fail",
+            "seconds": 904.8,
+            "size": 10740992,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0xefdc: original=0xeb40: GOT reference does not resolve to strbuf_slopbuf",
+            "log": "logs/git/rewrite-usr_local_bin_git-shell.log"
+          },
+          {
+            "binary": "/usr/local/bin/scalar",
+            "status": "fail",
+            "seconds": 929.7,
+            "size": 10907984,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x11a92: original=0x11526: GOT reference does not resolve to strbuf_slopbuf",
+            "log": "logs/git/rewrite-usr_local_bin_scalar.log"
+          },
+          {
+            "binary": "/usr/local/libexec/git-core/git-daemon",
+            "status": "fail",
+            "seconds": 912.9,
+            "size": 10806152,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0xd99d: original=0xd7b5: GOT reference does not resolve to strbuf_slopbuf",
+            "log": "logs/git/rewrite-usr_local_libexec_git-core_git-daemon.log"
+          },
+          {
+            "binary": "/usr/local/libexec/git-core/git-http-backend",
+            "status": "fail",
+            "seconds": 913.7,
+            "size": 10794992,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0xc8f4: original=0xc8b4: <rewrite-out>: required provenance/reference symbol dead is missing",
+            "log": "logs/git/rewrite-usr_local_libexec_git-core_git-http-backend.log"
+          },
+          {
+            "binary": "/usr/local/libexec/git-core/git-imap-send",
+            "status": "fail",
+            "seconds": 936.4,
+            "size": 10877064,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x12adc: original=0x12260: GOT reference does not resolve to strbuf_slopbuf",
+            "log": "logs/git/rewrite-usr_local_libexec_git-core_git-imap-send.log"
+          },
+          {
+            "binary": "/usr/local/libexec/git-core/git-sh-i18n--envsubst",
+            "status": "fail",
+            "seconds": 905.4,
+            "size": 10742416,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0xdb46: original=0xd956: GOT reference does not resolve to hash_algos",
+            "log": "logs/git/rewrite-usr_local_libexec_git-core_git-sh-i18n--envsubst.log"
+          }
+        ],
+        "seconds": 7507.8
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/git: gsfork-elf: <rewrite-out>:.text:0x22fc1: original=0x22b56: GOT reference does not resolve to strbuf_slopbuf"
+    },
+    "gnulib": {
+      "app": "gnulib",
+      "kind": "library",
+      "note": "",
+      "skip": "source-only portability library; exercised through gnulib-based apps (grep, sed, coreutils, diffutils, awk, make)",
+      "verdict": "not-assessed",
+      "reason": "source-only portability library; exercised through gnulib-based apps (grep, sed, coreutils, diffutils, awk, make)"
+    },
+    "grep": {
+      "app": "grep",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 36.0,
+        "log": "logs/grep/build.log"
+      },
+      "rewrite": {
+        "ok": 1,
+        "total": 1,
+        "failed": [],
+        "seconds": 23.6
+      },
+      "runtime_issues": {
+        "missing syscall 27 (mincore)": 6
+      },
+      "smoke": {
+        "pass": 0,
+        "fail": 6,
+        "skip": 0,
+        "failures": [
+          "version \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "match \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "ignore-case \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "count \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "regex \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "no-match \u2014 exit 134 (want 1): thread caused non-unwinding panic. aborting."
+        ],
+        "seconds": 0.8,
+        "log": "logs/grep/smoke.log"
+      },
+      "upstream": {
+        "exit": 1,
+        "pass": 1,
+        "fail": 4,
+        "skip": 0,
+        "seconds": 0.1,
+        "log": "logs/grep/upstream.log",
+        "first_failure": "FAIL: basic pattern match \u2014 expected 2 lines, got:"
+      },
+      "verdict": "partial",
+      "reason": "smoke: version \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.; run_tests.sh: 1 pass/4 fail; FAIL: basic pattern match \u2014 expected 2 lines, got:"
+    },
+    "libtirpc": {
+      "app": "libtirpc",
+      "kind": "library",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 8.4,
+        "log": "logs/libtirpc/build.log"
+      },
+      "rewrite": {
+        "ok": 1,
+        "total": 1,
+        "failed": [],
+        "seconds": 1.4
+      },
+      "runtime_issues": {},
+      "smoke": {
+        "pass": 1,
+        "fail": 0,
+        "skip": 0,
+        "failures": [],
+        "seconds": 0.0,
+        "log": "logs/libtirpc/smoke.log"
+      },
+      "verdict": "compatible",
+      "reason": ""
+    },
+    "llvm-project": {
+      "app": "llvm-project",
+      "kind": "program",
+      "note": "Very large binaries; the rewriter (gsfork-elf) may hit its per-tool timeout.",
+      "build": {
+        "status": "ok",
+        "seconds": 640.5,
+        "log": "logs/llvm-project/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 2,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/clang",
+            "status": "fail",
+            "seconds": 36.3,
+            "size": 569922200,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/llvm-project/usr/local/bin/clang: LSDA exception-specification filters are unsupported",
+            "log": "logs/llvm-project/rewrite-usr_local_bin_clang.log"
+          },
+          {
+            "binary": "/usr/local/bin/lld",
+            "status": "fail",
+            "seconds": 18.1,
+            "size": 318536424,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/llvm-project/usr/local/bin/lld: LSDA exception-specification filters are unsupported",
+            "log": "logs/llvm-project/rewrite-usr_local_bin_lld.log"
+          }
+        ],
+        "seconds": 54.4
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/clang: gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/llvm-project/usr/local/bin/clang: LSDA exception-specification filters are unsupported"
+    },
+    "lmbench": {
+      "app": "lmbench",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 92.5,
+        "log": "logs/lmbench/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 43,
+        "failed": [
+          {
+            "binary": "/bin/bw_file_rd",
+            "status": "fail",
+            "seconds": 166.8,
+            "size": 1028208,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x556e: original=0x532d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_bw_file_rd.log"
+          },
+          {
+            "binary": "/bin/bw_mem",
+            "status": "fail",
+            "seconds": 167.9,
+            "size": 1038312,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x6ede: original=0x695d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_bw_mem.log"
+          },
+          {
+            "binary": "/bin/bw_mmap_rd",
+            "status": "fail",
+            "seconds": 167.5,
+            "size": 1029136,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x55ee: original=0x539d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_bw_mmap_rd.log"
+          },
+          {
+            "binary": "/bin/bw_pipe",
+            "status": "fail",
+            "seconds": 169.2,
+            "size": 1025832,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x542e: original=0x51ed: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_bw_pipe.log"
+          },
+          {
+            "binary": "/bin/bw_tcp",
+            "status": "fail",
+            "seconds": 167.8,
+            "size": 1027872,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x55ee: original=0x535d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_bw_tcp.log"
+          },
+          {
+            "binary": "/bin/bw_unix",
+            "status": "fail",
+            "seconds": 168.4,
+            "size": 1026712,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x549e: original=0x525d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_bw_unix.log"
+          },
+          {
+            "binary": "/bin/disk",
+            "status": "fail",
+            "seconds": 168.6,
+            "size": 1030296,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x577e: original=0x552d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_disk.log"
+          },
+          {
+            "binary": "/bin/enough",
+            "status": "fail",
+            "seconds": 167.6,
+            "size": 1011544,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x4f6e: original=0x4d9d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_enough.log"
+          },
+          {
+            "binary": "/bin/flushdisk",
+            "status": "fail",
+            "seconds": 165.3,
+            "size": 1012432,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x4fbe: original=0x4ddd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_flushdisk.log"
+          },
+          {
+            "binary": "/bin/hello",
+            "status": "fail",
+            "seconds": 166.8,
+            "size": 1011160,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x4f2e: original=0x4d5d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_hello.log"
+          },
+          {
+            "binary": "/bin/lat_connect",
+            "status": "fail",
+            "seconds": 163.5,
+            "size": 1015024,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x518e: original=0x4f7d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_connect.log"
+          },
+          {
+            "binary": "/bin/lat_ctx",
+            "status": "fail",
+            "seconds": 165.2,
+            "size": 1030992,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x5a5e: original=0x57bd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_ctx.log"
+          },
+          {
+            "binary": "/bin/lat_fcntl",
+            "status": "fail",
+            "seconds": 165.6,
+            "size": 1026496,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x55fe: original=0x53cd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_fcntl.log"
+          },
+          {
+            "binary": "/bin/lat_fifo",
+            "status": "fail",
+            "seconds": 165.5,
+            "size": 1026816,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x54ce: original=0x529d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_fifo.log"
+          },
+          {
+            "binary": "/bin/lat_fs",
+            "status": "fail",
+            "seconds": 168.3,
+            "size": 1032232,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x5b7e: original=0x58dd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_fs.log"
+          },
+          {
+            "binary": "/bin/lat_http",
+            "status": "fail",
+            "seconds": 166.1,
+            "size": 1022176,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x531e: original=0x511d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_http.log"
+          },
+          {
+            "binary": "/bin/lat_mem_rd",
+            "status": "fail",
+            "seconds": 171.0,
+            "size": 1023152,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x562e: original=0x53ad: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_mem_rd.log"
+          },
+          {
+            "binary": "/bin/lat_mmap",
+            "status": "fail",
+            "seconds": 167.8,
+            "size": 1022272,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x546e: original=0x523d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_mmap.log"
+          },
+          {
+            "binary": "/bin/lat_ops",
+            "status": "fail",
+            "seconds": 169.1,
+            "size": 1062248,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x7dce: original=0x7a6d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_ops.log"
+          },
+          {
+            "binary": "/bin/lat_pagefault",
+            "status": "fail",
+            "seconds": 169.1,
+            "size": 1029128,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x57ce: original=0x557d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_pagefault.log"
+          },
+          {
+            "binary": "/bin/lat_pipe",
+            "status": "fail",
+            "seconds": 168.5,
+            "size": 1025248,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x53ae: original=0x517d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_pipe.log"
+          },
+          {
+            "binary": "/bin/lat_proc",
+            "status": "fail",
+            "seconds": 167.1,
+            "size": 1025064,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x555e: original=0x532d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_proc.log"
+          },
+          {
+            "binary": "/bin/lat_rpc",
+            "status": "fail",
+            "seconds": 169.4,
+            "size": 1038680,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x58de: original=0x566d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_rpc.log"
+          },
+          {
+            "binary": "/bin/lat_select",
+            "status": "fail",
+            "seconds": 168.8,
+            "size": 1028472,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x574e: original=0x549d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_select.log"
+          },
+          {
+            "binary": "/bin/lat_sem",
+            "status": "fail",
+            "seconds": 167.1,
+            "size": 1024736,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x539e: original=0x516d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_sem.log"
+          },
+          {
+            "binary": "/bin/lat_sig",
+            "status": "fail",
+            "seconds": 166.2,
+            "size": 1028896,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x56ae: original=0x545d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_sig.log"
+          },
+          {
+            "binary": "/bin/lat_syscall",
+            "status": "fail",
+            "seconds": 165.8,
+            "size": 1027904,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x569e: original=0x544d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_syscall.log"
+          },
+          {
+            "binary": "/bin/lat_tcp",
+            "status": "fail",
+            "seconds": 166.1,
+            "size": 1025904,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x539e: original=0x515d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_tcp.log"
+          },
+          {
+            "binary": "/bin/lat_udp",
+            "status": "fail",
+            "seconds": 167.0,
+            "size": 1028904,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x54ae: original=0x526d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_udp.log"
+          },
+          {
+            "binary": "/bin/lat_unix",
+            "status": "fail",
+            "seconds": 166.4,
+            "size": 1021408,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x52de: original=0x50cd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_unix.log"
+          },
+          {
+            "binary": "/bin/lat_unix_connect",
+            "status": "fail",
+            "seconds": 165.8,
+            "size": 1019560,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x51de: original=0x4fdd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lat_unix_connect.log"
+          },
+          {
+            "binary": "/bin/line",
+            "status": "fail",
+            "seconds": 166.9,
+            "size": 1013504,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x50ae: original=0x4ecd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_line.log"
+          },
+          {
+            "binary": "/bin/lmdd",
+            "status": "fail",
+            "seconds": 168.3,
+            "size": 1056904,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x7ebe: original=0x7b1d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lmdd.log"
+          },
+          {
+            "binary": "/bin/lmhttp",
+            "status": "fail",
+            "seconds": 168.1,
+            "size": 1040912,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x6fae: original=0x6cfd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_lmhttp.log"
+          },
+          {
+            "binary": "/bin/loop_o",
+            "status": "fail",
+            "seconds": 167.6,
+            "size": 1011376,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x4f2e: original=0x4d5d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_loop_o.log"
+          },
+          {
+            "binary": "/bin/memsize",
+            "status": "fail",
+            "seconds": 166.1,
+            "size": 1025176,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x564e: original=0x53fd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_memsize.log"
+          },
+          {
+            "binary": "/bin/mhz",
+            "status": "fail",
+            "seconds": 167.7,
+            "size": 1081528,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x98ce: original=0x946d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_mhz.log"
+          },
+          {
+            "binary": "/bin/msleep",
+            "status": "fail",
+            "seconds": 168.3,
+            "size": 1011624,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x4f5e: original=0x4d7d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_msleep.log"
+          },
+          {
+            "binary": "/bin/par_mem",
+            "status": "fail",
+            "seconds": 166.5,
+            "size": 1014216,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x50fe: original=0x4f0d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_par_mem.log"
+          },
+          {
+            "binary": "/bin/par_ops",
+            "status": "fail",
+            "seconds": 247.6,
+            "size": 2311408,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x5a35e: original=0x543ad: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_par_ops.log"
+          },
+          {
+            "binary": "/bin/stream",
+            "status": "fail",
+            "seconds": 151.8,
+            "size": 1031608,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x5b8e: original=0x58cd: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_stream.log"
+          },
+          {
+            "binary": "/bin/timing_o",
+            "status": "fail",
+            "seconds": 153.5,
+            "size": 1011624,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x4f5e: original=0x4d8d: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_timing_o.log"
+          },
+          {
+            "binary": "/bin/tlb",
+            "status": "fail",
+            "seconds": 150.5,
+            "size": 1027968,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x5c2e: original=0x59ad: GOT reference does not resolve to benchmp_child_sigchld",
+            "log": "logs/lmbench/rewrite-bin_tlb.log"
+          }
+        ],
+        "seconds": 7228.2
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/bin/bw_file_rd: gsfork-elf: <rewrite-out>:.text:0x556e: original=0x532d: GOT reference does not resolve to benchmp_child_sigchld"
+    },
+    "make": {
+      "app": "make",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 7.5,
+        "log": "logs/make/build.log"
+      },
+      "rewrite": {
+        "ok": 1,
+        "total": 1,
+        "failed": [],
+        "seconds": 36.4
+      },
+      "runtime_issues": {
+        "panic: LIND DEBUG PANIC: Lind unsupported ioctl request": 3
+      },
+      "smoke": {
+        "pass": 1,
+        "fail": 3,
+        "skip": 0,
+        "failures": [
+          "eval \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "recipe \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "shell-recipe \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting."
+        ],
+        "seconds": 0.4,
+        "log": "logs/make/smoke.log"
+      },
+      "upstream": {
+        "exit": 1,
+        "pass": 1,
+        "fail": 21,
+        "skip": 0,
+        "seconds": 2.6,
+        "log": "logs/make/upstream.log",
+        "first_failure": "FAIL: simple echo rule"
+      },
+      "verdict": "partial",
+      "reason": "smoke: eval \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.; run_tests.sh: 1 pass/21 fail; FAIL: simple echo rule"
+    },
+    "nginx": {
+      "app": "nginx",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 6.5,
+        "log": "logs/nginx/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/usr/sbin/nginx",
+            "status": "fail",
+            "seconds": 136.5,
+            "size": 4030160,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x4504c: original=0x40ffd: GOT reference does not resolve to ngx_processes",
+            "log": "logs/nginx/rewrite-usr_sbin_nginx.log"
+          }
+        ],
+        "seconds": 136.5
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/sbin/nginx: gsfork-elf: <rewrite-out>:.text:0x4504c: original=0x40ffd: GOT reference does not resolve to ngx_processes"
+    },
+    "openblas": {
+      "app": "openblas",
+      "kind": "library",
+      "note": "Built with NOFORTRAN=1 USE_THREAD=0 TARGET=GENERIC: no gfortran in the dev image, and the HASWELL kernels use AVX (vmovupd), which gsfork-elf rejects.",
+      "build": {
+        "status": "ok",
+        "seconds": 72.0,
+        "log": "logs/openblas/build.log"
+      },
+      "rewrite": {
+        "ok": 1,
+        "total": 2,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/openblas_utest",
+            "status": "fail",
+            "seconds": 97.4,
+            "size": 2426320,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x16bc4: original=0x14cb0: GOT reference does not resolve to superb",
+            "log": "logs/openblas/rewrite-usr_local_bin_openblas_utest.log"
+          }
+        ],
+        "seconds": 100.7
+      },
+      "runtime_issues": {
+        "missing syscall 237 (mbind)": 1
+      },
+      "smoke": {
+        "pass": 0,
+        "fail": 1,
+        "skip": 1,
+        "failures": [
+          "dgemm \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting."
+        ],
+        "seconds": 0.2,
+        "log": "logs/openblas/smoke.log"
+      },
+      "verdict": "runtime-fail",
+      "reason": "1/2 binaries failed to rewrite (first: /usr/local/bin/openblas_utest: gsfork-elf: <rewrite-out>:.text:0x16bc4: original=0x14cb0: GOT reference does not resolve to superb); smoke: dgemm \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting."
+    },
+    "perl": {
+      "app": "perl",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 77.5,
+        "log": "logs/perl/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/usr/local/bin/perl",
+            "status": "fail",
+            "seconds": 3600.0,
+            "size": 29605576,
+            "reason": "*** TIMEOUT after 3600s",
+            "log": "logs/perl/rewrite-usr_local_bin_perl.log"
+          }
+        ],
+        "seconds": 3600.0
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/usr/local/bin/perl: *** TIMEOUT after 3600s"
+    },
+    "postgres": {
+      "app": "postgres",
+      "kind": "program",
+      "note": "Client tools link libpq statically. Server-side extensions (plpgsql, dict_snowball, ...) are shared objects loaded with dlopen and are installed unrewritten.",
+      "build": {
+        "status": "ok",
+        "seconds": 39.5,
+        "log": "logs/postgres/build.log"
+      },
+      "rewrite": {
+        "ok": 4,
+        "total": 38,
+        "failed": [
+          {
+            "binary": "/usr/local/pgsql/bin/clusterdb",
+            "status": "fail",
+            "seconds": 45.1,
+            "size": 1239096,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x24b9f: original=0x229ef: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_clusterdb.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/createdb",
+            "status": "fail",
+            "seconds": 44.8,
+            "size": 1234392,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x24b2f: original=0x229ff: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_createdb.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/createuser",
+            "status": "fail",
+            "seconds": 46.3,
+            "size": 1242440,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x2505f: original=0x22e8f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_createuser.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/dropdb",
+            "status": "fail",
+            "seconds": 44.2,
+            "size": 1224216,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x245df: original=0x224ef: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_dropdb.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/dropuser",
+            "status": "fail",
+            "seconds": 44.0,
+            "size": 1219784,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x2454f: original=0x2246f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_dropuser.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/ecpg",
+            "status": "fail",
+            "seconds": 31.4,
+            "size": 1293368,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x12af8: original=0x115ee: GOT reference does not resolve to ecpg_no_indicator",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_ecpg.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/initdb",
+            "status": "fail",
+            "seconds": 56.3,
+            "size": 1455008,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x2f7ff: original=0x2ceef: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_initdb.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_amcheck",
+            "status": "fail",
+            "seconds": 47.9,
+            "size": 1302280,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x27e0f: original=0x2591f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_amcheck.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_basebackup",
+            "status": "fail",
+            "seconds": 57.7,
+            "size": 1493784,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x2f27f: original=0x2c5af: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_basebackup.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_checksums",
+            "status": "fail",
+            "seconds": 3.0,
+            "size": 259456,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_checksums:.text:0x953e: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_checksums.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_combinebackup",
+            "status": "fail",
+            "seconds": 9.4,
+            "size": 613320,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_combinebackup:.text:0x196ae: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_combinebackup.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_controldata",
+            "status": "fail",
+            "seconds": 2.5,
+            "size": 201784,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_controldata:.text:0x84de: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_controldata.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_createsubscriber",
+            "status": "fail",
+            "seconds": 24.0,
+            "size": 1363280,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_createsubscriber:.text:0x3478e: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_createsubscriber.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_ctl",
+            "status": "fail",
+            "seconds": 3.2,
+            "size": 249944,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_ctl:.text:0xa4ae: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_ctl.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_dump",
+            "status": "fail",
+            "seconds": 128.7,
+            "size": 2610640,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x6661f: original=0x5f0cf: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_dump.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_dumpall",
+            "status": "fail",
+            "seconds": 76.5,
+            "size": 1859408,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3e19f: original=0x3a43f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_dumpall.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_isready",
+            "status": "fail",
+            "seconds": 45.1,
+            "size": 1215744,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x243df: original=0x222ff: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_isready.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_receivewal",
+            "status": "fail",
+            "seconds": 48.9,
+            "size": 1329328,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x28ddf: original=0x268bf: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_receivewal.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_recvlogical",
+            "status": "fail",
+            "seconds": 48.7,
+            "size": 1318192,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x28b0f: original=0x2663f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_recvlogical.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_resetwal",
+            "status": "fail",
+            "seconds": 3.2,
+            "size": 247688,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_resetwal:.text:0xa54e: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_resetwal.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_restore",
+            "status": "fail",
+            "seconds": 72.7,
+            "size": 1790488,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3b90f: original=0x37d2f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_restore.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_rewind",
+            "status": "fail",
+            "seconds": 27.2,
+            "size": 1527408,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_rewind:.text:0x3bd8e: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_rewind.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_upgrade",
+            "status": "fail",
+            "seconds": 60.7,
+            "size": 1635000,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0xabb5: original=0xaa45: GOT reference does not resolve to new_cluster",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_upgrade.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_verifybackup",
+            "status": "fail",
+            "seconds": 7.6,
+            "size": 540704,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_verifybackup:.text:0x150ae: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_verifybackup.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_waldump",
+            "status": "fail",
+            "seconds": 6.3,
+            "size": 495216,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_waldump:.text:0x1286e: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_waldump.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pg_walsummary",
+            "status": "fail",
+            "seconds": 3.3,
+            "size": 273176,
+            "reason": "gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/postgres/usr/local/pgsql/bin/pg_walsummary:.text:0xa9ae: crc32 rax,qword ptr [rcx-10h]: unsupported instruction crc32",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pg_walsummary.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/pgbench",
+            "status": "fail",
+            "seconds": 65.4,
+            "size": 1596072,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3661f: original=0x32c6f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_pgbench.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/postgres",
+            "status": "fail",
+            "seconds": 1753.3,
+            "size": 51350296,
+            "reason": "gsfork-elf: /home/lind/rewriter/.venv/bin/ddisasm failed or reported recovery/link diagnostics:",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_postgres.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/psql",
+            "status": "fail",
+            "seconds": 114.6,
+            "size": 2432576,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x3d17d: original=0x3a894: GOT reference does not resolve to pg_asciiformat_old",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_psql.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/reindexdb",
+            "status": "fail",
+            "seconds": 46.6,
+            "size": 1265800,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x263af: original=0x2401f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_reindexdb.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/bin/vacuumdb",
+            "status": "fail",
+            "seconds": 47.3,
+            "size": 1287968,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x26cdf: original=0x2492f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_bin_vacuumdb.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/lib/pgxs/src/test/isolation/isolationtester",
+            "status": "fail",
+            "seconds": 44.4,
+            "size": 1198712,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x2730f: original=0x24ccf: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_lib_pgxs_src_test_isolation_isolationtester.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/lib/pgxs/src/test/isolation/pg_isolation_regress",
+            "status": "fail",
+            "seconds": 44.7,
+            "size": 1283448,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x2772f: original=0x2535f: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_lib_pgxs_src_test_isolation_pg_isolation_regress.log"
+          },
+          {
+            "binary": "/usr/local/pgsql/lib/pgxs/src/test/regress/pg_regress",
+            "status": "fail",
+            "seconds": 43.6,
+            "size": 1282624,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x2767f: original=0x252cf: GOT reference does not resolve to pg_enc2name_tbl",
+            "log": "logs/postgres/rewrite-usr_local_pgsql_lib_pgxs_src_test_regress_pg_regress.log"
+          }
+        ],
+        "seconds": 3170.7
+      },
+      "runtime_issues": {},
+      "smoke": {
+        "pass": 1,
+        "fail": 0,
+        "skip": 4,
+        "failures": [],
+        "seconds": 0.1,
+        "log": "logs/postgres/smoke.log"
+      },
+      "verdict": "partial",
+      "reason": "34/38 binaries failed to rewrite (first: /usr/local/pgsql/bin/clusterdb: gsfork-elf: <rewrite-out>:.text:0x24b9f: original=0x229ef: GOT reference does not resolve to pg_enc2name_tbl)"
+    },
+    "sed": {
+      "app": "sed",
+      "kind": "program",
+      "note": "",
+      "build": {
+        "status": "ok",
+        "seconds": 23.7,
+        "log": "logs/sed/build.log"
+      },
+      "rewrite": {
+        "ok": 1,
+        "total": 1,
+        "failed": [],
+        "seconds": 16.2
+      },
+      "runtime_issues": {
+        "panic: LIND DEBUG PANIC: Lind unsupported ioctl request": 2
+      },
+      "smoke": {
+        "pass": 3,
+        "fail": 2,
+        "skip": 0,
+        "failures": [
+          "in-place \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.",
+          "in-place-result \u2014 output lacks 'baz bar'"
+        ],
+        "seconds": 0.2,
+        "log": "logs/sed/smoke.log"
+      },
+      "upstream": {
+        "exit": 1,
+        "pass": 6,
+        "fail": 1,
+        "skip": 0,
+        "seconds": 0.3,
+        "log": "logs/sed/upstream.log",
+        "first_failure": "FAIL: In-Place Editing"
+      },
+      "verdict": "partial",
+      "reason": "smoke: in-place \u2014 exit 134 (want 0): thread caused non-unwinding panic. aborting.; run_tests.sh: 6 pass/1 fail; FAIL: In-Place Editing"
+    },
+    "tinycc": {
+      "app": "tinycc",
+      "kind": "program",
+      "note": "Upstream run_tests.sh targets i386 (wasm build) and needs sudo + an i686 cross toolchain; replaced by smoke tests.",
+      "build": {
+        "status": "ok",
+        "seconds": 1.6,
+        "log": "logs/tinycc/build.log"
+      },
+      "rewrite": {
+        "ok": 0,
+        "total": 1,
+        "failed": [
+          {
+            "binary": "/bin/tcc",
+            "status": "fail",
+            "seconds": 54.2,
+            "size": 1300352,
+            "reason": "gsfork-elf: <rewrite-out>:.text:0x14956: original=0x135a6: GOT reference does not resolve to global_label_stack",
+            "log": "logs/tinycc/rewrite-bin_tcc.log"
+          }
+        ],
+        "seconds": 54.2
+      },
+      "verdict": "rewrite-fail",
+      "reason": "/bin/tcc: gsfork-elf: <rewrite-out>:.text:0x14956: original=0x135a6: GOT reference does not resolve to global_label_stack"
+    }
+  }
+}

@@ -1,0 +1,3 @@
+$ /home/lind/rewriter/.venv/bin/gsfork-elf rewrite /home/lind/lind-wasm-apps/build/mpk/native/binutils/usr/local/bin/objdump /home/lind/lind-wasm-apps/build/mpk/stage/binutils/usr/local/bin/objdump --scratch-field=sandbox_scratch --sandbox-field=sandbox_offset -L /home/lind/lind-wasm/glibc-2.35/build/elf -L /home/lind/lind-wasm/glibc-2.35/build --tcb-layout /home/lind/lind-wasm/glibc-2.35/build/libc.so.6 --trust-library ld-linux-x86-64.so.2 --trust-library libm.so.6 --trust-library libc.so.6
+gsfork-elf: /home/lind/lind-wasm-apps/build/mpk/native/binutils/usr/local/bin/objdump:.text:0x180efd: pinsrd xmm1,dword ptr [rdx+10h],3: unsupported instruction pinsrd
+Diagnostics retained in /home/lind/lind-wasm-apps/build/mpk/stage/binutils/usr/local/bin/objdump.failed-vv066thg

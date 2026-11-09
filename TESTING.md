@@ -146,3 +146,10 @@ make test APP=<app>
   `SKIPPED` tally; the model for requirement 5 once ported here.
 - `curl/run_tests.sh` / `git/run_tests.sh` — `LIND_DYLINK`-conditional `--preload` handling;
   the model for requirement 9 once ported to `bash`, `coreutils`, and `grep`.
+
+## lind-mpk (native MPK backend) compatibility
+
+`mpk/` builds each app natively for lind-wasm's MPK backend (`lind_compile --mpk`),
+rewrites it with `gsfork-elf`, and runs smoke checks plus the app's unmodified
+`run_tests.sh` under `lind-boot`. Run `mpk/run-in-container.sh` to reproduce; results
+are in `mpk/results/report.md`. See [mpk/README.md](mpk/README.md).

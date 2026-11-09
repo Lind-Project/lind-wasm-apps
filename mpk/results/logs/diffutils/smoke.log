@@ -1,0 +1,54 @@
+$ bash /home/lind/lind-wasm-apps/mpk/lib/stage.sh smoke /home/lind/lind-wasm-apps/mpk/recipes/diffutils.sh
+SMOKE SKIP: version — /usr/local/bin/diff not installed (rewrite failed)
+SMOKE SKIP: diff-unified — /usr/local/bin/diff not installed (rewrite failed)
+SMOKE SKIP: diff-same — /usr/local/bin/diff not installed (rewrite failed)
+--- smoke cmp: /usr/local/bin/cmp /tmp/mpk-diff/a.txt /tmp/mpk-diff/b.txt (exit 134)
+
+thread 'main' (986851) panicked at /home/lind/lind-wasm/src/wasmtime/crates/threei/src/handler_table/hashmap_impl.rs:86:9:
+[3i|_get_handler] no handler for syscall_num: 27 in self_cageid: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (986851) panicked at /rustc/9e79395f92bff6a8f536430e42a4beae69f60ff8/library/core/src/panicking.rs:225:5:
+panic in a function that cannot unwind
+stack backtrace:
+   0:     0x5555563e2cfa - <unknown>
+   1:     0x5555563fb60a - <unknown>
+   2:     0x5555563e8ef2 - <unknown>
+   3:     0x5555563c525f - <unknown>
+   4:     0x5555563d9c81 - <unknown>
+   5:     0x5555563d9eeb - <unknown>
+   6:     0x5555563c534a - <unknown>
+   7:     0x5555563b9e19 - <unknown>
+   8:     0x5555563c61cd - <unknown>
+   9:     0x5555563fbb6d - <unknown>
+  10:     0x5555563fbaeb - <unknown>
+  11:     0x5555563fbc77 - <unknown>
+  12:     0x55555590f67b - <unknown>
+  13:     0x7fff7f682fc0 - <unknown>
+thread caused non-unwinding panic. aborting.
+SMOKE FAIL: cmp — exit 134 (want 1): thread caused non-unwinding panic. aborting.
+--- smoke diff3: /usr/local/bin/diff3 /tmp/mpk-diff/a.txt /tmp/mpk-diff/b.txt /tmp/mpk-diff/a.txt (exit 134)
+
+thread 'main' (986864) panicked at /home/lind/lind-wasm/src/wasmtime/crates/threei/src/handler_table/hashmap_impl.rs:86:9:
+[3i|_get_handler] no handler for syscall_num: 27 in self_cageid: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (986864) panicked at /rustc/9e79395f92bff6a8f536430e42a4beae69f60ff8/library/core/src/panicking.rs:225:5:
+panic in a function that cannot unwind
+stack backtrace:
+   0:     0x5555563e2cfa - <unknown>
+   1:     0x5555563fb60a - <unknown>
+   2:     0x5555563e8ef2 - <unknown>
+   3:     0x5555563c525f - <unknown>
+   4:     0x5555563d9c81 - <unknown>
+   5:     0x5555563d9eeb - <unknown>
+   6:     0x5555563c534a - <unknown>
+   7:     0x5555563b9e19 - <unknown>
+   8:     0x5555563c61cd - <unknown>
+   9:     0x5555563fbb6d - <unknown>
+  10:     0x5555563fbaeb - <unknown>
+  11:     0x5555563fbc77 - <unknown>
+  12:     0x55555590f67b - <unknown>
+  13:     0x7fff7f680fc0 - <unknown>
+thread caused non-unwinding panic. aborting.
+SMOKE FAIL: diff3 — exit 134 (want 1): thread caused non-unwinding panic. aborting.

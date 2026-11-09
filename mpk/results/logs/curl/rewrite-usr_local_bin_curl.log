@@ -1,0 +1,12 @@
+$ /home/lind/rewriter/.venv/bin/gsfork-elf rewrite /home/lind/lind-wasm-apps/build/mpk/native/curl/usr/local/bin/curl /home/lind/lind-wasm-apps/build/mpk/stage/curl/usr/local/bin/curl --scratch-field=sandbox_scratch --sandbox-field=sandbox_offset -L /home/lind/lind-wasm/glibc-2.35/build/elf -L /home/lind/lind-wasm/glibc-2.35/build --tcb-layout /home/lind/lind-wasm/glibc-2.35/build/libc.so.6 --trust-library ld-linux-x86-64.so.2 --trust-library libm.so.6 --trust-library libc.so.6
+gsfork-elf: /home/lind/rewriter/.venv/bin/ddisasm failed or reported recovery/link diagnostics:
+Building the initial gtirb representation [ 101ms]
+Processing module: curl
+    disassembly              load [   12s]    compute [ 2m20s]  transform WARNING: Could not find GLOBAL/WEAK symbol for Curl_sha256it
+WARNING: Moving symbol to first block of section: __bss_start
+[    5s]
+    SCC analysis                              compute [ 452ms]  transform [   0ms]
+    no return analysis       load [ 528ms]    compute [ 279ms]  transform [  34ms]
+    function inference       load [    1s]    compute [ 791ms]  transform [ 199ms]
+
+Diagnostics retained in /home/lind/lind-wasm-apps/build/mpk/stage/curl/usr/local/bin/curl.failed-agzbp6er
