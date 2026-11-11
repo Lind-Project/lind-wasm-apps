@@ -572,12 +572,6 @@ if [[ "$LIND_DYLINK" == "1" ]]; then
   "$LIND_WASM_OPT" --target=main --fpcast-emu \
     "$BASH_RAW_WASM" -o "$BASH_WASM"
 else
-  "$LIND_WASM_OPT" --static --fpcast-emu \
-  # Shared modules require the import-table and import-globals passes so that
-  # lind-dylink can patch relocations at load time.
-  "$LIND_WASM_OPT" --target=main --fpcast-emu \
-    "$BASH_RAW_WASM" -o "$BASH_WASM"
-else
   # Static bash uses raw wasm-opt, NOT `lind-wasm-opt --static`: the wrapper's
   # `--translate-to-exnref` breaks bash's longjmp control flow (loops, break,
   # continue, return, `[ ]`). See PR #266.
