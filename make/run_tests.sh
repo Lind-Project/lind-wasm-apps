@@ -14,6 +14,14 @@ fi
 LINDFS_ROOT="$LIND_WASM_ROOT/lindfs"
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+grate_setup "$@"
+
+# Runtime command for every test; the grate (if any) goes between the runtime
+# flags and the binary under test.
+LIND_RUN=(lind_run --enable-fpcast
+    --env PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
+    "${GRATE_CMD[@]}")
 
 mkdir -p "$LINDFS_ROOT/tests/make"
 trap 'rm -rf "$LINDFS_ROOT/tests/make"' EXIT
@@ -55,8 +63,7 @@ assert_make() {
     echo "RUNNING $description........"
 
     local actual
-    actual=$(timeout ${TIMEOUT_SECS}s lind_run --enable-fpcast \
-        --env PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin \
+    actual=$(timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" \
         usr/local/bin/make -f "tests/make/$mfname" "$target" 2>/dev/null)
 
     local exit_code=$?

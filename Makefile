@@ -49,6 +49,9 @@ LINDFS_ROOT    := $(LIND_WASM_ROOT)/lindfs
 #   make check-build APP="nginx grep sed"  # runs multiple apps on demand
 TESTABLE_APPS  := bash coreutils curl git grep lmbench sed tinycc cpython openblas awk perl make nginx
 APP            ?= $(TESTABLE_APPS)
+# Optional grate to run app tests under, e.g. `make test APP=git GRATE=chroot`.
+# Passed to each run_tests.sh as LIND_GRATE; see scripts/grate_lib.sh.
+GRATE          ?=
 
 # -------- Phonies -------------------------------------------------------------
 .PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 openblas clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install-openblas install install-base
@@ -63,17 +66,25 @@ test:
 	  echo "ERROR: no apps selected; set APP to one or more of: $(TESTABLE_APPS)"; \
 	  exit 1; \
 	fi
-	@for app in $(APP); do \
+	@failed=""; \
+	for app in $(APP); do \
 	  case " $(TESTABLE_APPS) " in \
 	    *" $$app "*) ;; \
 	    *) echo "ERROR: unsupported test app '$$app'; supported apps: $(TESTABLE_APPS)"; exit 1 ;; \
 	  esac; \
-	  if [[ -x '$(APPS_ROOT)/'"$$app"'/run_tests.sh' ]]; then \
-	    '$(APPS_ROOT)/'"$$app"'/run_tests.sh' "$$app"; \
+	  script='$(APPS_ROOT)/'"$$app"'/run_tests.sh'; \
+	  if [[ ! -x "$$script" ]]; then \
+	    echo "[SKIP] $$app: missing $$script"; \
+	  elif [[ -n '$(GRATE)' ]] && ! grep -q 'grate_setup' "$$script"; then \
+	    echo "[SKIP] $$app: run_tests.sh has no grate support (GRATE=$(GRATE))"; \
 	  else \
-	    echo "[SKIP] $$app: missing $(APPS_ROOT)/$$app/run_tests.sh"; \
+	    LIND_GRATE='$(GRATE)' "$$script" || failed="$$failed $$app"; \
 	  fi; \
-	done
+	done; \
+	if [[ -n "$$failed" ]]; then \
+	  echo "FAILED apps:$$failed"; \
+	  exit 1; \
+	fi
 
 check-build:
 	@if [[ -z "$(strip $(APP))" ]]; then \
