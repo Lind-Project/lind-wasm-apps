@@ -25,6 +25,11 @@ FROM ${BASE_IMAGE} AS build
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Steps 3, 5 and 6 use /lindfs and /scripts directly, but the Makefile installs
+# to $(LIND_WASM_ROOT)/lindfs. They match only when LIND_WASM_ROOT is /.
+RUN test "${LIND_WASM_ROOT:-}" = "/" \
+ || { echo "ERROR: expected LIND_WASM_ROOT=/ (got '${LIND_WASM_ROOT:-}')"; exit 1; }
+
 # clang is not built: its build script fails ("LD: unbound variable").
 ARG APPS="lmbench bash nginx coreutils git curl grep sed binutils diffutils perl awk gmake tinycc cpython postgres gcc"
 # Not named LIBS: ARGs become env vars, and configure reads LIBS.
@@ -57,7 +62,12 @@ RUN <<'EOF'
 set -uo pipefail   # no -e: record failures and keep going
 for t in $APPS; do
   start=$(date +%s)
-  make -C /apps "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
+  # Treat the other apps as already built, so this call builds only $t.
+  skip=()
+  for a in $APPS; do
+    [ "$a" != "$t" ] && skip+=(-o "$a")
+  done
+  make -C /apps "${skip[@]}" "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
   rc=$?
   printf "%s\t%s\t%s\n" "$t" "$rc" "$(( $(date +%s) - start ))" >> "$RESULTS_DIR/results.tsv"
   if [ "$rc" -eq 0 ]; then
@@ -90,8 +100,13 @@ RUN <<'EOF'
 set -uo pipefail
 run_install() {
   local t="install-$1" start rc
+  # Treat the other installs as done, so this call installs only $1.
+  local skip=()
+  for a in $INSTALL_LIBS $APPS; do
+    [ "$a" != "$1" ] && skip+=(-o "install-$a")
+  done
   start=$(date +%s)
-  make -C /apps "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
+  make -C /apps "${skip[@]}" "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
   rc=$?
   printf "%s\t%s\t%s\n" "$t" "$rc" "$(( $(date +%s) - start ))" >> "$RESULTS_DIR/results.tsv"
   echo "[$( [ "$rc" -eq 0 ] && echo OK || echo FAIL )] $t"
