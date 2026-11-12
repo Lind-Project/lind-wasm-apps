@@ -4,17 +4,18 @@ set -euo pipefail
 ###############################################################################
 # Binutils WASI build helper for lind-wasm-apps
 #
-# Cross-compiles GNU Binutils 2.46.0 (ld, as) to wasm32-wasi so that the
-# linker and assembler can run inside the Lind sandbox alongside cc1 from GCC.
-# The resulting tools target x86_64-linux-gnu (matching GCC's --target).
+# Cross-compiles GNU Binutils 2.46.0 (ld, as, ar, ranlib) to wasm32-wasi so
+# that the linker, assembler and archiver can run inside the Lind sandbox
+# alongside cc1 from GCC. The resulting tools target x86_64-linux-gnu
+# (matching GCC's --target).
 #
 # High-level strategy:
 #   1. Out-of-tree build
 #   2. Configure with --host=wasm32-unknown-wasi, --target=x86_64-linux-gnu
-#      Generator tools are built natively via CC_FOR_BUILD; ld/as are cross-
-#      compiled to wasm32 via CC.
-#   3. Build with 'make all-ld all-gas' (linker + assembler only)
-#   4. Stage ld and as, post-process with wasm-opt + lind-boot
+#      Generator tools are built natively via CC_FOR_BUILD; the tools are
+#      cross-compiled to wasm32 via CC.
+#   3. Build with 'make all-ld all-gas', then ar and ranlib from binutils/
+#   4. Stage ld, as, ar and ranlib, post-process with wasm-opt + lind-boot
 #
 # Prerequisites:
 #   - Run 'make preflight merge-sysroot' first
@@ -86,7 +87,11 @@ if [[ -z "${LIND_ASYNCIFY_SETJMP:-}" ]]; then
   CFLAGS_WASM+=" -fwasm-exceptions -mllvm -wasm-enable-sjlj"
 fi
 
+# wasm-ld's default stack is 64 KiB and sits directly above the data
+# section, so an overflow silently corrupts globals. Use 8 MiB, like a
+# native thread.
 LDFLAGS_WASM="-Wl,--import-memory,--export-memory,--max-memory=67108864 \
+  -Wl,-z,stack-size=8388608 \
   -Wl,--export=__stack_pointer,--export=__stack_low \
   -L$MERGED_SYSROOT/lib/wasm32-wasi \
   -L$MERGED_SYSROOT/usr/lib/wasm32-wasi"
@@ -154,10 +159,16 @@ if [[ ! -f Makefile ]]; then
 fi
 
 # ----------------------------------------------------------------------
-# 5) Build ld and as
+# 5) Build ld, as, ar and ranlib
 # ----------------------------------------------------------------------
 echo "[binutils] building (make all-ld all-gas)…"
 make all-ld all-gas -j"$JOBS" V=1 MAKEINFO=true
+
+# Only ar and ranlib are needed from binutils/, so build those two targets
+# instead of all-binutils.
+echo "[binutils] building ar and ranlib…"
+make configure-binutils MAKEINFO=true
+make -C binutils ar ranlib -j"$JOBS" V=1 MAKEINFO=true
 
 popd >/dev/null
 
@@ -213,13 +224,17 @@ post_process_binary() {
 }
 
 # ----------------------------------------------------------------------
-# 7) Stage ld and as
+# 7) Stage ld, as, ar and ranlib
 # ----------------------------------------------------------------------
 LD_BIN="$BINUTILS_BUILD/ld/ld-new"
 AS_BIN="$BINUTILS_BUILD/gas/as-new"
+AR_BIN="$BINUTILS_BUILD/binutils/ar"
+RANLIB_BIN="$BINUTILS_BUILD/binutils/ranlib"
 
 post_process_binary "ld" "$LD_BIN"
 post_process_binary "as" "$AS_BIN"
+post_process_binary "ar" "$AR_BIN"
+post_process_binary "ranlib" "$RANLIB_BIN"
 
 popd >/dev/null 2>&1 || true
 
