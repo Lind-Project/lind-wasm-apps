@@ -60,7 +60,19 @@ RUN make -C /apps preflight     2>&1 | tee "$RESULTS_DIR/logs/preflight.log" \
 RUN <<'EOF'
 #!/usr/bin/env bash
 set -uo pipefail   # no -e: record failures and keep going
+# Build prerequisites between apps. If an app's prerequisite did not build, skip the app.
+declare -A deps=( [postgres]="diffutils" )
+ok() { awk -v t="$1" '$1==t && $2==0 {f=1} END {exit !f}' "$RESULTS_DIR/results.tsv"; }
+
 for t in $APPS; do
+  # Skip an app if one of its prerequisites did not build.
+  missing=""
+  for d in ${deps[$t]:-}; do ok "$d" || missing+=" $d"; done
+  if [ -n "$missing" ]; then
+    printf "%s\t%s\t%s\n" "$t" "skipped" "0" >> "$RESULTS_DIR/results.tsv"
+    echo "[SKIP] $t (not built:$missing)"
+    continue
+  fi
   start=$(date +%s)
   # Treat the other apps as already built, so this call builds only $t.
   skip=()
@@ -98,6 +110,21 @@ RUN for d in bin dev etc grates lib sbin tmp usr/bin usr/lib usr/lib/locale \
 RUN <<'EOF'
 #!/usr/bin/env bash
 set -uo pipefail
+# Install prerequisites. If a prerequisite did not install, skip the app.
+declare -A deps=(
+  [postgres]="diffutils bash"
+  [git]="zlib openssl"
+  [curl]="zlib openssl"
+  [cpython]="zlib openssl"
+  [binutils]="zlib"
+  [lmbench]="libtirpc"
+  [gcc]="libcxx"
+)
+ok() { awk -v t="$1" '$1==t && $2==0 {f=1} END {exit !f}' "$RESULTS_DIR/results.tsv"; }
+skip_install() {
+  printf "%s\t%s\t%s\n" "install-$1" "skipped" "0" >> "$RESULTS_DIR/results.tsv"
+  echo "[SKIP] install-$1 ($2)"
+}
 run_install() {
   local t="install-$1" start rc
   # Treat the other installs as done, so this call installs only $1.
@@ -113,12 +140,12 @@ run_install() {
 }
 for lib in $INSTALL_LIBS; do run_install "$lib"; done
 for app in $APPS; do
-  if awk -v t="$app" '$1==t && $2==0 {f=1} END {exit !f}' "$RESULTS_DIR/results.tsv"; then
-    run_install "$app"
-  else
-    printf "%s\t%s\t%s\n" "install-$app" "skipped" "0" >> "$RESULTS_DIR/results.tsv"
-    echo "[SKIP] install-$app (build failed)"
-  fi
+  # Skip if the app did not build, or if one of its prerequisites is not installed.
+  ok "$app" || { skip_install "$app" "not built"; continue; }
+  missing=""
+  for d in ${deps[$app]:-}; do ok "install-$d" || missing+=" install-$d"; done
+  [ -z "$missing" ] || { skip_install "$app" "not installed:$missing"; continue; }
+  run_install "$app"
 done
 # Print the summary with cat: `column` is not installed in the base image, and this is the last command, so its exit code becomes the RUN's exit code.
 echo; cat "$RESULTS_DIR/results.tsv"
