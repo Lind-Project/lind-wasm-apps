@@ -17,11 +17,13 @@ declarative TOML config instead of hand-written bash.
 make test                       # run every app in TESTABLE_APPS
 APP=bash make test               # run one app
 APP="bash git grep" make test    # run a subset
+make test APP=git GRATE=chroot   # run under a grate (see requirement 10)
 ```
 
 `Makefile`'s `test` target loops over `$(APP)` and, for each one, checks whether
 `<app>/run_tests.sh` exists and is executable. If it isn't, the app is skipped with
-`[SKIP] $app: missing run_tests.sh` — this is not a failure, and `make test` still exits 0
+`[SKIP] $app: missing run_tests.sh` — this is not a failure. Every selected app runs even
+if an earlier one fails; `make test` then prints `FAILED apps: ...` and exits 1, or exits 0
 if every app that *does* have a suite passes.
 
 Tests assume the app is already built and installed:
@@ -138,6 +140,46 @@ make test APP=<app>
   *built* with `LIND_DYLINK=1`, but their `run_tests.sh` has no `LIND_DYLINK` handling, so
   that build variant is currently untested. See the tracking issue.
 
+### 10. Running under a grate (`--grate` / `GRATE`)
+
+- Every suite can optionally run each invocation of the app under a grate. There is no
+  separate grate script: the same `run_tests.sh` takes the grate as an option, and runs
+  exactly as before when none is given.
+  ```bash
+  ./git/run_tests.sh --grate chroot      # flag
+  LIND_GRATE=chroot ./git/run_tests.sh   # env var (the flag wins if both are set)
+  make test APP=git GRATE=chroot         # from make; passed through as LIND_GRATE
+  ```
+- `scripts/grate_lib.sh` owns grate handling. Source it after `test_lib.sh`, once
+  `SCRIPT_DIR` and `LINDFS_ROOT` are set, call `grate_setup "$@"`, and put `GRATE_CMD`
+  between the runtime flags and the program under test:
+  ```bash
+  source "$SCRIPT_DIR/../scripts/grate_lib.sh"
+  grate_setup "$@"
+  LIND_RUN=(lind_run --enable-fpcast --env PATH=...)   # flags, incl. any --preload
+  LIND_RUN+=("${GRATE_CMD[@]}")
+  timeout ${TIMEOUT_SECS}s "${LIND_RUN[@]}" usr/local/bin/<app> args...
+  ```
+  Build the runtime command as one array and use it at every call site, so the grate
+  can't be missed on one of them.
+- Grate names and their arguments live in one table in `grate_lib.sh`: `chroot`
+  (`--chroot-dir /`), `ipc`, `witness`, and `fs-routing-clamp` (`--prefix /tmp` with
+  `imfs-grate` nested). Any other name runs `grates/<name>-grate.cwasm` with no arguments.
+  A `-grate` suffix is accepted (`chroot-grate` = `chroot`); `none` means no grate.
+- An unknown argument, or a grate whose `.cwasm` is missing from `$LINDFS_ROOT/grates/`,
+  is a precondition failure (requirement 2): `exit 1` before any test runs, listing the
+  installed grates.
+- Known failures under a specific grate go in `<app>/grate_skips/<grate>.txt`, one exact
+  test name per line (`#` comments allowed). They're reported by `is_skipped`/`log_skip` as
+  `SKIP: <name> (known failure under grate <grate>)` and don't affect the exit code.
+- With `GRATE` set, `make test` skips apps whose `run_tests.sh` doesn't call `grate_setup`
+  (`[SKIP] <app>: run_tests.sh has no grate support`) rather than silently running them
+  without the grate.
+- The exit-code contract (requirement 6) is unchanged.
+- Caveats: `tinycc` only compiles under the grate; the programs tcc builds run natively on
+  the host. `coreutils/run_default_tests.sh` has its own grate handling and doesn't use
+  `grate_lib.sh` yet.
+
 ## Reference implementations
 
 - `grep/run_tests.sh` — precondition checks, fixture creation/cleanup, PASS/FAIL summary.
@@ -146,3 +188,5 @@ make test APP=<app>
   `SKIPPED` tally; the model for requirement 5 once ported here.
 - `curl/run_tests.sh` / `git/run_tests.sh` — `LIND_DYLINK`-conditional `--preload` handling;
   the model for requirement 9 once ported to `bash`, `coreutils`, and `grep`.
+- `git/run_tests.sh` — grate support (requirement 10): one `LIND_RUN` array with
+  `GRATE_CMD` appended after the `--preload` flags.
