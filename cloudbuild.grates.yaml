@@ -9,10 +9,13 @@
 #   1. Resolve Commit  - find the lind-wasm-apps commit being built
 #   2. Fetch Grates    - clone lind-wasm-example-grates into /workspace/grates
 #   3. Build And Test  - run the Dockerfile up to the artifacts-grates stage, save results to /workspace/out
-#   4. Publish Release - create or update a date-tagged pre-release, attach the results, notify Slack
-#   5. Evaluate        - fail the build only if docker build failed; test results do not decide it
+#   4. Write Release   - pick the release tag and write the release body from the results
+#   5. Publish Release - create or update a date-tagged pre-release, attach the results, notify Slack
+#   6. Evaluate        - fail the build only if docker build failed; test results do not decide it
 #
 # /workspace is shared by all steps.
+# Write Release is a separate step because Cloud Build limits one step argument
+# to 10000 characters, and Publish Release with the body script exceeds it.
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -175,9 +178,8 @@ steps:
         exit 0
 
   - name: "gcr.io/cloud-builders/gcloud"
-    id: Publish Release
+    id: Write Release
     entrypoint: bash
-    secretEnv: ["GITHUB_TOKEN", "SLACK_WEBHOOK"]
     env:
       - "BRANCH_NAME=$BRANCH_NAME"
       - "GITHUB_REPO=${_GITHUB_REPO}"
@@ -185,71 +187,25 @@ steps:
     args:
       - -c
       - |
-        # No -e: this step reports problems and exits 0. Publishing is a
-        # recording concern, not a test result.
+        # No -e: a missing body is reported by Publish Release.
         set -uo pipefail
 
         out=/workspace/out
-        api=https://api.github.com
-        # Asset uploads use a different host than the rest of the REST API.
-        uploads=https://uploads.github.com
-
+        # Picked once here, so both steps use the same tag even across midnight UTC.
         # Prefixed so it does not collide with the apps weekly tag (YYYY-MM-DD).
         tag="grates-$$(date -u +%Y-%m-%d)"
-        release_url="https://github.com/$${GITHUB_REPO}/releases/tag/$${tag}"
+        echo -n "$${tag}" > /workspace/release_tag
+        rm -f /workspace/release-body.md
 
-        # Post one message to Slack. Never fails the step and never prints the
-        # webhook URL: anyone with that URL can post to the channel.
-        notify_slack() {
-          if [[ -z "$${SLACK_WEBHOOK:-}" ]]; then
-            echo "Slack notification skipped: SLACK_WEBHOOK is empty."
-            return 0
-          fi
-          local payload
-          payload="$$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "$$1")"
-          curl -sS -o /dev/null -w 'slack: HTTP %{http_code}\n' \
-            -X POST -H 'Content-Type: application/json' \
-            -d "$${payload}" "$${SLACK_WEBHOOK}" \
-            || echo "slack: request failed."
-        }
-
-        # Every early exit goes through here, so the reason is in the log and
-        # in Slack. A week with no release must not look like a quiet week.
-        skip() {
-          echo "Publish skipped: $$1"
-          notify_slack "$$(printf '%s\n%s\n%s' \
-            "Weekly grate app test completed - $${tag}" \
-            "$${GITHUB_REPO}" \
-            "Release was not published: $$1")"
+        if [[ ! -f "$${out}/grate-test-results.tsv" ]]; then
+          echo "No grate test results. The release body was not written."
           exit 0
-        }
+        fi
 
-        rc="$$(cat /workspace/build_status 2>/dev/null)"
-        case "$${rc}" in
-          0)        ;;
-          nogrates) skip "could not fetch $${GRATES_REPO}. See the Fetch Grates step." ;;
-          124)      skip "docker build timed out after 5 hours." ;;
-          "")       skip "docker build did not run." ;;
-          *)        skip "docker build failed (exit $${rc}). See the Cloud Build log." ;;
-        esac
-
-        [[ -f "$${out}/grate-test-results.tsv" ]] || skip "no grate test results were produced."
-        [[ -n "$${GITHUB_TOKEN:-}" ]] || skip "GITHUB_TOKEN is empty."
-
-        # Refuse to guess. Tagging the wrong branch or commit is worse than not tagging.
         branch="$${BRANCH_NAME:-}"
-        [[ -n "$${branch}" ]] || skip "BRANCH_NAME is empty, so the branch to tag is unknown."
         commit="$$(cat /workspace/apps_commit 2>/dev/null)"
-        [[ -n "$${commit}" ]] || skip "could not resolve the commit of $${branch}."
         grates_commit="$$(cat /workspace/grates_commit 2>/dev/null)"
-
-        auth=(-H "Authorization: Bearer $${GITHUB_TOKEN}"
-              -H "Accept: application/vnd.github+json"
-              -H "X-GitHub-Api-Version: 2022-11-28")
-
-        # All results (tsv files, env.txt, every log) in one file.
         asset=grate-results.tar.gz
-        tar -C "$${out}" -czf "/workspace/$${asset}" .
         asset_url="https://github.com/$${GITHUB_REPO}/releases/download/$${tag}/$${asset}"
 
         # Body: app x grate results, build failures, and what was run.
@@ -360,6 +316,93 @@ steps:
         print(f"- runtime: {runtime}")
         print(f"- [{asset}]({asset_url}) - all results and logs")
         PY
+        rc=$$?
+        if [[ "$${rc}" -ne 0 ]]; then
+          echo "Writing the release body failed (exit $${rc})."
+          rm -f /workspace/release-body.md
+          exit 0
+        fi
+        echo "Release body written for $${tag}:"
+        cat /workspace/release-body.md
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: Publish Release
+    entrypoint: bash
+    secretEnv: ["GITHUB_TOKEN", "SLACK_WEBHOOK"]
+    env:
+      - "BRANCH_NAME=$BRANCH_NAME"
+      - "GITHUB_REPO=${_GITHUB_REPO}"
+      - "GRATES_REPO=${_GRATES_REPO}"
+    args:
+      - -c
+      - |
+        # No -e: this step reports problems and exits 0. Publishing is a
+        # recording concern, not a test result.
+        set -uo pipefail
+
+        out=/workspace/out
+        api=https://api.github.com
+        # Asset uploads use a different host than the rest of the REST API.
+        uploads=https://uploads.github.com
+
+        # Picked by the Write Release step.
+        tag="$$(cat /workspace/release_tag 2>/dev/null)"
+        [[ -n "$${tag}" ]] || tag="grates-$$(date -u +%Y-%m-%d)"
+        release_url="https://github.com/$${GITHUB_REPO}/releases/tag/$${tag}"
+
+        # Post one message to Slack. Never fails the step and never prints the
+        # webhook URL: anyone with that URL can post to the channel.
+        notify_slack() {
+          if [[ -z "$${SLACK_WEBHOOK:-}" ]]; then
+            echo "Slack notification skipped: SLACK_WEBHOOK is empty."
+            return 0
+          fi
+          local payload
+          payload="$$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1]}))' "$$1")"
+          curl -sS -o /dev/null -w 'slack: HTTP %{http_code}\n' \
+            -X POST -H 'Content-Type: application/json' \
+            -d "$${payload}" "$${SLACK_WEBHOOK}" \
+            || echo "slack: request failed."
+        }
+
+        # Every early exit goes through here, so the reason is in the log and
+        # in Slack. A week with no release must not look like a quiet week.
+        skip() {
+          echo "Publish skipped: $$1"
+          notify_slack "$$(printf '%s\n%s\n%s' \
+            "Weekly grate app test completed - $${tag}" \
+            "$${GITHUB_REPO}" \
+            "Release was not published: $$1")"
+          exit 0
+        }
+
+        rc="$$(cat /workspace/build_status 2>/dev/null)"
+        case "$${rc}" in
+          0)        ;;
+          nogrates) skip "could not fetch $${GRATES_REPO}. See the Fetch Grates step." ;;
+          124)      skip "docker build timed out after 5 hours." ;;
+          "")       skip "docker build did not run." ;;
+          *)        skip "docker build failed (exit $${rc}). See the Cloud Build log." ;;
+        esac
+
+        [[ -f "$${out}/grate-test-results.tsv" ]] || skip "no grate test results were produced."
+        [[ -n "$${GITHUB_TOKEN:-}" ]] || skip "GITHUB_TOKEN is empty."
+
+        # Refuse to guess. Tagging the wrong branch or commit is worse than not tagging.
+        branch="$${BRANCH_NAME:-}"
+        [[ -n "$${branch}" ]] || skip "BRANCH_NAME is empty, so the branch to tag is unknown."
+        commit="$$(cat /workspace/apps_commit 2>/dev/null)"
+        [[ -n "$${commit}" ]] || skip "could not resolve the commit of $${branch}."
+        auth=(-H "Authorization: Bearer $${GITHUB_TOKEN}"
+              -H "Accept: application/vnd.github+json"
+              -H "X-GitHub-Api-Version: 2022-11-28")
+
+        # Written by the Write Release step.
+        [[ -s /workspace/release-body.md ]] || skip "the release body was not written. See the Write Release step."
+
+        # All results (tsv files, env.txt, every log) in one file.
+        asset=grate-results.tar.gz
+        tar -C "$${out}" -czf "/workspace/$${asset}" .
 
         # Build the JSON in python so the body text is escaped correctly.
         python3 - "$${tag}" "$${commit}" /workspace/release-body.md \
