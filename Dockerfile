@@ -288,7 +288,7 @@ FROM build-grates AS test-grates
 
 # Apps with grate support that need fpcast.
 ARG GRATE_TEST_APPS="awk bash coreutils grep make nginx perl lmbench"
-ARG TEST_GRATES="none chroot witness fs-routing-clamp ipc".
+ARG TEST_GRATES="chroot witness fs-routing-clamp ipc".
 ARG GRATE_TEST_TIMEOUT=3600
 
 RUN <<'EOF'
