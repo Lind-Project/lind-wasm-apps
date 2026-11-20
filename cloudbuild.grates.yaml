@@ -1,6 +1,6 @@
 # Weekly grate app test CI for lind-wasm-apps
 #
-# Run by a trigger that Cloud Scheduler fires once a week.
+# Run by a trigger that Cloud Scheduler fires once every two weeks.
 # Builds the apps on the latest lind-wasm release image, builds the grates
 # from lind-wasm-example-grates, runs the app tests under each grate,
 # publishes the results as a GitHub pre-release, and posts to Slack.
@@ -19,9 +19,7 @@
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  # 32 GB of memory is needed: gcc's wasm-opt step is killed on E2_HIGHCPU_8 (8 GB).
   machineType: E2_HIGHCPU_32
-  # TODO: set from the first run. The first 100 GB is free.
   diskSizeGb: 200
   substitution_option: ALLOW_LOOSE
 
@@ -29,10 +27,10 @@ substitutions:
   _GITHUB_REPO: "Lind-Project/lind-wasm-apps"
   # Override to run against another runtime image.
   _BASE_IMAGE: "securesystemslab/lind-wasm:latest"
-  # Grates source. _GRATES_REF can be a branch, a tag, or a commit.
+  # Grates source.
   _GRATES_REPO: "Lind-Project/lind-wasm-example-grates"
   _GRATES_REF: "main"
-  # Apps and grates to test ('none' = no grate, the baseline).
+  # Apps and grates to test.
   # Empty values keep the defaults in the Dockerfile.
   _GRATE_TEST_APPS: ""
   _TEST_GRATES: ""
@@ -44,8 +42,7 @@ availableSecrets:
     - versionName: projects/x-micron-451502-m7/secrets/slack-webhook-grates-ci/versions/latest
       env: SLACK_WEBHOOK
 
-# A full app build takes about 1 hour 10 minutes on 32 cores. The grate tests
-# took about 1 hour 35 minutes on 8 cores locally (witness took 80 minutes of it).
+# A full app build takes about 1.5 hour. 
 # The docker build itself is stopped at 5 hours (Build And Test), so the later
 # steps still have time to report it. If this timeout is hit instead, no step
 # runs and Slack gets nothing.
@@ -541,4 +538,3 @@ steps:
         cat "$${out}/grate-test-results.tsv"
         echo "========================"
         echo "Pipeline finished. Test failures do not fail this build."
-        
