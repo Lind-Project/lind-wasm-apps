@@ -6,6 +6,9 @@
 #   build     - set up the build, build apps, install them into /lindfs, and prepare /lindfs to run them
 #   test      - run app tests
 #   artifacts - results only (results.tsv, test-results.tsv, env.txt, logs/)
+#   build-grates     - build the grates used by the grate app tests and install them into /lindfs/grates
+#   test-grates      - run app tests under each grate
+#   artifacts-grates - results only (grates-build.tsv, grate-test-results.tsv, env.txt, logs/)
 #
 # App build or test failures do not fail `docker build`.
 # Check results.tsv and test-results.tsv.
@@ -231,3 +234,106 @@ EOF
 # Copy only /apps-results out of the image.
 FROM scratch AS artifacts
 COPY --from=test /apps-results /
+
+# ---------------------------------------------------------------------------
+# Grate app tests: build lind-wasm-example-grates on top of `build`,
+# then run app tests under each grate (scripts/grate_lib.sh).
+#
+# Usage (from the repo root, with the grates repo checked out at ./grates):
+#   docker build --platform=linux/amd64 \
+#     --build-arg APPS_COMMIT=$(git rev-parse HEAD) \
+#     --build-arg GRATES_COMMIT=$(git -C grates rev-parse HEAD) \
+#     --target artifacts-grates --output type=local,dest=./grates-results .
+#
+# Grate build or test failures do not fail `docker build`.
+# Check grates-build.tsv and grate-test-results.tsv.
+# ---------------------------------------------------------------------------
+
+FROM build AS build-grates
+
+# Grates used by the grate app tests (grates repo Makefile targets).
+# Only these are built, so a broken unrelated grate does not affect the run.
+# imfs: the C grate is used (the Rust one installs under the same file name).
+ARG GRATE_TARGETS="rust/chroot-grate rust/ipc-grate c/witness-grate rust/fs-routing-clamp c/imfs-grate"
+ARG GRATES_COMMIT=unknown
+
+# The grates build scripts assume a developer layout ($HOME/lind-wasm,
+# $HOME/.../lind-wasm-apps). Point them at the release image layout.
+ENV LIND_WASM_LINKER=/scripts/bin/wasip1-clang.sh \
+    LIND_WASM_APPS_SYSROOT=/apps/build/sysroot_merged
+
+COPY grates /grates
+
+RUN <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail   # no -e: record failures and keep going
+# Some Cargo.toml files fetch grate-rs from the grates repo's main branch.
+# Use the checked-out copy instead, so every grate uses the same grate-rs.
+mkdir -p /grates/.cargo
+cat > /grates/.cargo/config.toml <<'TOML'
+[patch."https://github.com/Lind-Project/lind-wasm-example-grates"]
+grate-rs = { path = "/grates/lib/grate-rs" }
+TOML
+echo "grates_commit: ${GRATES_COMMIT}" >> "$RESULTS_DIR/env.txt"
+printf "target\texit\tseconds\n" > "$RESULTS_DIR/grates-build.tsv"
+for t in $GRATE_TARGETS; do
+  log="$RESULTS_DIR/logs/grate-build-${t//\//_}.log"
+  start=$(date +%s)
+  make -C /grates "$t" > "$log" 2>&1
+  rc=$?
+  printf "%s\t%s\t%s\n" "$t" "$rc" "$(( $(date +%s) - start ))" >> "$RESULTS_DIR/grates-build.tsv"
+  echo "[$( [ "$rc" -eq 0 ] && echo OK || echo FAIL )] $t (exit $rc)"
+done
+# Copy the built .cwasm files into /lindfs/grates ($LIND_WASM_ROOT/lindfs/grates).
+make -C /grates install > "$RESULTS_DIR/logs/grate-install.log" 2>&1
+echo "grate install exit: $?"
+ls -l /lindfs/grates
+# Last command decides the RUN's exit code; keep it one that always succeeds.
+echo; cat "$RESULTS_DIR/grates-build.tsv"
+EOF
+
+
+FROM build-grates AS test-grates
+
+# Apps with grate support that need fpcast. 'make' is the test name for gmake.
+ARG GRATE_TEST_APPS="awk bash coreutils grep make nginx perl lmbench"
+# 'none' runs the app without a grate, as the baseline.
+ARG TEST_GRATES="none chroot witness fs-routing-clamp ipc"
+# Time limit in seconds for one app/grate run (witness runs are slow).
+ARG GRATE_TEST_TIMEOUT=3600
+
+RUN <<'EOF'
+#!/usr/bin/env bash
+set -uo pipefail   # no -e: record failures and keep going
+OUT="$RESULTS_DIR/grate-test-results.tsv"
+printf "app\tgrate\texit\tseconds\n" > "$OUT"
+{ echo "grate_test_apps: ${GRATE_TEST_APPS}"; echo "test_grates: ${TEST_GRATES}"; } >> "$RESULTS_DIR/env.txt"
+for app in $GRATE_TEST_APPS; do
+  case "$app" in
+    make) target=gmake ;;
+    *)    target="$app" ;;
+  esac
+  # Skip apps that were not built or installed.
+  if ! awk -v t="install-$target" '$1==t && $2==0 {f=1} END {exit !f}' "$RESULTS_DIR/results.tsv"; then
+    for g in $TEST_GRATES; do printf "%s\t%s\tskipped\t0\n" "$app" "$g" >> "$OUT"; done
+    echo "[SKIP] $app (not built or not installed)"
+    continue
+  fi
+  for g in $TEST_GRATES; do
+    arg=(); [ "$g" != none ] && arg=(GRATE="$g")
+    start=$(date +%s)
+    # exit 124 = timeout; exit 2 = make reports a failed test
+    timeout "$GRATE_TEST_TIMEOUT" make -C /apps test APP="$app" "${arg[@]}" \
+      > "$RESULTS_DIR/logs/grate-test-$app-$g.log" 2>&1
+    rc=$?
+    printf "%s\t%s\t%s\t%s\n" "$app" "$g" "$rc" "$(( $(date +%s) - start ))" >> "$OUT"
+    echo "[$app / $g] exit $rc"
+  done
+done
+echo; cat "$OUT"
+EOF
+
+
+# Copy only /apps-results out of the image.
+FROM scratch AS artifacts-grates
+COPY --from=test-grates /apps-results /
