@@ -230,35 +230,26 @@ done
 echo; cat "$TEST_RESULTS"
 EOF
 
-
 # Copy only /apps-results out of the image.
 FROM scratch AS artifacts
 COPY --from=test /apps-results /
 
-# ---------------------------------------------------------------------------
-# Grate app tests: build lind-wasm-example-grates on top of `build`,
-# then run app tests under each grate (scripts/grate_lib.sh).
+# Grate app tests: build lind-wasm-example-grates on top of build stage.
 #
 # Usage (from the repo root, with the grates repo checked out at ./grates):
 #   docker build --platform=linux/amd64 \
 #     --build-arg APPS_COMMIT=$(git rev-parse HEAD) \
 #     --build-arg GRATES_COMMIT=$(git -C grates rev-parse HEAD) \
 #     --target artifacts-grates --output type=local,dest=./grates-results .
-#
-# Grate build or test failures do not fail `docker build`.
-# Check grates-build.tsv and grate-test-results.tsv.
-# ---------------------------------------------------------------------------
-
 FROM build AS build-grates
 
 # Grates used by the grate app tests (grates repo Makefile targets).
-# Only these are built, so a broken unrelated grate does not affect the run.
-# imfs: the C grate is used (the Rust one installs under the same file name).
 ARG GRATE_TARGETS="rust/chroot-grate rust/ipc-grate c/witness-grate rust/fs-routing-clamp c/imfs-grate"
 ARG GRATES_COMMIT=unknown
 
-# The grates build scripts assume a developer layout ($HOME/lind-wasm,
-# $HOME/.../lind-wasm-apps). Point them at the release image layout.
+# The grates build scripts assume a developer layout 
+# ($HOME/lind-wasm, $HOME/.../lind-wasm-apps).
+# Todo: remove this linking when the grates build scripts are fixed.
 ENV LIND_WASM_LINKER=/scripts/bin/wasip1-clang.sh \
     LIND_WASM_APPS_SYSROOT=/apps/build/sysroot_merged
 
@@ -295,11 +286,9 @@ EOF
 
 FROM build-grates AS test-grates
 
-# Apps with grate support that need fpcast. 'make' is the test name for gmake.
+# Apps with grate support that need fpcast.
 ARG GRATE_TEST_APPS="awk bash coreutils grep make nginx perl lmbench"
-# 'none' runs the app without a grate, as the baseline.
-ARG TEST_GRATES="none chroot witness fs-routing-clamp ipc"
-# Time limit in seconds for one app/grate run (witness runs are slow).
+ARG TEST_GRATES="none chroot witness fs-routing-clamp ipc".
 ARG GRATE_TEST_TIMEOUT=3600
 
 RUN <<'EOF'
@@ -332,7 +321,6 @@ for app in $GRATE_TEST_APPS; do
 done
 echo; cat "$OUT"
 EOF
-
 
 # Copy only /apps-results out of the image.
 FROM scratch AS artifacts-grates
