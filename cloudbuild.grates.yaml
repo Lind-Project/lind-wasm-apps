@@ -221,7 +221,7 @@ steps:
             return [l.split("\t") for l in lines if l.strip()]
 
         # Each app's test script prints its own summary line. Turn the known
-        # formats into "passed/total". If none match, show the raw line.
+        # formats into "passed/total". None means no summary line was found.
         ansi = re.compile(r"\x1b\[[0-9;]*m")
         patterns = [
             (re.compile(r"FAILED\D*(\d+)/(\d+) tests failed"),            # bash awk make perl (failures)
@@ -233,7 +233,6 @@ steps:
             (re.compile(r"(\d+)/(\d+) tests passed"),                     # awk make perl nginx lmbench
              lambda m: (int(m[1]), int(m[2]))),
         ]
-        keywords = re.compile(r"ALL PASSED|FAILED|tests passed|Results:|PASS: \d+ \|")
 
         def test_result(app, grate):
             try:
@@ -247,10 +246,7 @@ steps:
                     if m:
                         passed, total = conv(m)
                         return f"{passed}/{total}"
-            for line in reversed(lines):
-                if keywords.search(line):
-                    return line[:60].replace("|", "\\|")
-            return "no summary line"
+            return None
 
         apps, grates, cells = [], [], {}
         for app, grate, rc, *_ in rows(f"{out}/grate-test-results.tsv"):
@@ -263,11 +259,14 @@ steps:
             elif rc == "124":
                 cell = "timeout"
             else:
-                cell = test_result(app, grate)
+                # No summary line: the run stopped before the tests were counted.
+                cell = test_result(app, grate) or ("FAILED" if rc != "0" else "no summary")
             cells[(app, grate)] = cell
 
         print("## Grate test results")
-        print("Each cell is passed/total. `none` runs the app without a grate (baseline).")
+        print("Each cell is passed/total.")
+        print("`FAILED` means the run ended without a result summary, so no tests were counted")
+        print("(for example, the app or the grate stopped at startup). See the logs in the asset.")
         print("`-` means the app was not built or installed.")
         print()
         print("| app | " + " | ".join(grates) + " |")
