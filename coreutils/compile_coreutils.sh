@@ -464,6 +464,12 @@ EOF
 # is missing.
 ##################
 current_config_sig="$(config_signature)"
+if [[ -f "$CONFIG_SIG_FILE" && "$(cat "$CONFIG_SIG_FILE")" != "$current_config_sig" ]]; then
+  # Make does not track changes to link flags, so objects from the previous
+  # mode must not be reused after a static/dynamic mode switch.
+  rm -rf "$BUILD_DIR"
+  mkdir -p "$BUILD_DIR"
+fi
 need_configure=0
 if [[ "$FORCE_CLEAN" == "1" || "$FORCE_CONFIGURE" == "1" ]]; then
   need_configure=1
@@ -535,6 +541,16 @@ echo "[coreutils] building (best-effort; partial failures allowed)"
   fi
 )
 
+if [[ "$LIND_DYLINK" == "1" ]]; then
+  # These test helpers exit incorrectly with the dynamic link flags. Their
+  # PIC objects can be linked statically without changing the other tools.
+  for helper in getlimits timeout; do
+    rm -f "$BUILD_DIR/src/$helper"
+    make -C "$BUILD_DIR/src" "$helper" \
+      CC="$CC_WASM" LDFLAGS="${LDFLAGS_CONFIGURE[*]}"
+  done
+fi
+
 echo "[coreutils] staging wasm binaries..."
 SRC_BIN_DIR="$BUILD_DIR/src"
 if [[ ! -d "$SRC_BIN_DIR" ]]; then
@@ -546,6 +562,7 @@ fi
 # Keep intermediates in a dedicated folder instead of a temp directory
 TMP_STAGE_DIR="$BUILD_ROOT/intermediates"
 mkdir -p "$TMP_STAGE_DIR"
+rm -f "$TMP_STAGE_DIR"/*.wasm "$TMP_STAGE_DIR"/*.cwasm
 
 
 ###############################################################################
@@ -618,12 +635,38 @@ fi
 # tied to `JOBS` instead of spawning one process per staged binary.
 ##################
 echo "[coreutils] Step 1: Converting .wasm to .opt.wasm..."
+optimize_dynamic() {
+  local input="$1" output="$2" errors="${2}.errors"
+  if "$LIND_WASM_OPT" --target=main --fpcast-emu "$input" -o "$output" 2>"$errors"; then
+    rm -f "$errors"
+  elif grep -q 'signal_callback already exists' "$errors"; then
+    rm -f "$errors"
+    "$LIND_WASM_OPT" --target=main --fpcast-emu --without-epoch "$input" -o "$output"
+  else
+    cat "$errors" >&2
+    rm -f "$errors"
+    return 1
+  fi
+}
+optimize_static() {
+  local input="$1" output="$2" errors="${2}.errors"
+  if "$LIND_WASM_OPT" --static "$input" -o "$output" 2>"$errors"; then
+    rm -f "$errors"
+  elif grep -q 'asyncify_start_unwind already exists' "$errors"; then
+    rm -f "$errors"
+    "$LIND_WASM_OPT" --static --without-asyncify "$input" -o "$output"
+  else
+    cat "$errors" >&2
+    rm -f "$errors"
+    return 1
+  fi
+}
 for w in "${wasm_files[@]}"; do
   opt_file="${w%.wasm}.opt.wasm"
-  if [[ "$LIND_DYLINK" == "1" ]]; then
-    run_limited "$JOBS" "$LIND_WASM_OPT" --target=main --fpcast-emu "$w" -o "$opt_file"
+  if [[ "$LIND_DYLINK" == "1" && "$(basename "$w")" != "getlimits.wasm" && "$(basename "$w")" != "timeout.wasm" ]]; then
+    run_limited "$JOBS" optimize_dynamic "$w" "$opt_file"
   else
-    run_limited "$JOBS" "$LIND_WASM_OPT" --static "$w" -o "$opt_file"
+    run_limited "$JOBS" optimize_static "$w" "$opt_file"
   fi
 done
 wait_for_background_jobs
@@ -641,6 +684,7 @@ fi
 if [[ "$LIND_DYLINK" == "1" ]]; then
   echo "[coreutils] adding dylink exports via add-export-tool..."
   for w in "${opt_files[@]}"; do
+    case "$(basename "$w")" in getlimits.opt.wasm|timeout.opt.wasm) continue ;; esac
     "$ADD_EXPORT_TOOL" "$w" "$w" __wasm_apply_tls_relocs func __wasm_apply_tls_relocs optional
     "$ADD_EXPORT_TOOL" "$w" "$w" __wasm_apply_global_relocs func __wasm_apply_global_relocs optional
     "$ADD_EXPORT_TOOL" "$w" "$w" __stack_pointer global __stack_pointer
