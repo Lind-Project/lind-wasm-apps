@@ -25,6 +25,11 @@ FROM ${BASE_IMAGE} AS build
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Steps 3, 5 and 6 use /lindfs and /scripts directly, but the Makefile installs
+# to $(LIND_WASM_ROOT)/lindfs. They match only when LIND_WASM_ROOT is /.
+RUN test "${LIND_WASM_ROOT:-}" = "/" \
+ || { echo "ERROR: expected LIND_WASM_ROOT=/ (got '${LIND_WASM_ROOT:-}')"; exit 1; }
+
 # clang is not built: its build script fails ("LD: unbound variable").
 ARG APPS="lmbench bash nginx coreutils git curl grep sed binutils diffutils perl awk gmake tinycc cpython postgres gcc"
 # Not named LIBS: ARGs become env vars, and configure reads LIBS.
@@ -55,9 +60,26 @@ RUN make -C /apps preflight     2>&1 | tee "$RESULTS_DIR/logs/preflight.log" \
 RUN <<'EOF'
 #!/usr/bin/env bash
 set -uo pipefail   # no -e: record failures and keep going
+# Build prerequisites between apps. If an app's prerequisite did not build, skip the app.
+declare -A deps=( [postgres]="diffutils" )
+ok() { awk -v t="$1" '$1==t && $2==0 {f=1} END {exit !f}' "$RESULTS_DIR/results.tsv"; }
+
 for t in $APPS; do
+  # Skip an app if one of its prerequisites did not build.
+  missing=""
+  for d in ${deps[$t]:-}; do ok "$d" || missing+=" $d"; done
+  if [ -n "$missing" ]; then
+    printf "%s\t%s\t%s\n" "$t" "skipped" "0" >> "$RESULTS_DIR/results.tsv"
+    echo "[SKIP] $t (not built:$missing)"
+    continue
+  fi
   start=$(date +%s)
-  make -C /apps "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
+  # Treat the other apps as already built, so this call builds only $t.
+  skip=()
+  for a in $APPS; do
+    [ "$a" != "$t" ] && skip+=(-o "$a")
+  done
+  make -C /apps "${skip[@]}" "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
   rc=$?
   printf "%s\t%s\t%s\n" "$t" "$rc" "$(( $(date +%s) - start ))" >> "$RESULTS_DIR/results.tsv"
   if [ "$rc" -eq 0 ]; then
@@ -88,22 +110,42 @@ RUN for d in bin dev etc grates lib sbin tmp usr/bin usr/lib usr/lib/locale \
 RUN <<'EOF'
 #!/usr/bin/env bash
 set -uo pipefail
+# Install prerequisites. If a prerequisite did not install, skip the app.
+declare -A deps=(
+  [postgres]="diffutils bash"
+  [git]="zlib openssl"
+  [curl]="zlib openssl"
+  [cpython]="zlib openssl"
+  [binutils]="zlib"
+  [lmbench]="libtirpc"
+  [gcc]="libcxx"
+)
+ok() { awk -v t="$1" '$1==t && $2==0 {f=1} END {exit !f}' "$RESULTS_DIR/results.tsv"; }
+skip_install() {
+  printf "%s\t%s\t%s\n" "install-$1" "skipped" "0" >> "$RESULTS_DIR/results.tsv"
+  echo "[SKIP] install-$1 ($2)"
+}
 run_install() {
   local t="install-$1" start rc
+  # Treat the other installs as done, so this call installs only $1.
+  local skip=()
+  for a in $INSTALL_LIBS $APPS; do
+    [ "$a" != "$1" ] && skip+=(-o "install-$a")
+  done
   start=$(date +%s)
-  make -C /apps "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
+  make -C /apps "${skip[@]}" "$t" > "$RESULTS_DIR/logs/$t.log" 2>&1
   rc=$?
   printf "%s\t%s\t%s\n" "$t" "$rc" "$(( $(date +%s) - start ))" >> "$RESULTS_DIR/results.tsv"
   echo "[$( [ "$rc" -eq 0 ] && echo OK || echo FAIL )] $t"
 }
 for lib in $INSTALL_LIBS; do run_install "$lib"; done
 for app in $APPS; do
-  if awk -v t="$app" '$1==t && $2==0 {f=1} END {exit !f}' "$RESULTS_DIR/results.tsv"; then
-    run_install "$app"
-  else
-    printf "%s\t%s\t%s\n" "install-$app" "skipped" "0" >> "$RESULTS_DIR/results.tsv"
-    echo "[SKIP] install-$app (build failed)"
-  fi
+  # Skip if the app did not build, or if one of its prerequisites is not installed.
+  ok "$app" || { skip_install "$app" "not built"; continue; }
+  missing=""
+  for d in ${deps[$app]:-}; do ok "install-$d" || missing+=" install-$d"; done
+  [ -z "$missing" ] || { skip_install "$app" "not installed:$missing"; continue; }
+  run_install "$app"
 done
 # Print the summary with cat: `column` is not installed in the base image, and this is the last command, so its exit code becomes the RUN's exit code.
 echo; cat "$RESULTS_DIR/results.tsv"

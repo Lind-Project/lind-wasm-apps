@@ -72,6 +72,7 @@ FS_DIR_GUEST="${TMP_DIR_GUEST}/fs_dir"
 FS_DIR_HOST="${TMP_DIR_HOST}/fs_dir"
 
 source "$SCRIPT_DIR/../scripts/test_lib.sh"
+source "$SCRIPT_DIR/../scripts/grate_lib.sh"
 trap 'rm -rf "$TMP_DIR_HOST"' EXIT
 
 print_release_switch_instructions() {
@@ -317,9 +318,9 @@ run_configured_test() {
     fi
 
     output_file="$(mktemp)"
-    append_log "# lind_run Command: $(command_to_string "$LIND_RUN" "${parsed_args[@]}")"
+    append_log "# lind_run Command: $(command_to_string "$LIND_RUN" "${GRATE_CMD[@]}" "${parsed_args[@]}")"
 
-    run_with_timeout "$output_file" "$LIND_RUN" "${parsed_args[@]}"
+    run_with_timeout "$output_file" "$LIND_RUN" "${GRATE_CMD[@]}" "${parsed_args[@]}"
     rc=$?
 
     append_log "# Output:"
@@ -371,6 +372,9 @@ main() {
         exit 1
     fi
 
+    # The grate (if any) goes between lind_run and each lmbench binary.
+    grate_setup "$@"
+
     : >"$LOG_FILE"
 
     append_log "#####################################"
@@ -382,6 +386,7 @@ main() {
     append_log "# BUILD_BIN_DIR: $BUILD_BIN_DIR"
     append_log "# TEST_LIST_FILE: $TEST_LIST_FILE"
     append_log "# lind_run: $LIND_RUN"
+    append_log "# Grate: ${GRATE_NAME:-none} ${GRATE_CMD[*]}"
     append_log "# Timeout Seconds: $TEST_TIMEOUT_SECONDS"
     append_log "#####################################"
 
