@@ -1,4 +1,5 @@
 # OpenBLAS (no Fortran; single-threaded) + its C unit tests (utest)
+WASM_RUN_ARGS="--preload env=lib/libopenblas.so"  # lind_run flags in --mode wasm, as in openblas/run_tests.sh
 KIND=library
 NOTE="Built with NOFORTRAN=1 USE_THREAD=0 TARGET=GENERIC: no gfortran in the dev image, and the HASWELL kernels use AVX (vmovupd), which gsfork-elf rejects."
 recipe_build() {
@@ -22,5 +23,5 @@ C
 }
 recipe_smoke() {
   smoke dgemm "dgemm 19 22 43 50" -- /usr/local/bin/openblas_dgemm_check
-  SMOKE_TIMEOUT=300 smoke utest "SUCCESS" -- /usr/local/bin/openblas_utest
+  SMOKE_TIMEOUT=300 smoke utest "ok, 0 failed" -- /usr/local/bin/openblas_utest
 }

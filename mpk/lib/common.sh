@@ -26,12 +26,20 @@ export LDFLAGS="-L$PREFIX/lib"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 LINDFS="$LIND_WASM_ROOT/lindfs"
 SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-60}"
+# lind_run moved from scripts/ to scripts/bin/ in lind-wasm; accept both.
+if [[ -z "${LIND_RUN:-}" ]]; then
+  LIND_RUN="$LIND_WASM_ROOT/scripts/bin/lind_run"
+  [[ -x "$LIND_RUN" ]] || LIND_RUN="$LIND_WASM_ROOT/scripts/lind_run"
+fi
+# Extra lind_run flags placed before the guest program (assess.py sets this
+# from the recipe's WASM_RUN_ARGS in --mode wasm, e.g. --enable-fpcast).
+read -ra LIND_RUN_FLAGS <<<"${LIND_RUN_ARGS:-}"
 
 # Autotools trees are vendored with generated files; keep make from trying to
-# rerun aclocal/automake/autoconf because of copy timestamps.
+# rerun aclocal/automake/autoconf/makeinfo because of checkout timestamps.
 autotools_touch() {
   local f
-  for f in aclocal.m4 configure Makefile.in config.h.in config_h.in; do
+  for f in aclocal.m4 configure Makefile.in config.h.in config_h.in '*.info'; do
     find . -name "$f" -exec touch {} + 2>/dev/null || true
   done
 }
@@ -61,14 +69,15 @@ smoke() {
     esac
   done
   shift
-  # Binaries whose rewrite failed are not installed; that is already reported.
+  # Programs whose rewrite (or wasm build) failed are not installed; that is
+  # already reported.
   if [[ "$1" == /* && ! -e "$LINDFS$1" ]]; then
-    echo "SMOKE SKIP: $name — $1 not installed (rewrite failed)"
+    echo "SMOKE SKIP: $name — $1 not installed"
     return 0
   fi
   local out rc=0
   out="$(cd "$LIND_WASM_ROOT" && timeout --kill-after=5 "$SMOKE_TIMEOUT" \
-    "$LIND_WASM_ROOT/scripts/lind_run" "$@" <"$stdin" 2>&1)" || rc=$?
+    "$LIND_RUN" "${LIND_RUN_FLAGS[@]}" "$@" <"$stdin" 2>&1)" || rc=$?
   printf -- '--- smoke %s: %s (exit %s)\n%s\n' "$name" "$*" "$rc" "$(printf '%s' "$out" | head -c 4000)"
   if [[ $rc == 124 || $rc == 137 ]]; then
     echo "SMOKE FAIL: $name — timeout after ${SMOKE_TIMEOUT}s"

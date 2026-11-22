@@ -543,8 +543,11 @@ if [[ ! -d "$SRC_BIN_DIR" ]]; then
 fi
 
 
-# Keep intermediates in a dedicated folder instead of a temp directory
+# Keep intermediates in a dedicated folder instead of a temp directory. Start
+# it empty: the *.wasm glob below would also pick up a previous run's
+# *.opt.wasm and post-process it twice (wasm-opt: signal_callback already exists).
 TMP_STAGE_DIR="$BUILD_ROOT/intermediates"
+rm -rf "$TMP_STAGE_DIR"
 mkdir -p "$TMP_STAGE_DIR"
 
 

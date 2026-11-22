@@ -1,4 +1,5 @@
 # GNU grep 3.12
+WASM_RUN_ARGS="--enable-fpcast"  # lind_run flags in --mode wasm, as in grep/run_tests.sh
 recipe_build() {
   autotools_touch
   mpk_configure --disable-nls --disable-perl-regexp

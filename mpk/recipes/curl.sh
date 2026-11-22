@@ -1,4 +1,5 @@
 # curl with static OpenSSL + zlib; same protocol set as compile_curl.sh plus file://
+WASM_RUN_ARGS="--preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so"  # lind_run flags in --mode wasm, as in curl/run_tests.sh
 DEPS=(zlib openssl)
 recipe_build() {
   autoreconf -fi

@@ -1,4 +1,5 @@
 # GNU make
+WASM_RUN_ARGS="--enable-fpcast"  # lind_run flags in --mode wasm, as in make/run_tests.sh
 RUNTIME_DEPS=(bash coreutils)
 recipe_build() {
   autotools_touch

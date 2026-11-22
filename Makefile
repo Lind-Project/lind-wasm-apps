@@ -14,7 +14,13 @@ export LIND_DYLINK
 # -------- Paths ---------------------------------------------------------------
 LIND_WASM_ROOT ?= $(HOME)/lind-wasm
 BASE_SYSROOT   ?= $(LIND_WASM_ROOT)/src/glibc/sysroot
-LLVM_BIN_DIR   ?= $(LIND_WASM_ROOT)/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin
+# LLVM 18 toolchain: the one bundled in lind-wasm if present, else the clang on
+# PATH (the dev images install it to /opt/clang/bin).
+LLVM_BIN_DIR   ?= $(firstword $(wildcard $(LIND_WASM_ROOT)/clang+llvm-*/bin) \
+                    $(patsubst %/,%,$(dir $(realpath $(shell command -v clang 2>/dev/null)))))
+# Library compile scripts (zlib, openssl, ...) read LLVM_BIN instead.
+LLVM_BIN       ?= $(LLVM_BIN_DIR)
+export LLVM_BIN
 
 APPS_ROOT      := $(CURDIR)
 APPS_BUILD     := $(APPS_ROOT)/build
@@ -54,9 +60,26 @@ APP            ?= $(TESTABLE_APPS)
 GRATE          ?=
 
 # -------- Phonies -------------------------------------------------------------
-.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 openblas clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install-openblas install install-base
+.PHONY: all base preflight dirs print-config check-build libtirpc gnulib zlib openssl libcxx merge-base-sysroot merge-sysroot lmbench bash nginx coreutils cpython git curl grep sed gcc binutils clang postgres tinycc diffutils awk gmake perl ed25519 openblas clean clean-all rebuild-libs rebuild-sysroot install-bash install-nginx install-git install-curl install-grep install-sed install-lmbench install-coreutils install-gcc install-binutils install-clang install-tinycc install-cpython install-postgres install-diffutils install-gnulib install-libtirpc install-openssl install-zlib install-libcxx install-awk install-gmake install-perl install-openblas install install-base experiments experiments-wasm experiments-mpk
 
 all: preflight libtirpc gnulib merge-sysroot lmbench bash
+
+# -------- WASM vs MPK experiments (mpk/assess.py, see mpk/README.md) ----------
+#   make experiments                         # every app except gcc/clang, both modes
+#   make experiments EXP_APPS="bash nginx"   # selected apps (merged into the reports)
+#   make experiments-wasm EXCLUDE=           # wasm only, including gcc/clang
+# Reports: mpk/results/{comparison.md,report.md,wasm/report.md}
+EXCLUDE      ?= gcc clang
+EXP_APPS     ?=
+ASSESS_ARGS  ?=
+ASSESS        = python3 '$(APPS_ROOT)/mpk/assess.py' --lind-wasm-root '$(LIND_WASM_ROOT)' $(EXP_APPS) $(if $(strip $(EXCLUDE)),--exclude $(EXCLUDE)) $(ASSESS_ARGS)
+
+experiments:
+	$(ASSESS) --mode both
+experiments-wasm:
+	$(ASSESS) --mode wasm
+experiments-mpk:
+	$(ASSESS) --mode mpk
 
 # -------- Base set: common UNIX userland tools --------------------------------
 base: bash coreutils perl gmake awk curl grep sed diffutils

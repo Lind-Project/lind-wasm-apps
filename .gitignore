@@ -1,3 +1,6 @@
 build/*
 postgres/config.cache.wasi
 __pycache__/
+# mpk/assess.py build/install logs: bulky and regenerated on every run
+mpk/results/**/build.log
+mpk/results/**/install.log

@@ -1,4 +1,5 @@
 # git (Makefile build) with static zlib; no curl/perl/python/gettext
+WASM_RUN_ARGS="--preload env=lib/libz.so --preload env=lib/libcrypto.so --preload env=lib/libssl.so"  # lind_run flags in --mode wasm, as in git/run_tests.sh
 DEPS=(zlib)
 RUNTIME_DEPS=(bash coreutils)
 recipe_build() {

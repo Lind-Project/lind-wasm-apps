@@ -1,6 +1,7 @@
 # CPython with all stdlib extension modules linked statically into the interpreter
 # (lindfs has no rewritten lib-dynload .so files). Optional third-party-backed
 # modules whose libraries are missing from lind (ssl, sqlite3, ctypes, ...) are off.
+WASM_RUN_ARGS="--enable-fpcast --preload env=lib/libz.so --preload env=lib/libpython3.14.so"  # lind_run flags in --mode wasm, as in cpython/run_tests.sh
 DEPS=(zlib)
 RUNTIME_DEPS=(bash coreutils)
 UPSTREAM_TESTS=0

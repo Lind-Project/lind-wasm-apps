@@ -1,4 +1,5 @@
 # GNU awk (gawk)
+WASM_RUN_ARGS="--enable-fpcast"  # lind_run flags in --mode wasm, as in awk/run_tests.sh
 recipe_build() {
   autotools_touch
   mpk_configure --disable-nls --disable-extensions --without-readline --without-mpfr

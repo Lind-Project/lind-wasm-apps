@@ -144,6 +144,22 @@ APP=git make check-build
 
 Apps with test suites: bash, coreutils, curl, git, grep, lmbench, sed, tinycc, cpython, openblas.
 
+## Experiments: WASM vs MPK
+
+`make experiments` builds every app except gcc and clang, runs it under lind both
+as WebAssembly and natively under lind's MPK backend, and writes a side-by-side report:
+
+```bash
+make experiments                        # all apps except gcc/clang, WASM + MPK
+make experiments EXP_APPS="sed nginx"   # only some apps
+make experiments-wasm                   # WASM only (or experiments-mpk)
+```
+
+The comparison is written to `mpk/results/comparison.md`. The per-mode reports
+(`mpk/results/wasm/report.md` and `mpk/results/report.md`) have per-app logs.
+Builds and MPK rewrites are cached, so a rerun only redoes what changed.
+See [mpk/README.md](mpk/README.md) for the details and prerequisites.
+
 ## Build System
 
 ### Directory Layout
@@ -180,6 +196,7 @@ make <app>            # build a specific app
 make install          # install all apps to lindfs
 make install-<app>    # install a specific app
 make test             # run test suites
+make experiments      # build + run all apps (except gcc/clang) under WASM and MPK
 make check-build      # verify build artifacts exist
 make clean            # clean build artifacts
 make rebuild-libs     # force-rebuild library stamps
@@ -191,7 +208,8 @@ make rebuild-sysroot  # force-rebuild merged sysroot
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LIND_WASM_ROOT` | `~/lind-wasm` | Path to lind-wasm installation |
-| `LIND_DYLINK` | `0` | Set to `1` for dynamic/PIE builds |
+| `LIND_DYLINK` | `1` | Set to `0` for static builds |
+| `LLVM_BIN_DIR` | auto | wasm32 clang/LLVM tools: lind-wasm's bundled `clang+llvm-*/bin`, else the directory of `clang` on `PATH` |
 | `JOBS` | `$(nproc)` | Parallel build jobs |
 | `ARTIFACT_MODE` | `full` | Set to `fast` to skip cwasm generation (dev builds) |
 | `FORCE_CLEAN` | `0` | Set to `1` to force full rebuild |

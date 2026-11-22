@@ -1,4 +1,5 @@
 # perl 5 with static extensions (no dynamic loading: lindfs has no rewritten XS .so files)
+WASM_RUN_ARGS="--enable-fpcast"  # lind_run flags in --mode wasm, as in perl/run_tests.sh
 RUNTIME_DEPS=(bash coreutils)
 recipe_build() {
   ./Configure -des -Dcc="$MPK_CC" -Dld="$MPK_CC" -Doptimize="$CFLAGS" \

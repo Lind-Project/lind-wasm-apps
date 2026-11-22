@@ -1,4 +1,5 @@
 # PostgreSQL server + client tools (no readline/icu/zlib/openssl)
+WASM_RUN_ARGS="--enable-fpcast"  # lind_run flags in --mode wasm, as in postgres/run_tests.sh
 RUNTIME_DEPS=(bash coreutils)
 NOTE="Client tools link libpq statically. Server-side extensions (plpgsql, dict_snowball, ...) are shared objects loaded with dlopen and are installed unrewritten."
 recipe_build() {
@@ -17,6 +18,7 @@ recipe_build() {
 }
 recipe_smoke() {
   local pg=/usr/local/pgsql/bin
+  [[ -e "$LINDFS$pg/postgres" ]] || pg=/bin  # `make install-postgres` (wasm) installs into /bin
   lindfs_rm "$LINDFS/tmp/mpk-pgdata"
   smoke postgres-version "PostgreSQL" -- $pg/postgres --version
   smoke psql-version "psql (PostgreSQL)" -- $pg/psql --version

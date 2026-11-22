@@ -1,5 +1,6 @@
 # GNU bash; same feature flags as compile_bash.sh
-RUNTIME_DEPS=(coreutils)
+WASM_RUN_ARGS="--enable-fpcast"  # lind_run flags in --mode wasm, as in bash/run_tests.sh
+RUNTIME_DEPS=(coreutils grep)  # bash/run_tests.sh needs grep
 recipe_build() {
   autotools_touch
   mpk_configure --without-bash-malloc --disable-nls --disable-profiling --disable-job-control

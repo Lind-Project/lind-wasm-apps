@@ -1,4 +1,5 @@
 # GNU coreutils (all programs, installed into /bin like the wasm build)
+WASM_RUN_ARGS="--enable-fpcast"  # lind_run flags in --mode wasm, as in coreutils/run_tests.sh
 recipe_build() {
   autotools_touch
   # This coreutils' gnulib predates glibc 2.28's libio cleanup; restore the

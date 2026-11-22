@@ -1,4 +1,5 @@
 # lmbench micro-benchmarks (the set in expected-binaries.txt), libtirpc for lat_rpc
+WASM_RUN_ARGS="--enable-fpcast"  # lind_run flags in --mode wasm, as in lmbench/run_tests.sh
 DEPS=(libtirpc)
 recipe_build() {
   cd src

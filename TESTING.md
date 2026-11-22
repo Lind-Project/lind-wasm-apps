@@ -191,9 +191,15 @@ make test APP=<app>
 - `git/run_tests.sh` — grate support (requirement 10): one `LIND_RUN` array with
   `GRATE_CMD` appended after the `--preload` flags.
 
-## lind-mpk (native MPK backend) compatibility
+## WASM vs lind-mpk (native MPK backend) experiments
 
-`mpk/` builds each app natively for lind-wasm's MPK backend (`lind_compile --mpk`),
-rewrites it with `gsfork-elf`, and runs smoke checks plus the app's unmodified
-`run_tests.sh` under `lind-boot`. Run `mpk/run-in-container.sh` to reproduce; results
-are in `mpk/results/report.md`. See [mpk/README.md](mpk/README.md).
+`mpk/assess.py` runs every app in two modes under `lind-boot`. In both modes it
+runs smoke checks plus the app's unmodified `run_tests.sh`:
+
+- **WASM**: the regular `make <app>` / `make install-<app>` build.
+- **MPK**: a native build for lind-wasm's MPK backend (`lind_compile --mpk`),
+  rewritten with `gsfork-elf`.
+
+`make experiments` runs both modes for every app except gcc and clang. Results
+are in `mpk/results/comparison.md`, `mpk/results/wasm/report.md` and
+`mpk/results/report.md`. See [mpk/README.md](mpk/README.md).
