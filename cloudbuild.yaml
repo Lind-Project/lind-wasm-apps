@@ -16,7 +16,6 @@ options:
   logging: CLOUD_LOGGING_ONLY
   # 32 GB of memory is needed: gcc's wasm-opt step is killed on E2_HIGHCPU_8 (8 GB).
   machineType: E2_HIGHCPU_32
-  # TODO: set from the first run. The first 100 GB is free.
   diskSizeGb: 200
   substitution_option: ALLOW_LOOSE
 
