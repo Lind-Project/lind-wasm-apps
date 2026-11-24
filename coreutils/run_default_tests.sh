@@ -11,20 +11,47 @@ fi
 
 LINDFS="$LIND_WASM_ROOT/lindfs"
 LINDFS_TESTS="$LINDFS/tests"
+TEST_TIMEOUT_SECONDS="${LIND_TEST_TIMEOUT_SECONDS:-60}"
+
+if ! [[ "$TEST_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: LIND_TEST_TIMEOUT_SECONDS must be a positive integer" >&2
+  exit 2
+fi
+
 rm -rf "$LINDFS_TESTS/tmp"
+
+# Coreutils' upstream tests refer to build-tree binaries under /src, while the
+# installed Lind filesystem keeps them under /bin. Preserve those references
+# with a guest-visible alias so shell and Perl tests resolve the same tools.
+if [[ ! -e "$LINDFS/src" && ! -L "$LINDFS/src" ]]; then
+  ln -s bin "$LINDFS/src"
+elif [[ "$(readlink "$LINDFS/src" 2>/dev/null || true)" != "bin" ]]; then
+  echo "ERROR: $LINDFS/src already exists and is not a symlink to bin" >&2
+  exit 1
+fi
 
 # Ensure temp directory exists in the sandbox
 mkdir -p "$LINDFS/tmp"
+
+# Perl test scripts use /bin/perl, while the runnable Perl interpreter is
+# staged under /usr/local/bin. The /bin/perl WASM build is not executable by
+# the Lind runner, so make both guest paths resolve to the same interpreter.
+if [[ -x "$LINDFS/usr/local/bin/perl" ]]; then
+  ln -sfn /usr/local/bin/perl "$LINDFS/bin/perl"
+fi
 
 cp -r $SCRIPT_DIR/tests $LINDFS
 
 # Path related fixes to test config files and test files to adapt to run within the lind-wasm ecosystem
 file="$LINDFS_TESTS/test-lib.sh"
+# Automake normally opens fd 9 for test logs. We invoke each script directly,
+# so open it in the guest test shell and leave temp-dir cleanup to the host.
+sed -i '2i exec 9>&1' "$file"
+sed -i 's|cd "$test_dir_" && chmod -R u+rwx "$t_" && rm -rf "$t_" && exit $__st|cd "$test_dir_" \&\& exit $__st|' "$file"
 sed -i 's|"$abs_top_builddir/src/mktemp"|bin/mktemp|g' "$file"
 sed -i 's|^test_dir_=\$(pwd)|test_dir_=/tmp|' "$LINDFS_TESTS/test-lib.sh"
 sed -i "s|my \$cwd = \$@ ? '\.' : Cwd::getcwd();|my \$cwd = '/tmp';|" "$LINDFS_TESTS/CuTmpdir.pm"
-cp $SCRIPT_DIR/tests/Coreutils.pm $SCRIPT_DIR/tests/Coreutils.pm.bkup
-cp $SCRIPT_DIR/patch_files/Coreutils.pm $SCRIPT_DIR/tests
+cp "$SCRIPT_DIR/patch_files/Coreutils.pm" "$LINDFS_TESTS/Coreutils.pm"
 find "$LINDFS_TESTS" -type f -executable ! -name "*.pm" ! -name "*.pl" -exec sed -i 's|\$abs_top_builddir/src/|/bin/|g' {} +
 
 # =========================================================
@@ -153,7 +180,7 @@ TOTAL_PASS=0; TOTAL_FAIL=0; TOTAL_SKIP=0
 for CURRENT_TEST in "${TESTS_TO_RUN[@]}"; do
     HOST_TEST_PATH="$LINDFS_TESTS/$CURRENT_TEST"
 
-    if grep -Fxq "$CURRENT_TEST" "$SKIP_FILE"; then
+    if [[ -f "$SKIP_FILE" ]] && grep -Fxq "$CURRENT_TEST" "$SKIP_FILE"; then
         echo "Test $CURRENT_TEST is in the skip list. Skipping..."
         continue
     fi
@@ -201,9 +228,13 @@ else
     echo "==================================================="
 
     set +e
-    "${CMD[@]}"
+    timeout --signal=TERM --kill-after=2s "${TEST_TIMEOUT_SECONDS}s" "${CMD[@]}"
     EXIT_CODE=$?
     set -e
+
+    # Tests share the Lind guest's /tmp. Remove leftovers as the host because
+    # some guest chmod operations depend on syscalls not available in Lind.
+    find "$LINDFS/tmp" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + 2>/dev/null || true
 
     echo "==================================================="
     if [[ "$EXIT_CODE" -eq 0 ]]; then
@@ -212,6 +243,9 @@ else
     elif [[ "$EXIT_CODE" -eq 77 ]]; then
         printf "Result: $SANDBOX_PATH [\033[33mSKIP\033[0m] (Exit 77)\n"
         ((TOTAL_SKIP++)) || true
+    elif [[ "$EXIT_CODE" -eq 124 ]]; then
+        printf "Result: [\033[31mFAIL\033[0m] (Timed out after %s seconds)\n" "$TEST_TIMEOUT_SECONDS"
+        ((TOTAL_FAIL++)) || true
     else
         printf "Result: [\033[31mFAIL\033[0m] (Exit %d)\n" "$EXIT_CODE"
         ((TOTAL_FAIL++)) || true
@@ -229,8 +263,6 @@ if [[ "$TARGET_TEST" == "--all" ]]; then
     echo "==================================================="
 fi
 
-# Restore Coreutils.pm
-cp $SCRIPT_DIR/tests/Coreutils.pm.bkup $SCRIPT_DIR/tests/Coreutils.pm
 if [[ "$TOTAL_FAIL" -gt 0 ]]; then
     exit 1
 else
